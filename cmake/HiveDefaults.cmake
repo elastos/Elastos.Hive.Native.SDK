@@ -20,7 +20,7 @@ endif()
 
 # Hive Version Defintions.
 set(HIVE_VERSION_MAJOR "5")
-set(HIVE_VERSION_MINOR "1")
+set(HIVE_VERSION_MINOR "2")
 execute_process(
     COMMAND git rev-parse master
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
@@ -59,7 +59,7 @@ else()
 endif()
 
 if(APPLE)
-    set(CMAKE_INSTALL_RPATH "@execuable_path/Frameworks;@loader_path/Frameworks")
+    set(CMAKE_INSTALL_RPATH "@execuable_path/Frameworks;@loader_path/Frameworks;@loader_path/../lib")
 else()
     set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 endif()
