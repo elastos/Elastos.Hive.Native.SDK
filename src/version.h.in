@@ -1,0 +1,8 @@
+#ifndef __HIVE_VERSION_H__
+#define __HIVE_VERSION_H__
+
+static const char *hive_version = "@HIVE_VERSION_MAJOR@"
+                                  "@HIVE_VERSION_MINOR@"
+                                  "@HIVE_VERSION_PATCH@";
+
+#endif
