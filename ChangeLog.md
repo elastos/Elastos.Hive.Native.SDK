@@ -1,5 +1,6 @@
-# Change Log
+2019/04/12 Tang zhilong stiartsly@gmail.com
 
-## [v0.1.0](https://github.com/vasild/cpp-ipfs-api) (2016-11-05)
+**Version 0.0.1.0**, main feature list:
 
-- No releases yet. The current version is 0.1.0. See [Semantic Versioning item 4](http://semver.org/#spec-item-4).
+- Standard ipfs/cluster APIs
+- Key-value APIs
