@@ -234,7 +234,7 @@ int hive_move(hive_t *hive, const char *old, const char *new);
  *      can be retrieved by calling hive_get_error().
  */
 HIVE_API
-int hive_copy(hive_t *hive, const char *src, const char *dest_path);
+int hive_copy(hive_t *hive, const char *src_path, const char *dest_path);
 
 /**
  * \~English
