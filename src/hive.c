@@ -1,6 +1,9 @@
 #include <pthread.h>
 #include <crystal.h>
 #include <curl/curl.h>
+#include <libgen.h>
+#include <stdbool.h>
+#include <sys/param.h>
 
 #include "hive.h"
 #include "hive_impl.h"
@@ -129,7 +132,21 @@ int hive_mkdir(hive_t *hive, const char *path)
 
 int hive_move(hive_t *hive, const char *old, const char *new);
 
-int hive_copy(hive_t *hive, const char *src, const char *dest_path);
+int hive_copy(hive_t *hive, const char *src_path, const char *dest_path)
+{
+    int rc;
+
+    if (!hive || !src_path || !dest_path || src_path[0] != '/' ||
+        dest_path[0] == '\0' || strlen(src_path) > MAXPATHLEN ||
+        strlen(dest_path) > MAXPATHLEN || !strcmp(src_path, dest_path))
+        return -1;
+
+    ref(hive);
+    rc = hive->copy(hive, src_path, dest_path);
+    deref(hive);
+
+    return rc;
+}
 
 int hive_delete(hive_t *hive, const char *path);
 
