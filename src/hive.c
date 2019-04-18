@@ -60,6 +60,14 @@ hive_t *hive_new(const hive_opt_t *opt)
 {
     if (!opt || opt->type < 0 || opt->type >= HIVE_TYPE_NONEXIST)
         return NULL;
+
+    pthread_mutex_lock(&lock);
+    if (state != HIVE_MODULE_STATE_INITIALIZED) {
+        pthread_mutex_unlock(&lock);
+        return NULL;
+    }
+    pthread_mutex_unlock(&lock);
+
     return hive_new_recipes[opt->type](opt);
 }
 
