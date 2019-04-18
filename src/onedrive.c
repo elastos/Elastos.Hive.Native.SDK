@@ -49,31 +49,6 @@ static int hive_1drv_authorize(hive_t *hive)
     return oauth_cli_authorize(onedrv->oauth);
 }
 
-static void list_configure_req(http_client_t *cli, void *args)
-{
-    char *url = (char *)(((void **)args)[0]);
-    char *resp_body = (char *)(((void **)args)[1]);
-    size_t *resp_body_len = (size_t *)(((void **)args)[2]);
-
-    http_client_set_url_escape(cli, url);
-    http_client_set_method(cli, HTTP_METHOD_GET);
-    http_client_set_response_body_instant(cli, resp_body, *resp_body_len);
-}
-
-static void mkdir_configure_req(http_client_t *cli, void *args)
-{
-    char *url = (char *)(((void **)args)[0]);
-    char *req_body = (char *)(((void **)args)[1]);
-    char *resp_body = (char *)(((void **)args)[2]);
-    size_t *resp_body_len = (size_t *)(((void **)args)[3]);
-
-    http_client_set_url_escape(cli, url);
-    http_client_set_method(cli, HTTP_METHOD_POST);
-    http_client_set_request_body_instant(cli, req_body, strlen(req_body));
-    http_client_set_header(cli, "Content-Type", "application/json");
-    http_client_set_response_body_instant(cli, resp_body, *resp_body_len);
-}
-
 static int hive_1drv_list(hive_t *hive, const char *path, char **result)
 {
 #define RESP_BODY_MAX_SZ 16384
@@ -85,12 +60,12 @@ static int hive_1drv_list(hive_t *hive, const char *path, char **result)
     size_t resp_body_len = sizeof(resp_body);
     int resp_code;
     cJSON *resp_part, *next_link, *resp, *val_part, *elem, *val;
-    http_client_t *cli;
+    http_client_t *http_cli;
 
     if (!strcmp(path, "/"))
         rc = snprintf(url, sizeof(url), "%s/drive/root/children", ONEDRV_ROOT);
     else {
-        http_client_t *http_cli = http_client_init();
+        http_cli = http_client_init();
         if (!http_cli)
             return -1;
         path_esc = http_client_escape(http_cli, path, strlen(path));
@@ -113,20 +88,29 @@ static int hive_1drv_list(hive_t *hive, const char *path, char **result)
     }
 
     while (true) {
-        void *args[] = {url, resp_body, &resp_body_len};
-        cli = oauth_cli_perform_tsx(onedrv->oauth, list_configure_req, args);
-        if (!cli) {
+        http_cli = http_client_init();
+        if (!http_cli) {
             cJSON_Delete(resp);
             return -1;
         }
 
-        resp_code = http_client_get_response_code(cli);
+        http_client_set_url_escape(http_cli, url);
+        http_client_set_method(http_cli, HTTP_METHOD_GET);
+        http_client_set_response_body_instant(http_cli, resp_body, resp_body_len);
+
+        rc = oauth_cli_perform_tsx(onedrv->oauth, http_cli);
+        if (rc) {
+            cJSON_Delete(resp);
+            return -1;
+        }
+
+        resp_code = http_client_get_response_code(http_cli);
         if (resp_code != 200) {
             cJSON_Delete(resp);
             return -1;
         }
 
-        resp_body_len = http_client_get_response_body_length(cli);
+        resp_body_len = http_client_get_response_body_length(http_cli);
         if (resp_body_len == sizeof(resp_body)) {
             cJSON_Delete(resp);
             return -1;
@@ -165,6 +149,7 @@ static int hive_1drv_list(hive_t *hive, const char *path, char **result)
                 cJSON_Delete(resp_part);
                 return -1;
             }
+            resp_body_len = sizeof(resp_body);
             cJSON_Delete(resp_part);
             continue;
         }
@@ -190,13 +175,13 @@ static int hive_1drv_mkdir(hive_t *hive, const char *path)
     char *req_body_str;
     char *dir;
     char *dir_esc;
-    http_client_t *cli;
+    http_client_t *http_cli;
 
     dir = dirname((char *)path);
     if (!strcmp(dir, "/"))
         rc = snprintf(url, sizeof(url), "%s/drive/root/children", ONEDRV_ROOT);
     else {
-        http_client_t *http_cli = http_client_init();
+        http_cli = http_client_init();
         if (!http_cli)
             return -1;
         dir_esc = http_client_escape(http_cli, dir, strlen(dir));
@@ -232,17 +217,26 @@ static int hive_1drv_mkdir(hive_t *hive, const char *path)
     if (!req_body_str)
         return -1;
 
-    void *args[] = {url, req_body_str, resp_body, &resp_body_len};
-    cli = oauth_cli_perform_tsx(onedrv->oauth, mkdir_configure_req, args);
-    free(req_body_str);
-    if (!cli)
+    http_cli = http_client_init();
+    if (!http_cli)
         return -1;
 
-    resp_code = http_client_get_response_code(cli);
+    http_client_set_url_escape(http_cli, url);
+    http_client_set_method(http_cli, HTTP_METHOD_POST);
+    http_client_set_request_body_instant(http_cli, req_body_str, strlen(req_body_str));
+    http_client_set_header(http_cli, "Content-Type", "application/json");
+    http_client_set_response_body_instant(http_cli, resp_body, resp_body_len);
+
+    rc = oauth_cli_perform_tsx(onedrv->oauth, http_cli);
+    free(req_body_str);
+    if (rc)
+        return -1;
+
+    resp_code = http_client_get_response_code(http_cli);
     if (resp_code != 201)
         return -1;
 
-    resp_body_len = http_client_get_response_body_length(cli);
+    resp_body_len = http_client_get_response_body_length(http_cli);
     if (resp_body_len == sizeof(resp_body))
         return -1;
     resp_body[resp_body_len] = '\0';

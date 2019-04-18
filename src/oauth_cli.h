@@ -23,7 +23,6 @@ typedef struct oauth_client oauth_cli_t;
 oauth_cli_t *oauth_cli_new(oauth_opt_t *opt);
 void oauth_cli_delete(oauth_cli_t *cli);
 int oauth_cli_authorize(oauth_cli_t *cli);
-http_client_t *oauth_cli_perform_tsx(oauth_cli_t *cli,
-    void (*configure_req)(http_client_t *, void *), void *user_data);
+int oauth_cli_perform_tsx(oauth_cli_t *cli, http_client_t *http_cli);
 
 #endif // __OAUTH_CLI_H__

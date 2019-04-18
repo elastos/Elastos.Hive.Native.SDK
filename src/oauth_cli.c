@@ -760,25 +760,23 @@ int oauth_cli_authorize(oauth_cli_t *cli)
     return 0;
 }
 
-http_client_t *oauth_cli_perform_tsx(oauth_cli_t *cli,
-    void (*configure_req)(http_client_t *, void *), void *user_data)
+int oauth_cli_perform_tsx(oauth_cli_t *cli, http_client_t *http_cli)
 {
     char auth_hdr[2048];
     int rc;
     long resp_code;
-    http_client_t *http_cli;
 
     pthread_mutex_lock(&cli->lock);
     if (cli->state < OAUTH_CLI_STATE_AUTHORIZED || cli->state > OAUTH_CLI_STATE_REFRESHING) {
         pthread_mutex_unlock(&cli->lock);
-        return NULL;
+        return -1;
     }
 retry:
     while (cli->state == OAUTH_CLI_STATE_INSTANT_REFRESH || cli->state == OAUTH_CLI_STATE_REFRESHING)
         pthread_cond_wait(&cli->cond, &cli->lock);
     if (cli->state >= OAUTH_CLI_STATE_STOPPED) {
         pthread_mutex_unlock(&cli->lock);
-        return NULL;
+        return -1;
     }
     assert(cli->state == OAUTH_CLI_STATE_AUTHORIZED);
 
@@ -786,24 +784,19 @@ retry:
         cli->svr_resp.token_type, cli->svr_resp.access_token);
     if (rc >= sizeof(auth_hdr)) {
         pthread_mutex_unlock(&cli->lock);
-        return NULL;
+        return -1;
     }
     pthread_mutex_unlock(&cli->lock);
 
-    http_cli = http_client_init();
-    if (!http_cli)
-        return NULL;
-
-    configure_req(http_cli, user_data);
     http_client_set_header(http_cli, "Authorization", auth_hdr);
 
     rc = http_client_request(http_cli);
     if (rc)
-        return NULL;
+        return -1;
 
     resp_code = http_client_get_response_code(http_cli);
     if (resp_code < 0)
-        return NULL;
+        return -1;
     else if (resp_code == 401) {
         pthread_mutex_lock(&cli->lock);
         if (cli->state == OAUTH_CLI_STATE_AUTHORIZED) {
@@ -811,11 +804,11 @@ retry:
             pthread_cond_broadcast(&cli->cond);
         } else if (cli->state >= OAUTH_CLI_STATE_STOPPED) {
             pthread_mutex_unlock(&cli->lock);
-            return NULL;
+            return -1;
         }
         assert(cli->state == OAUTH_CLI_STATE_INSTANT_REFRESH || cli->state == OAUTH_CLI_STATE_REFRESHING);
         goto retry;
     }
 
-    return http_cli;
+    return 0;
 }
