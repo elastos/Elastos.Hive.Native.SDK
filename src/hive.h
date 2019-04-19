@@ -160,7 +160,7 @@ int hive_stat(hive_t *hive, const char *path, char **result);
  *      can be retrieved by calling hive_get_error().
  */
 HIVE_API
-int hive_set_timestamp(hive_t *hive, const char *path, const struct timeval);
+int hive_set_timestamp(hive_t *hive, const char *path, const struct timeval timestamp);
 
 /**
  * \~English

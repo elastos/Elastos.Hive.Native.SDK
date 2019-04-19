@@ -98,9 +98,21 @@ void hive_kill(hive_t *hive)
 
 void hive_free_json(char *json);
 
-int hive_stat(hive_t *hive, const char *path, char **result);
+int hive_stat(hive_t *hive, const char *path, char **result)
+{
+    int rc;
 
-int hive_set_timestamp(hive_t *hive, const char *path, const struct timeval);
+    if (!hive || !path || !result || path[0] != '/')
+        return -1;
+
+    ref(hive);
+    rc = hive->stat(hive, path, result);
+    deref(hive);
+
+    return rc;
+}
+
+int hive_set_timestamp(hive_t *hive, const char *path, const struct timeval timestamp);
 
 int hive_list(hive_t *hive, const char *path, char **result)
 {
@@ -130,7 +142,21 @@ int hive_mkdir(hive_t *hive, const char *path)
     return rc;
 }
 
-int hive_move(hive_t *hive, const char *old, const char *new);
+int hive_move(hive_t *hive, const char *old, const char *new)
+{
+    int rc;
+
+    if (!hive || !old || !new || old[0] != '/' ||
+        new[0] == '\0' || strlen(old) > MAXPATHLEN ||
+        strlen(new) > MAXPATHLEN || !strcmp(old, new))
+        return -1;
+
+    ref(hive);
+    rc = hive->move(hive, old, new);
+    deref(hive);
+
+    return rc;
+}
 
 int hive_copy(hive_t *hive, const char *src_path, const char *dest_path)
 {
