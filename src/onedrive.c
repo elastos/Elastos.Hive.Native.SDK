@@ -20,6 +20,7 @@ struct hive_onedrive {
 #define mkdir     base.mkdir
 #define list      base.list
 #define copy      base.copy
+#define delete    base.delete
 
 #define ONEDRV_ROOT "https://graph.microsoft.com/v1.0/me"
 
@@ -49,6 +50,44 @@ static int hive_1drv_authorize(hive_t *hive)
     hive_1drv_t *onedrv = (hive_1drv_t *)hive;
 
     return oauth_cli_authorize(onedrv->oauth);
+}
+
+static int hive_1drv_delete(hive_t *hive, const char *path)
+{
+    hive_1drv_t *onedrv = (hive_1drv_t *)hive;
+    char url[MAXPATHLEN + 1];
+    int rc;
+    long resp_code;
+    http_client_t *http_cli;
+    char *path_esc;
+
+    http_cli = http_client_new();
+    if (!http_cli)
+        return -1;
+    path_esc = http_client_escape(http_cli, path, strlen(path));
+    if (!path_esc)
+        return -1;
+    rc = snprintf(url, sizeof(url), "%s/drive/root:%s:", ONEDRV_ROOT, path_esc);
+    http_client_memory_free(path_esc);
+    if (rc >= sizeof(url))
+        return -1;
+
+    http_cli = http_client_new();
+    if (!http_cli)
+        return -1;
+
+    http_client_set_url_escape(http_cli, url);
+    http_client_set_method(http_cli, HTTP_METHOD_DELETE);
+
+    rc = oauth_cli_perform_tsx(onedrv->oauth, http_cli);
+    if (rc)
+        return -1;
+
+    rc = http_client_get_response_code(http_cli, &resp_code);
+    if (rc < 0 || resp_code != 204)
+        return -1;
+
+    return 0;
 }
 
 static int hive_1drv_copy(hive_t *hive, const char *src_path, const char *dest_path)
@@ -384,6 +423,7 @@ hive_t *hive_1drv_new(const hive_opt_t *base_opt)
     onedrv->mkdir     = hive_1drv_mkdir;
     onedrv->list      = hive_1drv_list;
     onedrv->copy      = hive_1drv_copy;
+    onedrv->delete    = hive_1drv_delete;
 
     return (hive_t *)onedrv;
 }
