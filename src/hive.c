@@ -148,7 +148,19 @@ int hive_copy(hive_t *hive, const char *src_path, const char *dest_path)
     return rc;
 }
 
-int hive_delete(hive_t *hive, const char *path);
+int hive_delete(hive_t *hive, const char *path)
+{
+    int rc;
+
+    if (!hive || !path || path[0] != '/' || path[1] == '\0')
+        return -1;
+
+    ref(hive);
+    rc = hive->delete(hive, path);
+    deref(hive);
+
+    return rc;
+}
 
 int hive_async_stat(hive_t *hive, const char *path,
     hive_resp_cbs_t *callbacks, void *context);
