@@ -280,6 +280,9 @@ int http_client_set_method(http_client_t *client, http_method_t method)
     case HTTP_METHOD_DELETE:
         code = curl_easy_setopt(client->curl, CURLOPT_CUSTOMREQUEST, "DELETE");
         break;
+    case HTTP_METHOD_PATCH:
+        curl_easy_setopt(client->curl, CURLOPT_CUSTOMREQUEST, "PATCH");
+        break;
     default:
         assert(0);
         break;

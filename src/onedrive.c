@@ -21,6 +21,8 @@ struct hive_onedrive {
 #define list      base.list
 #define copy      base.copy
 #define delete    base.delete
+#define move      base.move
+#define stat      base.stat
 
 #define ONEDRV_ROOT "https://graph.microsoft.com/v1.0/me"
 
@@ -50,6 +52,171 @@ static int hive_1drv_authorize(hive_t *hive)
     hive_1drv_t *onedrv = (hive_1drv_t *)hive;
 
     return oauth_cli_authorize(onedrv->oauth);
+}
+
+static int hive_1drv_stat(hive_t *hive, const char *path, char **result)
+{
+#define RESP_BODY_MAX_SZ 16384
+    hive_1drv_t *onedrv = (hive_1drv_t *)hive;
+    char url[MAXPATHLEN + 1];
+    int rc;
+    char *path_esc;
+    char resp_body[RESP_BODY_MAX_SZ];
+    size_t resp_body_len = sizeof(resp_body);
+    long resp_code;
+    http_client_t *http_cli;
+
+    if (!strcmp(path, "/"))
+        rc = snprintf(url, sizeof(url), "%s/drive/root", ONEDRV_ROOT);
+    else {
+        http_cli = http_client_new();
+        if (!http_cli)
+            return -1;
+        path_esc = http_client_escape(http_cli, path, strlen(path));
+        if (!path_esc)
+            return -1;
+        rc = snprintf(url, sizeof(url), "%s/drive/root:%s:", ONEDRV_ROOT, path_esc);
+        http_client_memory_free(path_esc);
+    }
+    if (rc >= sizeof(url))
+        return -1;
+
+    http_cli = http_client_new();
+    if (!http_cli)
+        return -1;
+
+    http_client_set_url_escape(http_cli, url);
+    http_client_set_method(http_cli, HTTP_METHOD_GET);
+    http_client_set_response_body_instant(http_cli, resp_body, resp_body_len);
+
+    rc = oauth_cli_perform_tsx(onedrv->oauth, http_cli);
+    if (rc)
+        return -1;
+
+    rc = http_client_get_response_code(http_cli, &resp_code);
+    if (rc < 0 || resp_code != 200)
+        return -1;
+
+    resp_body_len = http_client_get_response_body_length(http_cli);
+    if (resp_body_len == sizeof(resp_body))
+        return -1;
+    resp_body[resp_body_len] = '\0';
+
+    *result = malloc(resp_body_len + 1);
+    if (!*result)
+        return -1;
+
+    memcpy(*result, resp_body, resp_body_len + 1);
+    return 0;
+
+#undef RESP_BODY_MAX_SZ
+}
+
+static int hive_1drv_move(hive_t *hive, const char *old, const char *new)
+{
+#define is_dir(str) ((str)[strlen(str) - 1] == '/' || (str)[strlen(str) - 1] == '.')
+    hive_1drv_t *onedrv = (hive_1drv_t *) hive;
+    char url[MAXPATHLEN + 1];
+    int rc;
+    http_client_t *http_cli;
+    char *old_esc;
+    cJSON *req_body, *parent_ref;
+    char src_dir[MAXPATHLEN + 1];
+    char src_base[MAXPATHLEN + 1];
+    const char *dst_dir;
+    const char *dst_base;
+    bool dir_eq = false, base_eq = false;
+    char *req_body_str;
+    long resp_code;
+
+    strcpy(src_dir, dirname((char *)old));
+    strcpy(src_base, basename((char *)old));
+    dst_dir = is_dir(new) ? new : dirname((char *)new);
+    dst_base = is_dir(new) ? src_base : basename((char *)new);
+
+    if (!strcmp(src_dir, dst_dir) || !strcmp(dst_dir, ".") || !strcmp(dst_dir, "./"))
+        dir_eq = true;
+    if (!strcmp(src_base, dst_base))
+        base_eq = true;
+    if (dir_eq && base_eq)
+        return -1;
+
+    if (!strcmp(old, "/"))
+        rc = snprintf(url, sizeof(url), "%s/drive/root", ONEDRV_ROOT);
+    else {
+        http_cli = http_client_new();
+        if (!http_cli)
+            return -1;
+        old_esc = http_client_escape(http_cli, old, strlen(old));
+        if (!old_esc)
+            return -1;
+        rc = snprintf(url, sizeof(url), "%s/drive/root:%s:", ONEDRV_ROOT, old_esc);
+        http_client_memory_free(old_esc);
+    }
+    if (rc >= sizeof(url))
+        return -1;
+
+    req_body = cJSON_CreateObject();
+    if (!req_body)
+        return -1;
+
+    if (!dir_eq) {
+        char parent_dir[MAXPATHLEN + 1];
+
+        if (new[0] == '/')
+            rc = snprintf(parent_dir, sizeof(parent_dir), "/drive/root:%s", dst_dir);
+        else
+            rc = snprintf(parent_dir, sizeof(parent_dir), "/drive/root:%s/%s",
+                          !strcmp(src_dir, "/") ? "" : src_dir, dst_dir);
+        if (rc >= sizeof(parent_dir)) {
+            cJSON_Delete(req_body);
+            return -1;
+        }
+        if (parent_dir[strlen(parent_dir) - 1] == '/')
+            parent_dir[strlen(parent_dir) - 1] = '\0';
+        parent_ref = cJSON_AddObjectToObject(req_body, "parentReference");
+        if (!parent_ref) {
+            cJSON_Delete(req_body);
+            return -1;
+        }
+        if (!cJSON_AddStringToObject(parent_ref, "path", parent_dir)) {
+            cJSON_Delete(req_body);
+            return -1;
+        }
+    }
+
+    if (!base_eq) {
+        if (!cJSON_AddStringToObject(req_body, "name", dst_base)) {
+            cJSON_Delete(req_body);
+            return -1;
+        }
+    }
+
+    req_body_str = cJSON_Print(req_body);
+    cJSON_Delete(req_body);
+    if (!req_body_str)
+        return -1;
+
+    http_cli = http_client_new();
+    if (!http_cli)
+        return -1;
+
+    http_client_set_url_escape(http_cli, url);
+    http_client_set_method(http_cli, HTTP_METHOD_PATCH);
+    http_client_set_header(http_cli, "Content-Type", "application/json");
+    http_client_set_request_body_instant(http_cli, req_body_str, strlen(req_body_str));
+
+    rc = oauth_cli_perform_tsx(onedrv->oauth, http_cli);
+    free(req_body_str);
+    if (rc)
+        return -1;
+
+    rc = http_client_get_response_code(http_cli, &resp_code);
+    if (rc < 0 || resp_code != 200)
+        return -1;
+
+    return 0;
+#undef is_dir
 }
 
 static int hive_1drv_delete(hive_t *hive, const char *path)
@@ -424,6 +591,8 @@ hive_t *hive_1drv_new(const hive_opt_t *base_opt)
     onedrv->list      = hive_1drv_list;
     onedrv->copy      = hive_1drv_copy;
     onedrv->delete    = hive_1drv_delete;
+    onedrv->move      = hive_1drv_move;
+    onedrv->stat      = hive_1drv_stat;
 
     return (hive_t *)onedrv;
 }
