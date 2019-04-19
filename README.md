@@ -1,9 +1,11 @@
+[![Build Status](https://travis-ci.org/elastos/Elastos.NET.Hive.Native.SDK.svg)](https://travis-ci.org/elastos/Elastos.NET.Hive.Native.SDK)
+
 ## Thinking of Hive Sotorage APIs
 
 ### 1. API version
 - version
 
-### 2. Standard methods 
+### 2. Standard methods
 - Stat ( including timestamp)
 - SetTimeStamp
 - List
@@ -15,13 +17,13 @@
 - Write (Put)
 
 ### 3. Synchronization of Contents (exclusive)
-- Sync 
+- Sync
 
 ### 4. Sharing resources (exclusive)
 - Lock
 - Unlock
-  
-### 5. Retrival 
+
+### 5. Retrival
 - Search
 
 ### 6. Content Versioning (Not this version)
@@ -43,13 +45,13 @@
 - write —  Upload or replace the content of drive-item
 
 ### 2. WebDAV
-- stat — PROPFIND 
+- stat — PROPFIND
 - settimestamp — PROPATCH
 - list — PROPFIND
 - mkdir  — MKCOL
 - move — MOVE
 - copy — COPY
-- delete — (Http Method/DELETE /resource path) 
+- delete — (Http Method/DELETE /resource path)
 - read (Http Method/GET/resource path)
 - write (Http Method/POST/resource path)
 
@@ -60,7 +62,7 @@
 - mkdir — /api/v0/files/mkdir
 - move — /api/v0/files/mv
 - copy — /api/v0/files/cp
-- delete — /api/v0/files/rm 
+- delete — /api/v0/files/rm
 - read — /api/v0/files/read
 - write — /api/v0/files/write
 
