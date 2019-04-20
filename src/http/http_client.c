@@ -236,6 +236,9 @@ http_client_t *http_client_new(void)
     curl_easy_setopt(client->curl, CURLOPT_NOSIGNAL, 1L);
     curl_easy_setopt(client->curl, CURLOPT_SHARE, curl_share);
     curl_easy_setopt(client->curl, CURLOPT_CURLU, client->url);
+#if defined(_WIN32) || defined(_WIN64)
+    curl_easy_setopt(client->curl, CURLOPT_SSL_VERIFYPEER, 0);
+#endif
 
     pthread_setspecific(http_client_key, client);
 
@@ -471,7 +474,7 @@ size_t http_response_body_write_callback(char *ptr, size_t size, size_t nmemb,
     if (response->unused < length)
         return (size_t)-1;
 
-    memcpy(response->data + response->used, ptr, length);
+    memcpy((char *)response->data + response->used, ptr, length);
     response->unused -= length;
     response->used += length;
 
