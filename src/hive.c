@@ -3,7 +3,9 @@
 #include <curl/curl.h>
 #include <libgen.h>
 #include <stdbool.h>
+#ifdef HAVE_SYS_PARAM_H
 #include <sys/param.h>
+#endif
 
 #include "hive.h"
 #include "hive_impl.h"
@@ -136,7 +138,7 @@ int hive_mkdir(hive_t *hive, const char *path)
         return -1;
 
     ref(hive);
-    rc = hive->mkdir(hive, path);
+    rc = hive->makedir(hive, path);
     deref(hive);
 
     return rc;

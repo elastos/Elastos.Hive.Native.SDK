@@ -19,6 +19,11 @@ if(HAVE_SYS_TIME_H)
     add_definitions(-DHAVE_SYS_TIME_H=1)
 endif()
 
+check_include_file(sys/param.h HAVE_SYS_PARAM_H)
+if(HAVE_SYS_PARAM_H)
+    add_definitions(-DHAVE_SYS_PARAM_H=1)
+endif()
+
 configure_file(
     version.h.in
     version.h
