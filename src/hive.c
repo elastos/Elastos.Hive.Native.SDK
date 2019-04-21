@@ -5,7 +5,7 @@
 #include "hive.h"
 #include "hive_impl.h"
 #include "onedrive.h"
-#include "http_cli.h"
+#include "http_client.h"
 
 
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
@@ -22,7 +22,7 @@ void hive_global_cleanup()
         return;
     }
 
-    http_client_global_cleanup();
+    http_client_cleanup();
 
     state = HIVE_MODULE_STATE_UNINITIALIZED;
     pthread_mutex_unlock(&lock);
@@ -36,7 +36,7 @@ hive_err_t hive_global_init()
         return 0;
     }
 
-    if (http_client_global_init()) {
+    if (http_client_init()) {
         hive_global_cleanup();
         return -1;
     }
