@@ -317,7 +317,6 @@ int http_client_get_url(http_client_t *client, char **url)
 
     assert(client);
     assert(url);
-    assert(*url);
 
     code = curl_url_get(client->url, CURLUPART_URL, url, 0);
     if (code != CURLUE_OK)  {
