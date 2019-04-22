@@ -58,7 +58,7 @@ typedef size_t (*http_client_request_body_callback_t)(char *buffer, size_t size,
                                                       void *userdata);
 
 int http_client_set_request_body_instant(http_client_t *client,
-                                        void *data, size_t len);
+                                         void *data, size_t len);
 
 int http_client_set_request_body(http_client_t *client,
                                  http_client_request_body_callback_t *callback,
