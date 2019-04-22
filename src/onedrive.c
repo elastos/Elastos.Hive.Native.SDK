@@ -7,7 +7,7 @@
 #include <sys/param.h>
 
 #include "oauth_cli.h"
-#include "http_cli.h"
+#include "http_client.h"
 #include "hive_impl.h"
 #include "onedrive.h"
 
@@ -58,14 +58,14 @@ static int hive_1drv_list(hive_t *hive, const char *path, char **result)
     char *path_esc;
     char resp_body[RESP_BODY_MAX_SZ];
     size_t resp_body_len = sizeof(resp_body);
-    int resp_code;
+    long resp_code;
     cJSON *resp_part, *next_link, *resp, *val_part, *elem, *val;
     http_client_t *http_cli;
 
     if (!strcmp(path, "/"))
         rc = snprintf(url, sizeof(url), "%s/drive/root/children", ONEDRV_ROOT);
     else {
-        http_cli = http_client_init();
+        http_cli = http_client_new();
         if (!http_cli)
             return -1;
         path_esc = http_client_escape(http_cli, path, strlen(path));
@@ -88,7 +88,7 @@ static int hive_1drv_list(hive_t *hive, const char *path, char **result)
     }
 
     while (true) {
-        http_cli = http_client_init();
+        http_cli = http_client_new();
         if (!http_cli) {
             cJSON_Delete(resp);
             return -1;
@@ -104,8 +104,8 @@ static int hive_1drv_list(hive_t *hive, const char *path, char **result)
             return -1;
         }
 
-        resp_code = http_client_get_response_code(http_cli);
-        if (resp_code != 200) {
+        rc = http_client_get_response_code(http_cli, &resp_code);
+        if (rc < 0 && resp_code != 200) {
             cJSON_Delete(resp);
             return -1;
         }
@@ -181,7 +181,7 @@ static int hive_1drv_mkdir(hive_t *hive, const char *path)
     if (!strcmp(dir, "/"))
         rc = snprintf(url, sizeof(url), "%s/drive/root/children", ONEDRV_ROOT);
     else {
-        http_cli = http_client_init();
+        http_cli = http_client_new();
         if (!http_cli)
             return -1;
         dir_esc = http_client_escape(http_cli, dir, strlen(dir));
@@ -217,7 +217,7 @@ static int hive_1drv_mkdir(hive_t *hive, const char *path)
     if (!req_body_str)
         return -1;
 
-    http_cli = http_client_init();
+    http_cli = http_client_new();
     if (!http_cli)
         return -1;
 
@@ -232,8 +232,8 @@ static int hive_1drv_mkdir(hive_t *hive, const char *path)
     if (rc)
         return -1;
 
-    resp_code = http_client_get_response_code(http_cli);
-    if (resp_code != 201)
+    rc = http_client_get_response_code(http_cli, &resp_code);
+    if (rc < 0 && resp_code != 201)
         return -1;
 
     resp_body_len = http_client_get_response_body_length(http_cli);

@@ -19,7 +19,7 @@
 #include <errno.h>
 #include <cjson/cJSON.h>
 
-#include "http_cli.h"
+#include "http_client.h"
 #include "oauth_cli.h"
 #include "sandbird.h"
 
@@ -180,7 +180,7 @@ static int perform_token_tsx(oauth_cli_t *cli, char *req_body, void *resp_body, 
     long resp_code;
     int rc;
 
-    http_cli = http_client_init();
+    http_cli = http_client_new();
     if (!http_cli)
         return -1;
 
@@ -193,8 +193,8 @@ static int perform_token_tsx(oauth_cli_t *cli, char *req_body, void *resp_body, 
     if (rc)
         return -1;
 
-    resp_code = http_client_get_response_code(http_cli);
-    if (resp_code != 200)
+    rc = http_client_get_response_code(http_cli, &resp_code);
+    if (rc < 0 && resp_code != 200)
         return -1;
 
     *resp_body_len = http_client_get_response_body_length(http_cli);
@@ -304,7 +304,7 @@ static int refresh_token(oauth_cli_t *cli)
     if (rc < 0 || rc >= sizeof(redirect_url_raw))
         return -1;
 
-    http_cli = http_client_init();
+    http_cli = http_client_new();
     if (!http_cli)
         return -1;
 
@@ -531,7 +531,7 @@ static int get_auth_code(oauth_cli_t *cli)
     char buf[512];
     bool finish = false;
 
-    http_cli = http_client_init();
+    http_cli = http_client_new();
     if (!http_cli)
         return -1;
 
@@ -596,7 +596,7 @@ static int redeem_access_token(oauth_cli_t *cli)
     if (rc < 0 || rc >= sizeof(redirect_url_raw))
         return -1;
 
-    http_cli = http_client_init();
+    http_cli = http_client_new();
     if (!http_cli)
         return -1;
 
@@ -794,9 +794,10 @@ retry:
     if (rc)
         return -1;
 
-    resp_code = http_client_get_response_code(http_cli);
-    if (resp_code < 0)
+    rc = http_client_get_response_code(http_cli, &resp_code);
+    if (rc < 0)
         return -1;
+
     else if (resp_code == 401) {
         pthread_mutex_lock(&cli->lock);
         if (cli->state == OAUTH_CLI_STATE_AUTHORIZED) {
