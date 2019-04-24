@@ -4,6 +4,8 @@
 #include <pthread.h>
 
 #include <curl/curl.h>
+#include <crystal.h>
+
 #include "http_client.h"
 
 static CURLSH *curl_share = NULL;
@@ -148,15 +150,15 @@ int http_client_init()
     int rc;
 
     code = curl_global_init(CURL_GLOBAL_ALL);
-    if (rc != CURLE_OK) {
-        //vlogE("HttpClient: Initialize global curl error (%d)", code);
-        return __curlcode_to_error(rc);
+    if (code != CURLE_OK) {
+        vlogE("HttpClient: Initialize global curl error (%d)", code);
+        return __curlcode_to_error(code);
     }
 
     code = CURLE_OUT_OF_MEMORY;
     curl_share = curl_share_init();
     if (!curl_share) {
-        //vlogE("HttpClient: Initialize curl share error.");
+        vlogE("HttpClient: Initialize curl share error.");
         http_client_cleanup();
         return __curlcode_to_error(code);
     }
@@ -184,25 +186,43 @@ void http_client_cleanup(void)
     curl_share_cleanup(curl_share);
 }
 
+static void http_client_destroy(void *ptr)
+{
+    http_client_t *client = (http_client_t *)ptr;
+
+    assert(client);
+
+    if (client->curl)
+        curl_easy_cleanup(client->curl);
+    if (client->url)
+        curl_url_cleanup(client->url);
+    if (client->hdr)
+        curl_slist_free_all(client->hdr);
+}
+
 http_client_t *http_client_new(void)
 {
     http_client_t *client;
 
     client = (http_client_t *)pthread_getspecific(http_client_key);
     if (!client) {
-        client = (http_client_t *)calloc(1, sizeof(http_client_t));
-        if (!client)
+        client = (http_client_t *)rc_zalloc(sizeof(http_client_t), http_client_destroy);
+        if (!client) {
+            // hive_set_error();
             return NULL;
+        }
 
         client->url = curl_url();
         if (!client->url) {
-            http_client_close(client);
+        // hive_set_error(); out of memory.
+            deref(client);
             return NULL;
         }
 
         client->curl = curl_easy_init();
         if (!client->curl) {
-            http_client_close(client);
+        // hive_set_error(); out of memory.
+            deref(client);
             return NULL;
         }
     } else {
@@ -224,17 +244,8 @@ http_client_t *http_client_new(void)
 
 void http_client_close(http_client_t *client)
 {
-    if (!client)
-        return;
-
-    if (client->curl)
-        curl_easy_cleanup(client->curl);
-    if (client->url)
-        curl_url_cleanup(client->url);
-    if (client->hdr)
-        curl_slist_free_all(client->hdr);
-
-    free(client);
+    if (client)
+        deref(client);
 }
 
 void http_client_reset(http_client_t *client)
@@ -287,7 +298,7 @@ int http_client_set_url(http_client_t *client, const char *url)
 
     code = curl_url_set(client->url, CURLUPART_URL, url, CURLU_URLENCODE);
     if (code != CURLUE_OK) {
-        //vlogE("HttpClient: Set url %s error (%d)", curl, code);
+        vlogE("HttpClient: Set url %s error (%d)", url, code);
         return __curlucode_to_error(code);
     }
 
@@ -304,7 +315,7 @@ int http_client_set_url_escape(http_client_t *client, const char *url)
 
     code = curl_url_set(client->url, CURLUPART_URL, url, 0);
     if (code != CURLUE_OK) {
-        //vlogE("HttpClient: Escape url %s error (%d)", curl, code);
+        vlogE("HttpClient: Escape url %s error (%d)", url, code);
         return __curlucode_to_error(code);
     }
 
@@ -320,7 +331,7 @@ int http_client_get_url(http_client_t *client, char **url)
 
     code = curl_url_get(client->url, CURLUPART_URL, url, 0);
     if (code != CURLUE_OK)  {
-        //vlogE("HttpClient: Get url from curl error (%d)", code);
+        vlogE("HttpClient: Get url from curl error (%d)", code);
         return  __curlucode_to_error(code);
     }
 
@@ -453,7 +464,6 @@ size_t http_response_body_write_callback(char *ptr, size_t size, size_t nmemb,
 {
     http_response_body_t *response = (http_response_body_t *)userdata;
     size_t length = size * nmemb;
-    int rc;
 
     if (response->unused < length)
         return (size_t)-1;
@@ -513,7 +523,7 @@ int http_client_request(http_client_t *client)
 
     code = curl_easy_perform(client->curl);
     if (code != CURLE_OK) {
-        //vlogE("HttpClient: Perform http request error (%d)", code);
+        vlogE("HttpClient: Perform http request error (%d)", code);
         return __curlcode_to_error(code);
     }
 
