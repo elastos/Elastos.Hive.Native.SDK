@@ -150,9 +150,9 @@ int http_client_init()
     int rc;
 
     code = curl_global_init(CURL_GLOBAL_ALL);
-    if (rc != CURLE_OK) {
+    if (code != CURLE_OK) {
         vlogE("HttpClient: Initialize global curl error (%d)", code);
-        return __curlcode_to_error(rc);
+        return __curlcode_to_error(code);
     }
 
     code = CURLE_OUT_OF_MEMORY;
@@ -206,9 +206,6 @@ http_client_t *http_client_new(void)
 
     client = (http_client_t *)pthread_getspecific(http_client_key);
     if (!client) {
-        CURL *curl;
-        CURLU *url;
-
         client = (http_client_t *)rc_zalloc(sizeof(http_client_t), http_client_destroy);
         if (!client) {
             // hive_set_error();
@@ -222,8 +219,8 @@ http_client_t *http_client_new(void)
             return NULL;
         }
 
-        client->url = curl_url();
-        if (!client->url) {
+        client->curl = curl_easy_init();
+        if (!client->curl) {
         // hive_set_error(); out of memory.
             deref(client);
             return NULL;
@@ -467,7 +464,6 @@ size_t http_response_body_write_callback(char *ptr, size_t size, size_t nmemb,
 {
     http_response_body_t *response = (http_response_body_t *)userdata;
     size_t length = size * nmemb;
-    int rc;
 
     if (response->unused < length)
         return (size_t)-1;
