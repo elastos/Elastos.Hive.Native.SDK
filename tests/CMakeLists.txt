@@ -1,11 +1,18 @@
-project(test C)
+project(hive-test C)
 
 include(HiveDefaults)
 include(CheckIncludeFile)
 include(CheckFunctionExists)
 
 set(SRC
-    onedrv_auth.c)
+    tests.c
+    hive-new-test.c
+    hive-authorize-test.c
+    hive-mkdir-test.c
+    hive-no-file-test.c
+    hive-file-test.c
+    hive-asynctest.c
+    )
 
 if(ENABLE_SHARED)
     add_definitions(-DCRYSTAL_DYNAMIC)
@@ -19,7 +26,8 @@ set(LIBS
 
 set(DEPS
     ela-hive
-    libcrystal)
+    libcrystal
+    CUnit)
 
 if(WIN32)
     add_definitions(-DWIN32_LEAN_AND_MEAN
@@ -30,12 +38,14 @@ if(WIN32)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /utf-8")
     set(LIBS
         ${LIBS}
+        libcunit
         pthread
         Ws2_32
         Shlwapi)
 else()
     set(LIBS
         ${LIBS}
+        cunit
         pthread)
 endif()
 
@@ -48,8 +58,12 @@ link_directories(
     ${HIVE_INT_DIST_DIR}/lib
     ${CMAKE_CURRENT_BINARY_DIR}/../src)
 
-add_executable(test
+add_executable(hivetest
     ${SRC})
 
-add_dependencies(test ${DEPS})
-target_link_libraries(test ${LIBS})
+add_dependencies(hivetest ${DEPS})
+target_link_libraries(hivetest ${LIBS})
+install(TARGETS hivetest
+    RUNTIME DESTINATION "bin"
+    ARCHIVE DESTINATION "lib"
+    LIBRARY DESTINATION "lib")
