@@ -28,7 +28,7 @@ set(SRC
     hive.c
     oauth_cli.c
     onedrive.c
-    sandbird.c
+    sandbird/sandbird.c
     http/http_client.c)
 
 set(HEADERS
@@ -44,6 +44,7 @@ include_directories(
     BEFORE
     .
     http
+    sandbird
     ${CMAKE_CURRENT_BINARY_DIR}
     ${HIVE_INT_DIST_DIR}/include)
 
