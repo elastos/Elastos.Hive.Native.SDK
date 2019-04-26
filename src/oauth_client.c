@@ -18,6 +18,9 @@
 #include <stdbool.h>
 #include <errno.h>
 #include <cjson/cJSON.h>
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
 
 #include "http_client.h"
 #include "oauth_client.h"

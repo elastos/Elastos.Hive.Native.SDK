@@ -9,6 +9,16 @@ if(HAVE_UNISTD_H)
     add_definitions(-DHAVE_UNISTD_H=1)
 endif()
 
+check_include_file(malloc.h HAVE_MALLOC_H)
+if(HAVE_MALLOC_H)
+    add_definitions(-DHAVE_MALLOC_H=1)
+endif()
+
+check_include_file(libgen.h HAVE_LIBGEN_H)
+if(HAVE_LIBGEN_H)
+    add_definitions(-DHAVE_LIBGEN_H=1)
+endif()
+
 check_include_file(io.h HAVE_IO_H)
 if(HAVE_IO_H)
     add_definitions(-DHAVE_IO_H=1)

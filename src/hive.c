@@ -1,7 +1,9 @@
 #include <pthread.h>
 #include <crystal.h>
 #include <curl/curl.h>
+#ifdef HAVE_LIBGEN_H
 #include <libgen.h>
+#endif
 #include <stdbool.h>
 #ifdef HAVE_SYS_PARAM_H
 #include <sys/param.h>

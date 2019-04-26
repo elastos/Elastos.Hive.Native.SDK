@@ -2,7 +2,9 @@
 #include <errno.h>
 #include <crystal.h>
 #include <stdio.h>
+#ifdef HAVE_LIBGEN_H
 #include <libgen.h>
+#endif
 #include <cjson/cJSON.h>
 #ifdef HAVE_SYS_PARAM_H
 #include <sys/param.h>
