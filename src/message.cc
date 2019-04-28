@@ -261,9 +261,7 @@ bool DStore::add_value(const std::string& key,
   }
 
   needPublish = true;
-  publish();
-
-  return true;
+  return publish();
 }
 
 bool DStore::remove_values(const std::string& key) {
@@ -292,9 +290,7 @@ bool DStore::remove_values(const std::string& key) {
   }
 
   needPublish = true;
-  publish();
-
-  return true;
+  return publish();
 }
 
 bool DStore::set_sender_UID(std::string& uid) {
@@ -342,7 +338,7 @@ bool DStore::set_sender_UID(std::string& uid) {
     }
     return false;
   }
-  
+
   bool messagesPath = false;
   for (ipfs::Json::iterator it = result["Entries"].begin();
        it != result["Entries"].end(); ++it) {
