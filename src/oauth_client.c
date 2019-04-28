@@ -20,7 +20,7 @@
 #include <cjson/cJSON.h>
 
 #include "http_client.h"
-#include "oauth_cli.h"
+#include "oauth_client.h"
 #include "sandbird.h"
 
 typedef struct server_response {
@@ -34,20 +34,18 @@ typedef struct server_response {
 
 typedef struct oauth_client {
     enum {
-        OAUTH_CLI_STATE_UNAUTHORIZED,
-        OAUTH_CLI_STATE_AUTHORIZING,
-        OAUTH_CLI_STATE_AUTHORIZED,
-        OAUTH_CLI_STATE_INSTANT_REFRESH,
-        OAUTH_CLI_STATE_REFRESHING,
-        OAUTH_CLI_STATE_STOPPED,
-        OAUTH_CLI_STATE_FAILED,
-        OAUTH_CLI_STATE_CLEANUP
+        OAUTH_CLIENT_STATE_UNAUTHORIZED,
+        OAUTH_CLIENT_STATE_AUTHORIZING,
+        OAUTH_CLIENT_STATE_AUTHORIZED,
+        OAUTH_CLIENT_STATE_REFRESHING,
+        OAUTH_CLIENT_STATE_STOPPED,
+        OAUTH_CLIENT_STATE_FAILED
     } state;
     oauth_opt_t     opt;
     svr_resp_t      svr_resp;
     pthread_mutex_t lock;
     pthread_cond_t  cond;
-} oauth_cli_t;
+} oauth_client_t;
 
 #define reset_svr_resp(resp) do { \
         if ((resp)->auth_code) free((resp)->auth_code); \
@@ -57,7 +55,7 @@ typedef struct oauth_client {
         if ((resp)->refresh_token) free((resp)->refresh_token); \
     } while (0)
 
-static char *encode_profile(oauth_cli_t *cli)
+static char *encode_profile(oauth_client_t *cli)
 {
     cJSON *json = NULL;
     cJSON *auth_code;
@@ -110,7 +108,7 @@ end:
     return json_str;
 }
 
-static void save_profile(oauth_cli_t *cli)
+static void save_profile(oauth_client_t *cli)
 {
     char *json_str = NULL;
     int fd;
@@ -174,7 +172,7 @@ static void save_profile(oauth_cli_t *cli)
     }
 }
 
-static int perform_token_tsx(oauth_cli_t *cli, char *req_body, void *resp_body, size_t *resp_body_len)
+static int perform_token_tsx(oauth_client_t *cli, char *req_body, void *resp_body, size_t *resp_body_len)
 {
     http_client_t *http_cli;
     long resp_code;
@@ -201,7 +199,7 @@ static int perform_token_tsx(oauth_cli_t *cli, char *req_body, void *resp_body, 
     return 0;
 }
 
-static int decode_access_token_resp(oauth_cli_t *cli, const char *json_str, bool load_profile)
+static int decode_access_token_resp(oauth_client_t *cli, const char *json_str, bool load_profile)
 {
     cJSON *json;
     cJSON *auth_code;
@@ -284,7 +282,7 @@ succeed:
     return rc;
 }
 
-static int refresh_token(oauth_cli_t *cli)
+static int refresh_token(oauth_client_t *cli)
 {
 #define REQ_BODY_MAX_SZ 2048
 #define RESP_BODY_MAX_SZ 2048
@@ -367,58 +365,7 @@ static int refresh_token(oauth_cli_t *cli)
 #undef RESP_BODY_MAX_SZ
 }
 
-static void *refresh_token_routine(void *arg)
-{
-    oauth_cli_t *cli = (oauth_cli_t *)arg;
-    int rc;
-    struct timespec next_refresh;
-
-    pthread_mutex_lock(&cli->lock);
-    while (cli->state < OAUTH_CLI_STATE_AUTHORIZED)
-        pthread_cond_wait(&cli->cond, &cli->lock);
-    if (cli->state >= OAUTH_CLI_STATE_STOPPED)
-        goto cleanup;
-
-schedule_refresh:
-    rc = 0;
-    next_refresh.tv_sec = cli->svr_resp.expires_at.tv_sec;
-    next_refresh.tv_nsec = cli->svr_resp.expires_at.tv_usec * 1000;
-
-    while (cli->state == OAUTH_CLI_STATE_AUTHORIZED && rc != ETIMEDOUT)
-        rc = pthread_cond_timedwait(&cli->cond, &cli->lock, &next_refresh);
-    if (cli->state >= OAUTH_CLI_STATE_STOPPED)
-        goto cleanup;
-    assert(cli->state == OAUTH_CLI_STATE_AUTHORIZED || cli->state == OAUTH_CLI_STATE_INSTANT_REFRESH);
-
-    cli->state = OAUTH_CLI_STATE_REFRESHING;
-    pthread_mutex_unlock(&cli->lock);
-
-    rc = refresh_token(cli);
-
-    pthread_mutex_lock(&cli->lock);
-    if (cli->state != OAUTH_CLI_STATE_REFRESHING) {
-        assert(cli->state >= OAUTH_CLI_STATE_STOPPED);
-        goto cleanup;
-    } else if (rc) {
-        cli->state = OAUTH_CLI_STATE_FAILED;
-        goto cleanup;
-    }
-    cli->state = OAUTH_CLI_STATE_AUTHORIZED;
-    pthread_cond_broadcast(&cli->cond);
-    save_profile(cli);
-    goto schedule_refresh;
-
-cleanup:
-    while (cli->state != OAUTH_CLI_STATE_CLEANUP)
-        pthread_cond_wait(&cli->cond, &cli->lock);
-    pthread_mutex_unlock(&cli->lock);
-    reset_svr_resp(&cli->svr_resp);
-    pthread_mutex_destroy(&cli->lock);
-    pthread_cond_destroy(&cli->cond);
-    return NULL;
-}
-
-static int load_profile(oauth_cli_t *cli)
+static int load_profile(oauth_client_t *cli)
 {
     struct stat sbuf;
     int fd;
@@ -474,7 +421,7 @@ static int load_profile(oauth_cli_t *cli)
 static int handle_auth_redirect(sb_Event *e)
 {
     bool *finish = (bool *)(((void **)e->udata)[1]);
-    oauth_cli_t *cli = (oauth_cli_t *)(((void **)e->udata)[0]);
+    oauth_client_t *cli = (oauth_client_t *)(((void **)e->udata)[0]);
     char code[128];
     int rc;
 
@@ -484,7 +431,7 @@ static int handle_auth_redirect(sb_Event *e)
         return SB_RES_OK;
     }
 
-    if (strncmp(e->path, cli->opt.redirect_path, strlen(cli->opt.redirect_path)))
+    if (strcmp(e->path, cli->opt.redirect_path))
         return SB_RES_OK;
 
     rc = sb_get_var(e->stream, "code", code, sizeof(code));
@@ -502,34 +449,24 @@ static int handle_auth_redirect(sb_Event *e)
 
 static void *open_auth_url(void *args)
 {
-    http_client_t *http_cli = (http_client_t *)(((void **)args)[0]);
-    int *res = (int *)(((void **)args)[1]);
-    oauth_cli_t *cli = (oauth_cli_t *)(((void **)args)[2]);
-    char *url;
-    int rc;
-
-    rc = http_client_get_url(http_cli, &url);
-    if (rc) {
-        *res = -1;
-        return NULL;
-    }
-    *res = 0;
+    oauth_client_t *cli = (oauth_client_t *)(((void **)args)[0]);
+    char *url = (char *)(((void **)args)[1]);
 
     cli->opt.open_url(url);
 
-    http_client_memory_free(url);
     return NULL;
 }
 
-static int get_auth_code(oauth_cli_t *cli)
+static int get_auth_code(oauth_client_t *cli)
 {
     sb_Options opt;
     sb_Server *server;
     pthread_t tid;
-    int rc, trc = 1;
+    int rc;
     http_client_t *http_cli;
     char buf[512];
     bool finish = false;
+    char *url;
 
     http_cli = http_client_new();
     if (!http_cli)
@@ -556,16 +493,16 @@ static int get_auth_code(oauth_cli_t *cli)
     if (!server)
         return -1;
 
-    void *args2[] = {http_cli, &trc, cli};
-    rc = pthread_create(&tid, NULL, open_auth_url, args2);
+    rc = http_client_get_url(http_cli, &url);
     if (rc) {
         sb_close_server(server);
         return -1;
     }
-    pthread_detach(tid);
 
-    while (trc == 1) ;
-    if (trc) {
+    void *args2[] = {cli, url};
+    rc = pthread_create(&tid, NULL, open_auth_url, args2);
+    if (rc) {
+        http_client_memory_free(url);
         sb_close_server(server);
         return -1;
     }
@@ -573,10 +510,12 @@ static int get_auth_code(oauth_cli_t *cli)
     while (!finish)
         sb_poll_server(server, 300000);
     sb_close_server(server);
+    pthread_join(tid, NULL);
+    http_client_memory_free(url);
     return cli->svr_resp.auth_code ? 0 : -1;
 }
 
-static int redeem_access_token(oauth_cli_t *cli)
+static int redeem_access_token(oauth_client_t *cli)
 {
 #define REQ_BODY_MAX_SZ 512
 #define RESP_BODY_MAX_SZ 2048
@@ -659,163 +598,203 @@ static int redeem_access_token(oauth_cli_t *cli)
 #undef RESP_BODY_MAX_SZ
 }
 
-oauth_cli_t *oauth_cli_new(oauth_opt_t *opt)
+static void oauth_client_destructor(void *arg)
 {
-    oauth_cli_t *cli;
-    int rc;
-    pthread_t worker_tid;
+    oauth_client_t *cli = (oauth_client_t *)arg;
 
-    cli = (oauth_cli_t *)calloc(1, sizeof(oauth_cli_t));
+    reset_svr_resp(&cli->svr_resp);
+    pthread_mutex_destroy(&cli->lock);
+    pthread_cond_destroy(&cli->cond);
+}
+
+oauth_client_t *oauth_client_new(oauth_opt_t *opt)
+{
+    oauth_client_t *cli;
+    int rc;
+
+    cli = (oauth_client_t *)rc_zalloc(sizeof(oauth_client_t), oauth_client_destructor);
     if (!cli)
         return NULL;
 
-    rc = pthread_mutex_init(&cli->lock, NULL);
-    if (rc) {
-        free(cli);
-        return NULL;
-    }
-
-    rc = pthread_cond_init(&cli->cond, NULL);
-    if (rc) {
-        pthread_mutex_destroy(&cli->lock);
-        free(cli);
-        return NULL;
-    }
+    pthread_mutex_init(&cli->lock, NULL);
+    pthread_cond_init(&cli->cond, NULL);
 
     cli->opt = *opt;
     if (!access(opt->profile_path, F_OK)) {
         rc = load_profile(cli);
         if (rc) {
-            pthread_mutex_destroy(&cli->lock);
-            pthread_cond_destroy(&cli->cond);
-            free(cli);
+            deref(cli);
             return NULL;
         }
-        cli->state = OAUTH_CLI_STATE_AUTHORIZED;
+        cli->state = OAUTH_CLIENT_STATE_AUTHORIZED;
     }
-
-    rc = pthread_create(&worker_tid, NULL, refresh_token_routine, cli);
-    if (rc) {
-        pthread_mutex_destroy(&cli->lock);
-        pthread_cond_destroy(&cli->cond);
-        free(cli);
-        return NULL;
-    }
-    pthread_detach(worker_tid);
 
     return cli;
 }
 
-void oauth_cli_delete(oauth_cli_t *cli)
+void oauth_client_delete(oauth_client_t *cli)
 {
     pthread_mutex_lock(&cli->lock);
-    if (cli->state == OAUTH_CLI_STATE_CLEANUP)
-        return;
-    cli->state = OAUTH_CLI_STATE_CLEANUP;
+    if (cli->state < OAUTH_CLIENT_STATE_STOPPED) {
+        cli->state = OAUTH_CLIENT_STATE_STOPPED;
+        pthread_cond_broadcast(&cli->cond);
+    }
     pthread_mutex_unlock(&cli->lock);
-    pthread_cond_signal(&cli->cond);
+    deref(cli);
 }
 
-int oauth_cli_authorize(oauth_cli_t *cli)
+int oauth_client_authorize(oauth_client_t *cli)
 {
     int rc;
 
     pthread_mutex_lock(&cli->lock);
-    if (cli->state >= OAUTH_CLI_STATE_AUTHORIZED &&
-        cli->state <= OAUTH_CLI_STATE_REFRESHING) {
+    if (cli->state > OAUTH_CLIENT_STATE_REFRESHING) {
+        pthread_mutex_unlock(&cli->lock);
+        return -1;
+    }
+
+    if (cli->state == OAUTH_CLIENT_STATE_AUTHORIZED) {
         pthread_mutex_unlock(&cli->lock);
         return 0;
     }
 
-    if (cli->state != OAUTH_CLI_STATE_UNAUTHORIZED) {
+    if (cli->state == OAUTH_CLIENT_STATE_AUTHORIZING ||
+        cli->state == OAUTH_CLIENT_STATE_REFRESHING) {
+        while (cli->state == OAUTH_CLIENT_STATE_AUTHORIZING ||
+            cli->state == OAUTH_CLIENT_STATE_REFRESHING)
+            pthread_cond_wait(&cli->cond, &cli->lock);
+        rc = cli->state == OAUTH_CLIENT_STATE_AUTHORIZED ? 0 : -1;
         pthread_mutex_unlock(&cli->lock);
-        return -1;
+        return rc;
     }
-    cli->state = OAUTH_CLI_STATE_AUTHORIZING;
+
+    cli->state = OAUTH_CLIENT_STATE_AUTHORIZING;
     pthread_mutex_unlock(&cli->lock);
 
     rc = get_auth_code(cli);
     pthread_mutex_lock(&cli->lock);
-    if (cli->state != OAUTH_CLI_STATE_AUTHORIZING) {
+    if (cli->state != OAUTH_CLIENT_STATE_AUTHORIZING) {
         pthread_mutex_unlock(&cli->lock);
         return -1;
     } else if (rc) {
-        cli->state = OAUTH_CLI_STATE_FAILED;
+        cli->state = OAUTH_CLIENT_STATE_FAILED;
         pthread_mutex_unlock(&cli->lock);
+        pthread_cond_broadcast(&cli->cond);
         return -1;
     }
     pthread_mutex_unlock(&cli->lock);
 
     rc = redeem_access_token(cli);
     pthread_mutex_lock(&cli->lock);
-    if (cli->state != OAUTH_CLI_STATE_AUTHORIZING) {
+    if (cli->state != OAUTH_CLIENT_STATE_AUTHORIZING) {
         pthread_mutex_unlock(&cli->lock);
         return -1;
     } else if (rc) {
-        cli->state = OAUTH_CLI_STATE_FAILED;
+        cli->state = OAUTH_CLIENT_STATE_FAILED;
         pthread_mutex_unlock(&cli->lock);
+        pthread_cond_broadcast(&cli->cond);
         return -1;
     }
 
-    cli->state = OAUTH_CLI_STATE_AUTHORIZED;
+    cli->state = OAUTH_CLIENT_STATE_AUTHORIZED;
     save_profile(cli);
-
     pthread_mutex_unlock(&cli->lock);
-    pthread_cond_signal(&cli->cond);
+    pthread_cond_broadcast(&cli->cond);
 
     return 0;
 }
 
-int oauth_cli_perform_tsx(oauth_cli_t *cli, http_client_t *http_cli)
+int oauth_client_get_access_token(oauth_client_t *cli, char **token)
 {
-    char auth_hdr[2048];
     int rc;
-    long resp_code;
+    struct timeval now;
 
     pthread_mutex_lock(&cli->lock);
-    if (cli->state < OAUTH_CLI_STATE_AUTHORIZED || cli->state > OAUTH_CLI_STATE_REFRESHING) {
+    if (cli->state < OAUTH_CLIENT_STATE_AUTHORIZED ||
+        cli->state > OAUTH_CLIENT_STATE_REFRESHING) {
         pthread_mutex_unlock(&cli->lock);
         return -1;
     }
-retry:
-    while (cli->state == OAUTH_CLI_STATE_INSTANT_REFRESH || cli->state == OAUTH_CLI_STATE_REFRESHING)
-        pthread_cond_wait(&cli->cond, &cli->lock);
-    if (cli->state >= OAUTH_CLI_STATE_STOPPED) {
-        pthread_mutex_unlock(&cli->lock);
-        return -1;
-    }
-    assert(cli->state == OAUTH_CLI_STATE_AUTHORIZED);
 
-    rc = snprintf(auth_hdr, sizeof(auth_hdr), "%s %s",
-        cli->svr_resp.token_type, cli->svr_resp.access_token);
-    if (rc < 0 || rc >= sizeof(auth_hdr)) {
-        pthread_mutex_unlock(&cli->lock);
-        return -1;
-    }
-    pthread_mutex_unlock(&cli->lock);
-
-    http_client_set_header(http_cli, "Authorization", auth_hdr);
-
-    rc = http_client_request(http_cli);
-    if (rc)
-        return -1;
-
-    rc = http_client_get_response_code(http_cli, &resp_code);
-    if (rc < 0)
-        return -1;
-
-    else if (resp_code == 401) {
-        pthread_mutex_lock(&cli->lock);
-        if (cli->state == OAUTH_CLI_STATE_AUTHORIZED) {
-            cli->state = OAUTH_CLI_STATE_INSTANT_REFRESH;
-            pthread_cond_broadcast(&cli->cond);
-        } else if (cli->state >= OAUTH_CLI_STATE_STOPPED) {
+    if (cli->state == OAUTH_CLIENT_STATE_AUTHORIZED) {
+        rc = gettimeofday(&now, NULL);
+        if (rc) {
             pthread_mutex_unlock(&cli->lock);
             return -1;
         }
-        assert(cli->state == OAUTH_CLI_STATE_INSTANT_REFRESH || cli->state == OAUTH_CLI_STATE_REFRESHING);
-        goto retry;
+
+        if (now.tv_sec >= cli->svr_resp.expires_at.tv_sec) {
+            cli->state = OAUTH_CLIENT_STATE_REFRESHING;
+            pthread_mutex_unlock(&cli->lock);
+
+            rc = refresh_token(cli);
+
+            pthread_mutex_lock(&cli->lock);
+            pthread_cond_broadcast(&cli->cond);
+            if (rc) {
+                cli->state = OAUTH_CLIENT_STATE_FAILED;
+                pthread_mutex_unlock(&cli->lock);
+                return -1;
+            }
+            cli->state = OAUTH_CLIENT_STATE_AUTHORIZED;
+            save_profile(cli);
+        }
+    } else {
+        while (cli->state == OAUTH_CLIENT_STATE_REFRESHING)
+            pthread_cond_wait(&cli->cond, &cli->lock);
+        if (cli->state >= OAUTH_CLIENT_STATE_STOPPED) {
+            pthread_mutex_unlock(&cli->lock);
+            return -1;
+        }
+    }
+    assert(cli->state == OAUTH_CLIENT_STATE_AUTHORIZED);
+
+    *token = malloc(strlen(cli->svr_resp.token_type) +
+        strlen(cli->svr_resp.access_token) + 2);
+    sprintf(*token, "%s %s", cli->svr_resp.token_type, cli->svr_resp.access_token);
+    pthread_mutex_unlock(&cli->lock);
+
+    return *token ? 0 : -1;
+}
+
+int oauth_client_refresh_access_token(oauth_client_t *cli, char **token)
+{
+    int rc;
+
+    pthread_mutex_lock(&cli->lock);
+    if (cli->state < OAUTH_CLIENT_STATE_AUTHORIZED ||
+        cli->state > OAUTH_CLIENT_STATE_REFRESHING) {
+        pthread_mutex_unlock(&cli->lock);
+        return -1;
     }
 
-    return 0;
+    if (cli->state == OAUTH_CLIENT_STATE_REFRESHING) {
+        while (cli->state == OAUTH_CLIENT_STATE_REFRESHING)
+            pthread_cond_wait(&cli->cond, &cli->lock);
+        rc = cli->state == OAUTH_CLIENT_STATE_AUTHORIZED ? 0 : -1;
+        pthread_mutex_unlock(&cli->lock);
+        return rc;
+    }
+
+    cli->state = OAUTH_CLIENT_STATE_REFRESHING;
+    pthread_mutex_unlock(&cli->lock);
+
+    rc = refresh_token(cli);
+
+    pthread_mutex_lock(&cli->lock);
+    pthread_cond_broadcast(&cli->cond);
+    if (rc) {
+        cli->state = OAUTH_CLIENT_STATE_FAILED;
+        pthread_mutex_unlock(&cli->lock);
+        return -1;
+    }
+
+    cli->state = OAUTH_CLIENT_STATE_AUTHORIZED;
+    save_profile(cli);
+    *token = malloc(strlen(cli->svr_resp.token_type) +
+                    strlen(cli->svr_resp.access_token) + 2);
+    sprintf(*token, "%s %s", cli->svr_resp.token_type, cli->svr_resp.access_token);
+    pthread_mutex_unlock(&cli->lock);
+
+    return *token ? 0 : -1;
 }
