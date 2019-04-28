@@ -9,14 +9,14 @@
 #endif
 #include <string.h>
 
-#include "oauth_cli.h"
+#include "oauth_client.h"
 #include "http_client.h"
 #include "hive_impl.h"
 #include "onedrive.h"
 
 struct hive_onedrive {
     hive_t base;
-    oauth_cli_t *oauth;
+    oauth_client_t *oauth;
 };
 #define authorize base.authorize
 #define makedir   base.makedir
@@ -46,14 +46,14 @@ static void hive_1drv_destroy(void *hive)
     if (!onedrv->oauth)
         return;
 
-    oauth_cli_delete(onedrv->oauth);
+    oauth_client_delete(onedrv->oauth);
 }
 
 static int hive_1drv_authorize(hive_t *hive)
 {
     hive_1drv_t *onedrv = (hive_1drv_t *)hive;
 
-    return oauth_cli_authorize(onedrv->oauth);
+    return oauth_client_authorize(onedrv->oauth);
 }
 
 static int hive_1drv_stat(hive_t *hive, const char *path, char **result)
@@ -67,6 +67,7 @@ static int hive_1drv_stat(hive_t *hive, const char *path, char **result)
     size_t resp_body_len = sizeof(resp_body);
     long resp_code;
     http_client_t *http_cli;
+    char *access_token;
 
     if (!strcmp(path, "/"))
         rc = snprintf(url, sizeof(url), "%s/drive/root", ONEDRV_ROOT);
@@ -83,21 +84,37 @@ static int hive_1drv_stat(hive_t *hive, const char *path, char **result)
     if (rc < 0 || rc >= sizeof(url))
         return -1;
 
-    http_cli = http_client_new();
-    if (!http_cli)
+    rc = oauth_client_get_access_token(onedrv->oauth, &access_token);
+    if (rc)
         return -1;
+
+retry:
+    http_cli = http_client_new();
+    if (!http_cli) {
+        free(access_token);
+        return -1;
+    }
 
     http_client_set_url_escape(http_cli, url);
     http_client_set_method(http_cli, HTTP_METHOD_GET);
+    http_client_set_header(http_cli, "Authorization", access_token);
     http_client_set_response_body_instant(http_cli, resp_body, resp_body_len);
+    free(access_token);
 
-    rc = oauth_cli_perform_tsx(onedrv->oauth, http_cli);
+    rc = http_client_request(http_cli);
     if (rc)
         return -1;
 
     rc = http_client_get_response_code(http_cli, &resp_code);
-    if (rc < 0 || resp_code != 200)
+    if (rc < 0 || (resp_code != 200 && resp_code != 401))
         return -1;
+
+    if (resp_code == 401) {
+        rc = oauth_client_refresh_access_token(onedrv->oauth, &access_token);
+        if (rc)
+            return -1;
+        goto retry;
+    }
 
     resp_body_len = http_client_get_response_body_length(http_cli);
     if (resp_body_len == sizeof(resp_body))
@@ -130,6 +147,7 @@ static int hive_1drv_move(hive_t *hive, const char *old, const char *new)
     bool dir_eq = false, base_eq = false;
     char *req_body_str;
     long resp_code;
+    char *access_token;
 
     strcpy(src_dir, dirname((char *)old));
     strcpy(src_base, basename((char *)old));
@@ -199,24 +217,49 @@ static int hive_1drv_move(hive_t *hive, const char *old, const char *new)
     if (!req_body_str)
         return -1;
 
-    http_cli = http_client_new();
-    if (!http_cli)
+    rc = oauth_client_get_access_token(onedrv->oauth, &access_token);
+    if (rc) {
+        free(req_body_str);
         return -1;
+    }
+
+retry:
+    http_cli = http_client_new();
+    if (!http_cli) {
+        free(req_body_str);
+        free(access_token);
+        return -1;
+    }
 
     http_client_set_url_escape(http_cli, url);
     http_client_set_method(http_cli, HTTP_METHOD_PATCH);
     http_client_set_header(http_cli, "Content-Type", "application/json");
+    http_client_set_header(http_cli, "Authorization", access_token);
     http_client_set_request_body_instant(http_cli, req_body_str, strlen(req_body_str));
+    free(access_token);
 
-    rc = oauth_cli_perform_tsx(onedrv->oauth, http_cli);
-    free(req_body_str);
-    if (rc)
+    rc = http_client_request(http_cli);
+    if (rc) {
+        free(req_body_str);
         return -1;
+    }
 
     rc = http_client_get_response_code(http_cli, &resp_code);
-    if (rc < 0 || resp_code != 200)
+    if (rc < 0 || (resp_code != 200 && resp_code != 401)) {
+        free(req_body_str);
         return -1;
+    }
 
+    if (resp_code == 401) {
+        rc = oauth_client_refresh_access_token(onedrv->oauth, &access_token);
+        if (rc) {
+            free(req_body_str);
+            return -1;
+        }
+        goto retry;
+    }
+
+    free(req_body_str);
     return 0;
 #undef is_dir
 }
@@ -229,6 +272,7 @@ static int hive_1drv_delete(hive_t *hive, const char *path)
     long resp_code;
     http_client_t *http_cli;
     char *path_esc;
+    char *access_token;
 
     http_cli = http_client_new();
     if (!http_cli)
@@ -241,20 +285,36 @@ static int hive_1drv_delete(hive_t *hive, const char *path)
     if (rc < 0 || rc >= sizeof(url))
         return -1;
 
-    http_cli = http_client_new();
-    if (!http_cli)
+    rc = oauth_client_get_access_token(onedrv->oauth, &access_token);
+    if (rc)
         return -1;
 
-    http_client_set_url_escape(http_cli, url);
-    http_client_set_method(http_cli, HTTP_METHOD_DELETE);
+retry:
+    http_cli = http_client_new();
+    if (!http_cli) {
+        free(access_token);
+        return -1;
+    }
 
-    rc = oauth_cli_perform_tsx(onedrv->oauth, http_cli);
+    http_client_set_url_escape(http_cli, url);
+    http_client_set_header(http_cli, "Authorization", access_token);
+    http_client_set_method(http_cli, HTTP_METHOD_DELETE);
+    free(access_token);
+
+    rc = http_client_request(http_cli);
     if (rc)
         return -1;
 
     rc = http_client_get_response_code(http_cli, &resp_code);
-    if (rc < 0 || resp_code != 204)
+    if (rc < 0 || (resp_code != 204 && resp_code != 401))
         return -1;
+
+    if (resp_code == 401) {
+        rc = oauth_client_refresh_access_token(onedrv->oauth, &access_token);
+        if (rc)
+            return -1;
+        goto retry;
+    }
 
     return 0;
 }
@@ -275,6 +335,7 @@ static int hive_1drv_copy(hive_t *hive, const char *src_path, const char *dest_p
     bool dir_eq = false, base_eq = false;
     char *req_body_str;
     long resp_code;
+    char *access_token;
 
     strcpy(src_dir, dirname((char *)src_path));
     strcpy(src_base, basename((char *)src_path));
@@ -344,24 +405,49 @@ static int hive_1drv_copy(hive_t *hive, const char *src_path, const char *dest_p
     if (!req_body_str)
         return -1;
 
-    http_cli = http_client_new();
-    if (!http_cli)
+    rc = oauth_client_get_access_token(onedrv->oauth, &access_token);
+    if (rc) {
+        free(req_body_str);
         return -1;
+    }
+
+retry:
+    http_cli = http_client_new();
+    if (!http_cli) {
+        free(req_body_str);
+        free(access_token);
+        return -1;
+    }
 
     http_client_set_url_escape(http_cli, url);
     http_client_set_method(http_cli, HTTP_METHOD_POST);
     http_client_set_header(http_cli, "Content-Type", "application/json");
+    http_client_set_header(http_cli, "Authorization", access_token);
     http_client_set_request_body_instant(http_cli, req_body_str, strlen(req_body_str));
+    free(access_token);
 
-    rc = oauth_cli_perform_tsx(onedrv->oauth, http_cli);
-    free(req_body_str);
-    if (rc)
+    rc = http_client_request(http_cli);
+    if (rc) {
+        free(req_body_str);
         return -1;
+    }
 
     rc = http_client_get_response_code(http_cli, &resp_code);
-    if (rc < 0 || resp_code != 202)
+    if (rc < 0 || (resp_code != 202 && resp_code != 401)) {
+        free(req_body_str);
         return -1;
+    }
 
+    if (resp_code == 401) {
+        rc = oauth_client_refresh_access_token(onedrv->oauth, &access_token);
+        if (rc) {
+            free(req_body_str);
+            return -1;
+        }
+        goto retry;
+    }
+
+    free(req_body_str);
     return 0;
 #undef is_dir
 }
@@ -378,6 +464,7 @@ static int hive_1drv_list(hive_t *hive, const char *path, char **result)
     long resp_code;
     cJSON *resp_part, *next_link, *resp, *val_part, *elem, *val;
     http_client_t *http_cli;
+    char *access_token;
 
     if (!strcmp(path, "/"))
         rc = snprintf(url, sizeof(url), "%s/drive/root/children", ONEDRV_ROOT);
@@ -404,32 +491,53 @@ static int hive_1drv_list(hive_t *hive, const char *path, char **result)
         return -1;
     }
 
+    rc = oauth_client_get_access_token(onedrv->oauth, &access_token);
+    if (rc) {
+        cJSON_Delete(resp);
+        return -1;
+    }
+
     while (true) {
         http_cli = http_client_new();
         if (!http_cli) {
             cJSON_Delete(resp);
+            free(access_token);
             return -1;
         }
 
         http_client_set_url_escape(http_cli, url);
+        http_client_set_header(http_cli, "Authorization", access_token);
         http_client_set_method(http_cli, HTTP_METHOD_GET);
         http_client_set_response_body_instant(http_cli, resp_body, resp_body_len);
 
-        rc = oauth_cli_perform_tsx(onedrv->oauth, http_cli);
+        rc = http_client_request(http_cli);
         if (rc) {
             cJSON_Delete(resp);
+            free(access_token);
             return -1;
         }
 
         rc = http_client_get_response_code(http_cli, &resp_code);
-        if (rc < 0 || resp_code != 200) {
+        if (rc < 0 || (resp_code != 200 && resp_code != 401)) {
             cJSON_Delete(resp);
+            free(access_token);
             return -1;
+        }
+
+        if (resp_code == 401) {
+            free(access_token);
+            rc = oauth_client_refresh_access_token(onedrv->oauth, &access_token);
+            if (rc) {
+                cJSON_Delete(resp);
+                return -1;
+            }
+            continue;
         }
 
         resp_body_len = http_client_get_response_body_length(http_cli);
         if (resp_body_len == sizeof(resp_body)) {
             cJSON_Delete(resp);
+            free(access_token);
             return -1;
         }
         resp_body[resp_body_len] = '\0';
@@ -437,6 +545,7 @@ static int hive_1drv_list(hive_t *hive, const char *path, char **result)
         resp_part = cJSON_Parse(resp_body);
         if (!resp_part) {
             cJSON_Delete(resp);
+            free(access_token);
             return -1;
         }
 
@@ -444,6 +553,7 @@ static int hive_1drv_list(hive_t *hive, const char *path, char **result)
         if (!val_part || !cJSON_IsArray(val_part) || !(val_sz = cJSON_GetArraySize(val_part))) {
             cJSON_Delete(resp);
             cJSON_Delete(resp_part);
+            free(access_token);
             return -1;
         }
 
@@ -456,6 +566,7 @@ static int hive_1drv_list(hive_t *hive, const char *path, char **result)
         if (next_link && (!cJSON_IsString(next_link) || !*next_link->valuestring)) {
             cJSON_Delete(resp);
             cJSON_Delete(resp_part);
+            free(access_token);
             return -1;
         }
 
@@ -464,6 +575,7 @@ static int hive_1drv_list(hive_t *hive, const char *path, char **result)
             if (rc < 0 || rc >= sizeof(url)) {
                 cJSON_Delete(resp);
                 cJSON_Delete(resp_part);
+                free(access_token);
                 return -1;
             }
             resp_body_len = sizeof(resp_body);
@@ -474,6 +586,7 @@ static int hive_1drv_list(hive_t *hive, const char *path, char **result)
         *result = cJSON_PrintUnformatted(resp);
         cJSON_Delete(resp);
         cJSON_Delete(resp_part);
+        free(access_token);
         return *result ? 0 : -1;
     }
 #undef RESP_BODY_MAX_SZ
@@ -493,6 +606,7 @@ static int hive_1drv_mkdir(hive_t *hive, const char *path)
     char *dir;
     char *dir_esc;
     http_client_t *http_cli;
+    char *access_token;
 
     dir = dirname((char *)path);
     if (!strcmp(dir, "/"))
@@ -534,25 +648,50 @@ static int hive_1drv_mkdir(hive_t *hive, const char *path)
     if (!req_body_str)
         return -1;
 
-    http_cli = http_client_new();
-    if (!http_cli)
+    rc = oauth_client_get_access_token(onedrv->oauth, &access_token);
+    if (rc) {
+        free(req_body_str);
         return -1;
+    }
+
+retry:
+    http_cli = http_client_new();
+    if (!http_cli) {
+        free(req_body_str);
+        free(access_token);
+        return -1;
+    }
 
     http_client_set_url_escape(http_cli, url);
     http_client_set_method(http_cli, HTTP_METHOD_POST);
     http_client_set_header(http_cli, "Content-Type", "application/json");
+    http_client_set_header(http_cli, "Authorization", access_token);
     http_client_set_request_body_instant(http_cli, req_body_str, strlen(req_body_str));
     http_client_set_response_body_instant(http_cli, resp_body, resp_body_len);
+    free(access_token);
 
-    rc = oauth_cli_perform_tsx(onedrv->oauth, http_cli);
-    free(req_body_str);
-    if (rc)
+    rc = http_client_request(http_cli);
+    if (rc) {
+        free(req_body_str);
         return -1;
+    }
 
     rc = http_client_get_response_code(http_cli, &resp_code);
-    if (rc < 0 || resp_code != 201)
+    if (rc < 0 || (resp_code != 201 && resp_code != 401)) {
+        free(req_body_str);
         return -1;
+    }
 
+    if (resp_code == 401) {
+        rc = oauth_client_refresh_access_token(onedrv->oauth, &access_token);
+        if (rc) {
+            free(req_body_str);
+            return -1;
+        }
+        goto retry;
+    }
+
+    free(req_body_str);
     resp_body_len = http_client_get_response_body_length(http_cli);
     if (resp_body_len == sizeof(resp_body))
         return -1;
@@ -582,14 +721,14 @@ hive_t *hive_1drv_new(const hive_opt_t *base_opt)
     if (!onedrv)
         return NULL;
 
-    onedrv->oauth = oauth_cli_new(&oauth_opt);
+    onedrv->oauth = oauth_client_new(&oauth_opt);
     if (!onedrv->oauth) {
         deref(onedrv);
         return NULL;
     }
 
     onedrv->authorize = hive_1drv_authorize;
-    onedrv->makedir     = hive_1drv_mkdir;
+    onedrv->makedir   = hive_1drv_mkdir;
     onedrv->list      = hive_1drv_list;
     onedrv->copy      = hive_1drv_copy;
     onedrv->delete    = hive_1drv_delete;

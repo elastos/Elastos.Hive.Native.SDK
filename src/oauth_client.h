@@ -18,11 +18,12 @@ typedef struct oauth_option {
     void (*open_url)(const char *url);
 } oauth_opt_t;
 
-typedef struct oauth_client oauth_cli_t;
+typedef struct oauth_client oauth_client_t;
 
-oauth_cli_t *oauth_cli_new(oauth_opt_t *opt);
-void oauth_cli_delete(oauth_cli_t *cli);
-int oauth_cli_authorize(oauth_cli_t *cli);
-int oauth_cli_perform_tsx(oauth_cli_t *cli, http_client_t *http_client);
+oauth_client_t *oauth_client_new(oauth_opt_t *opt);
+void oauth_client_delete(oauth_client_t *client);
+int oauth_client_authorize(oauth_client_t *client);
+int oauth_client_get_access_token(oauth_client_t *client, char **token);
+int oauth_client_refresh_access_token(oauth_client_t *client, char **token);
 
 #endif // __OAUTH_CLIENT_H__
