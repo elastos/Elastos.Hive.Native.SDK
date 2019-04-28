@@ -64,8 +64,7 @@ int dstore_add_value(DStoreC *dstore, const char *key, const uint8_t *value,
     snprintf(buf, sizeof(buf), "%d", cnt++);
     auto dmsg = std::make_shared<DMessage>(
         buf, std::string{reinterpret_cast<const char *>(value), len});
-    ds->add_value(key, dmsg);
-    return 0;
+    return ds->add_value(key, dmsg) ? 0 : -1;
   } catch (...) {
     return -1;
   }
@@ -77,8 +76,7 @@ int dstore_remove_values(DStoreC *dstore, const char *key) {
   if (!dstore || !key || !*key) return -1;
 
   try {
-    ds->remove_values(key);
-    return 0;
+    return ds->remove_values(key) ? 0 : -1;
   } catch (...) {
     return -1;
   }
