@@ -2,32 +2,35 @@
 #include <stdio.h>
 #include <string.h>
 #include <CUnit/Basic.h>
-
+#include <windows.h>
+#include <Shellapi.h>
+#if defined(HAVE_UNISTD_H)
+#include <unistd.h>
+#endif
 #include <hive.h>
 
+const char *profile_name = "hive1drv.json";
+const char *file_path = "/Documents/HiveTest/helloworld.txt";
+const char *file_newpath = "/Documents/HiveTest_New/helloworld.txt";
+const char *file_newname = "/byeworld.txt";
+
 static hive_1drv_opt_t onedrv_option;
+
+int hive_delete_profile_file(char* profile_name)
+{
+    int rc = 0;
+
+    if (access(profile_name, F_OK) == 0)
+        rc = remove(profile_name);
+
+    return rc;
+}
 
 static
 void onedrv_open_oauth_url(const char *url)
 {
 
     ShellExecute(NULL, "open", url, NULL, NULL, SW_SHOWNORMAL);
-    printf("***onedrv_open_oauth_url\n");
-    return;
-}
-
-static void test_hive_authorize(void)
-{
-    int rc;
-    hive_t *hive = NULL;
-
-    hive = hive_new((hive_opt_t *)(&onedrv_option));
-    CU_ASSERT_PTR_NOT_NULL_FATAL(hive);
-
-    rc = hive_authorize(hive);
-    CU_ASSERT_EQUAL(rc, 0);
-
-    hive_kill(hive);
     return;
 }
 
@@ -39,6 +42,29 @@ static void test_hive_authorize_without_new(void)
     rc = hive_authorize(hive);
     CU_ASSERT_EQUAL(rc, -1);
 
+    return;
+}
+
+static void test_hive_double_authorize(void)
+{
+    int rc;
+    hive_t *hive = NULL;
+
+    hive = hive_new((hive_opt_t *)(&onedrv_option));
+    CU_ASSERT_PTR_NOT_NULL_FATAL(hive);
+
+    rc = hive_authorize(hive);
+    CU_ASSERT_EQUAL(rc, 0);
+
+    rc = hive_authorize(hive);
+    CU_ASSERT_EQUAL(rc, 0);
+
+    hive_kill(hive);
+    return;
+}
+
+static void test_hive_authorizing(void)
+{
     return;
 }
 
@@ -58,12 +84,13 @@ static int hive_authorize_test_suite_cleanup(void)
 
     hive_global_cleanup();
 
-    return 0;
+    return hive_delete_profile_file(profile_name);
 }
 
 static CU_TestInfo cases[] = {
-    {   "test_hive_authorize",             test_hive_authorize             },
     {   "test_hive_authorize_without_new", test_hive_authorize_without_new },
+    {   "test_hive_double_authorize",      test_hive_double_authorize      },
+    {   "test_hive_authorizing",           test_hive_authorizing           },
     {   NULL,                              NULL                            }
 };
 

@@ -14,7 +14,6 @@
 #include "onedrive.h"
 #include "http_client.h"
 
-
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 static enum {
     HIVE_MODULE_STATE_UNINITIALIZED,
@@ -144,7 +143,10 @@ int hive_stat(hive_t *hive, const char *path, char **result)
     return rc;
 }
 
-int hive_set_timestamp(hive_t *hive, const char *path, const struct timeval timestamp);
+int hive_set_timestamp(hive_t *hive, const char *path, const struct timeval timestamp)
+{
+    return 0;
+}
 
 int hive_list(hive_t *hive, const char *path, char **result)
 {

@@ -1,7 +1,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <CUnit/Basic.h>
-
+#include <windows.h>
+#include <Shellapi.h>
+#if defined(HAVE_UNISTD_H)
+#include <unistd.h>
+#endif
 #include <hive.h>
 
 static hive_1drv_opt_t onedrv_option;
@@ -9,9 +13,7 @@ static hive_1drv_opt_t onedrv_option;
 static
 void onedrv_open_oauth_url(const char *url)
 {
-
     ShellExecute(NULL, "open", url, NULL, NULL, SW_SHOWNORMAL);
-    printf("***onedrv_open_oauth_url\n");
     return;
 }
 

@@ -2,25 +2,29 @@
 #include <stdio.h>
 #include <string.h>
 #include <CUnit/Basic.h>
-
+#include <windows.h>
+#include <Shellapi.h>
+#if defined(HAVE_UNISTD_H)
+#include <unistd.h>
+#endif
 #include <hive.h>
+
+extern const char *profile_name;
+extern const char *file_path;
+extern const char *file_newpath;
+extern const char *file_newname;
+extern int hive_delete_profile_file(char* profile_name);
 
 static hive_opt_t hive_option;
 static hive_1drv_opt_t onedrv_option;
 static hive_t *hive = NULL;
 static char *result;
 
-static const char *file_path  = "hive-test.txt";
-static const char *file_new_path = "hive-new-test.txt";
-static const char *file_name = "hive-1drv.txt";
-static const char *file_new_name = "hive-new-1drv.txt";
-
 static
 void onedrv_open_oauth_url(const char *url)
 {
 
     ShellExecute(NULL, "open", url, NULL, NULL, SW_SHOWNORMAL);
-    printf("***onedrv_open_oauth_url\n");
     return;
 }
 
@@ -28,7 +32,12 @@ static void test_hive_settime_without_mkdir(void)
 {
     int rc;
 
-    rc = hive_mkdir(hive, file_path);
+    struct timeval time;
+    gettimeofday(&time, NULL);
+    time.tv_sec += 1000;
+    time.tv_usec += 100000;
+
+    rc = hive_set_timestamp(hive, file_path, time);
     CU_ASSERT_EQUAL(rc, -1);
 
     return;
@@ -68,7 +77,7 @@ static void test_hive_copy_without_mkdir(void)
 {
     int rc;
 
-    rc = hive_copy(hive, file_name, file_new_name);
+    rc = hive_copy(hive, file_path, file_newpath);
     CU_ASSERT_EQUAL(rc, -1);
 
     return;
@@ -78,7 +87,7 @@ static void test_hive_move_without_mkdir(void)
 {
     int rc;
 
-    rc = hive_move(hive, file_name, file_new_name);
+    rc = hive_move(hive, file_path, file_newname);
     CU_ASSERT_EQUAL(rc, -1);
 
     return;
@@ -87,14 +96,18 @@ static void test_hive_move_without_mkdir(void)
 static int hive_no_file_test_suite_init(void)
 {
     onedrv_option.base.type = HIVE_TYPE_ONEDRIVE;
-    strcpy(onedrv_option.profile_path, "hive1drv.json");
+    strcpy(onedrv_option.profile_path, profile_name);
     onedrv_option.open_oauth_url = onedrv_open_oauth_url;
 
-    int rc = hive_global_init();
+    if (hive_delete_profile_file(profile_name))
+        return -1;
+
+    if (hive_global_init())
+        return -1;
 
     hive = hive_new((hive_opt_t *)(&onedrv_option));
     if(!hive)
-        rc = -1;
+        return -1;
 
     return hive_authorize(hive);
 }
@@ -109,7 +122,7 @@ static int hive_no_file_test_suite_cleanup(void)
 
     hive = NULL;
 
-    return 0;
+    return hive_delete_profile_file(profile_name);
 }
 
 static CU_TestInfo cases[] = {
