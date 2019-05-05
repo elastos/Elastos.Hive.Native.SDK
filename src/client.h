@@ -5,11 +5,6 @@
 extern "C" {
 #endif
 
-<<<<<<< HEAD
-#include <limits.h>
-
-=======
->>>>>>> 4f476d9... WIP: convert windows CR/LF to unix LF
 typedef struct HiveClient HiveClient;
 
 struct HiveOAuthInfo {
