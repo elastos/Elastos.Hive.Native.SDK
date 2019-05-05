@@ -418,7 +418,7 @@ bool DStore::resolve() {
   if (needResolve) {
     try {
       node.NameResolve("/ipns/" + peerId, &result);
-      rootPath = result["Path"];
+      rootPath = result["Path"].get<std::string>();
     } catch (const std::exception& e) {
       if (debugLog) {
         std::cerr << "NameResolve: " << e.what() << std::endl;

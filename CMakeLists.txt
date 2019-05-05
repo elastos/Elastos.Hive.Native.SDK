@@ -20,6 +20,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Find curl
 find_package(CURL REQUIRED)
 include_directories(${CURL_INCLUDE_DIRS})
+add_definitions(-DCURL_STATICLIB)
 
 # Find "JSON for Modern C++" (nlohmann/json.hpp)
 include_directories("include/hive")
@@ -78,4 +79,6 @@ if(BUILD_TESTING)
 endif()
 
 # Samples
-add_subdirectory(samples)
+if(BUILD_SAMPLE)
+    add_subdirectory(samples)
+endif()
