@@ -17,7 +17,7 @@ DStoreC *dstore_create(const char *hive_conf) {
     auto ds = new DStore{host_rand, 9095};
 
     // Please replace this line
-    std::string uid = "uid-00ec6a5e-a36d-4313-a579-5ce46be3eadb";
+    std::string uid = "uid-2041b18e-ca86-4962-9a21-d477f7f627ce";
     ds->set_sender_UID(uid);
 
     return reinterpret_cast<DStoreC *>(ds);

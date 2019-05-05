@@ -491,7 +491,7 @@ void Node::GetProperty(const Json& input, const std::string& property_name,
         ":\n" + input.dump());
   }
 
-  *property_value = input[property_name];
+  *property_value = input[property_name].get<PropertyType>();
 }
 
 std::string Node::MakeUrl(

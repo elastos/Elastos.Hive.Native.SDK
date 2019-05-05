@@ -1,3 +1,9 @@
+2019/05/05 Li Fenxiang lifenxiang@elastos.org
+
+**Version 0.1.1**, main feature list:
+
+- Fix compilation for mac Xcode 10.2
+
 2019/04/26 Wang Yi wangyi@storswift.com
 
 **Version 0.1**, main feature list:
