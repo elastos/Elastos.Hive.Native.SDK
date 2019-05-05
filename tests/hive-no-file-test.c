@@ -99,8 +99,8 @@ static int hive_no_file_test_suite_init(void)
     strcpy(onedrv_option.profile_path, profile_name);
     onedrv_option.open_oauth_url = onedrv_open_oauth_url;
 
-    if (hive_delete_profile_file(profile_name))
-        return -1;
+    //if (hive_delete_profile_file(profile_name))
+       // return -1;
 
     if (hive_global_init())
         return -1;

@@ -10,9 +10,9 @@
 #include <hive.h>
 
 const char *profile_name = "hive1drv.json";
-const char *file_path = "/Documents/HiveTest/helloworld.txt";
-const char *file_newpath = "/Documents/HiveTest_New/helloworld.txt";
-const char *file_newname = "/byeworld.txt";
+const char *file_path = "/Documents/HiveTest/helloworld";
+const char *file_newpath = "/Documents/HiveTest_New/helloworld";
+const char *file_newname = "/byeworld";
 
 static hive_1drv_opt_t onedrv_option;
 
