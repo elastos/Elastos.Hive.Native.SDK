@@ -5,8 +5,11 @@
 extern "C" {
 #endif
 
+<<<<<<< HEAD
 #include <limits.h>
 
+=======
+>>>>>>> 4f476d9... WIP: convert windows CR/LF to unix LF
 typedef struct HiveClient HiveClient;
 
 struct HiveOAuthInfo {
@@ -27,7 +30,7 @@ enum HiveDriveType {
 
 
 typedef struct HiveOptions {
-    char persistent_location[PATH_MAX];
+    char *perisisten_location;
     int  drive_type;
 } HiveOptions;
 
@@ -50,3 +53,4 @@ int hive_client_close(HiveClient *hive);
 #endif
 
 #endif // __HIVE_CLIENT_H__
+
