@@ -5,6 +5,8 @@
 extern "C" {
 #endif
 
+#include <limits.h>
+
 typedef struct HiveClient HiveClient;
 
 struct HiveOAuthInfo {
@@ -25,7 +27,7 @@ enum HiveDriveType {
 
 
 typedef struct HiveOptions {
-    char perisisten_location;
+    char persistent_location[PATH_MAX];
     int  drive_type;
 } HiveOptions;
 
