@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static void open_url(const char *url)
+static int open_url(const char *url)
 {
     char cmd[strlen("open ") + strlen(url) + 3];
     strcpy(cmd, "open ");
@@ -11,6 +11,7 @@ static void open_url(const char *url)
     strcat(cmd, url);
     strcat(cmd, "'");
     system(cmd);
+    return 0;
 }
 
 int main()

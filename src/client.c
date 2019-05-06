@@ -30,9 +30,10 @@ HiveClient *hive_client_new(const HiveOptions *options)
     ClientFactoryMethod *method;
     HiveClient *client = NULL;
 
-    int drive_type = options->drive_type;
+    if (!options || !options->persistent_location || !*options->persistent_location)
+        return NULL;
 
-    for (method = &client_factory_methods[0]; !method; method++) {
+    for (method = &client_factory_methods[0]; method->factory_func; method++) {
         if (method->drive_type == options->drive_type) {
             client = method->factory_func(options);
             break;

@@ -51,7 +51,7 @@ typedef struct hive_options {
 typedef struct hive_onedrive_options {
     hive_opt_t base;
     char profile_path[PATH_MAX];
-    void (*open_oauth_url)(const char *url);
+    int (*open_oauth_url)(const char *url);
 } hive_1drv_opt_t;
 
 typedef int hive_err_t;

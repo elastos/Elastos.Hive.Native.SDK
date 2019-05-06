@@ -331,7 +331,7 @@ int http_client_set_url_escape(http_client_t *client, const char *url)
     return 0;
 }
 
-int http_client_get_url(http_client_t *client, char **url)
+int http_client_get_url_escape(http_client_t *client, char **url)
 {
     CURLUcode code;
 
@@ -339,6 +339,70 @@ int http_client_get_url(http_client_t *client, char **url)
     assert(url);
 
     code = curl_url_get(client->url, CURLUPART_URL, url, 0);
+    if (code != CURLUE_OK)  {
+        vlogE("HttpClient: Get url from curl error (%d)", code);
+        return  __curlucode_to_error(code);
+    }
+
+    return 0;
+}
+
+int http_client_get_scheme(http_client_t *client, char **scheme)
+{
+    CURLUcode code;
+
+    assert(client);
+    assert(scheme);
+
+    code = curl_url_get(client->url, CURLUPART_SCHEME, scheme, CURLU_URLDECODE);
+    if (code != CURLUE_OK)  {
+        vlogE("HttpClient: Get url from curl error (%d)", code);
+        return  __curlucode_to_error(code);
+    }
+
+    return 0;
+}
+
+int http_client_get_host(http_client_t *client, char **host)
+{
+    CURLUcode code;
+
+    assert(client);
+    assert(host);
+
+    code = curl_url_get(client->url, CURLUPART_HOST, host, CURLU_URLDECODE);
+    if (code != CURLUE_OK)  {
+        vlogE("HttpClient: Get url from curl error (%d)", code);
+        return  __curlucode_to_error(code);
+    }
+
+    return 0;
+}
+
+int http_client_get_port(http_client_t *client, char **port)
+{
+    CURLUcode code;
+
+    assert(client);
+    assert(port);
+
+    code = curl_url_get(client->url, CURLUPART_PORT, port, CURLU_URLDECODE);
+    if (code != CURLUE_OK)  {
+        vlogE("HttpClient: Get url from curl error (%d)", code);
+        return  __curlucode_to_error(code);
+    }
+
+    return 0;
+}
+
+int http_client_get_path(http_client_t *client, char **path)
+{
+    CURLUcode code;
+
+    assert(client);
+    assert(path);
+
+    code = curl_url_get(client->url, CURLUPART_PATH, path, CURLU_URLDECODE);
     if (code != CURLUE_OK)  {
         vlogE("HttpClient: Get url from curl error (%d)", code);
         return  __curlucode_to_error(code);

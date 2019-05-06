@@ -9,13 +9,12 @@ typedef struct oauth_option {
     const char *auth_url;
     const char *token_url;
     const char *scope;
-    const char *cli_id;
-    const char *cli_secret;
+    const char *client_id;
     const char *redirect_port;
     const char *redirect_path;
     const char *redirect_url;
     char profile_path[PATH_MAX];
-    void (*open_url)(const char *url);
+    int (*grant_authorize)(const char *url);
 } oauth_opt_t;
 
 typedef struct oauth_client oauth_client_t;
