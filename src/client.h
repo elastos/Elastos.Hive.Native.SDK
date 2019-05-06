@@ -25,7 +25,7 @@ enum HiveDriveType {
 
 
 typedef struct HiveOptions {
-    char *perisisten_location;
+    char *persistent_location;
     int  drive_type;
 } HiveOptions;
 

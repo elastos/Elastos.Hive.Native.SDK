@@ -21,6 +21,7 @@
 #ifdef HAVE_MALLOC_H
 #include <malloc.h>
 #endif
+#include <stdio.h>
 
 #include "http_client.h"
 #include "oauth_client.h"
@@ -296,7 +297,6 @@ static int refresh_token(oauth_client_t *cli)
     char redirect_url_raw[128];
     http_client_t *http_cli;
     char *cli_id;
-    char *cli_secret;
     char *refresh_token;
     char *redirect_url;
 
@@ -309,7 +309,7 @@ static int refresh_token(oauth_client_t *cli)
     if (!http_cli)
         return -1;
 
-    cli_id = http_client_escape(http_cli, cli->opt.cli_id, strlen(cli->opt.cli_id));
+    cli_id = http_client_escape(http_cli, cli->opt.client_id, strlen(cli->opt.client_id));
     if (!cli_id)
         return -1;
 
@@ -319,34 +319,23 @@ static int refresh_token(oauth_client_t *cli)
         return -1;
     }
 
-    cli_secret = http_client_escape(http_cli, cli->opt.cli_secret, strlen(cli->opt.cli_secret));
-    if (!cli_secret) {
-        http_client_memory_free(cli_id);
-        http_client_memory_free(redirect_url);
-        return -1;
-    }
-
     refresh_token = http_client_escape(http_cli, cli->svr_resp.refresh_token, strlen(cli->svr_resp.refresh_token));
     if (!refresh_token) {
         http_client_memory_free(cli_id);
         http_client_memory_free(redirect_url);
-        http_client_memory_free(cli_secret);
         return -1;
     }
 
     rc = snprintf(req_body, sizeof(req_body),
         "client_id=%s&"
         "redirect_uri=%s&"
-        "client_secret=%s&"
         "refresh_token=%s&"
         "grant_type=refresh_token",
         cli_id,
         redirect_url,
-        cli_secret,
         refresh_token);
     http_client_memory_free(cli_id);
     http_client_memory_free(redirect_url);
-    http_client_memory_free(cli_secret);
     http_client_memory_free(refresh_token);
     if (rc < 0 || rc >= sizeof(req_body))
         return -1;
@@ -455,7 +444,7 @@ static void *open_auth_url(void *args)
     oauth_client_t *cli = (oauth_client_t *)(((void **)args)[0]);
     char *url = (char *)(((void **)args)[1]);
 
-    cli->opt.open_url(url);
+    cli->opt.grant_authorize(url);
 
     return NULL;
 }
@@ -468,7 +457,7 @@ static int get_auth_code(oauth_client_t *cli)
     int rc;
     http_client_t *http_cli;
     char buf[512];
-    bool finish = false;
+    bool svr_finish = false;
     char *url;
 
     http_cli = http_client_new();
@@ -481,12 +470,12 @@ static int get_auth_code(oauth_client_t *cli)
         cli->opt.redirect_url, cli->opt.redirect_port, cli->opt.redirect_path);
     assert(rc > 0 && rc < sizeof(buf));
 
-    http_client_set_query(http_cli, "client_id", cli->opt.cli_id);
+    http_client_set_query(http_cli, "client_id", cli->opt.client_id);
     http_client_set_query(http_cli, "scope", cli->opt.scope);
     http_client_set_query(http_cli, "redirect_uri", buf);
     http_client_set_query(http_cli, "response_type", "code");
 
-    void *args1[] = {cli, &finish};
+    void *args1[] = {cli, &svr_finish};
     memset(&opt, 0, sizeof(opt));
     opt.port = cli->opt.redirect_port;
     opt.handler = handle_auth_redirect;
@@ -496,7 +485,7 @@ static int get_auth_code(oauth_client_t *cli)
     if (!server)
         return -1;
 
-    rc = http_client_get_url(http_cli, &url);
+    rc = http_client_get_url_escape(http_cli, &url);
     if (rc) {
         sb_close_server(server);
         return -1;
@@ -510,7 +499,7 @@ static int get_auth_code(oauth_client_t *cli)
         return -1;
     }
 
-    while (!finish)
+    while (!svr_finish)
         sb_poll_server(server, 300000);
     sb_close_server(server);
     pthread_join(tid, NULL);
@@ -529,7 +518,6 @@ static int redeem_access_token(oauth_client_t *cli)
     char redirect_url_raw[128];
     http_client_t *http_cli;
     char *cli_id;
-    char *cli_secret;
     char *code;
     char *redirect_url;
 
@@ -542,7 +530,7 @@ static int redeem_access_token(oauth_client_t *cli)
     if (!http_cli)
         return -1;
 
-    cli_id = http_client_escape(http_cli, cli->opt.cli_id, strlen(cli->opt.cli_id));
+    cli_id = http_client_escape(http_cli, cli->opt.client_id, strlen(cli->opt.client_id));
     if (!cli_id)
         return -1;
 
@@ -552,34 +540,23 @@ static int redeem_access_token(oauth_client_t *cli)
         return -1;
     }
 
-    cli_secret = http_client_escape(http_cli, cli->opt.cli_secret, strlen(cli->opt.cli_secret));
-    if (!cli_secret) {
-        http_client_memory_free(cli_id);
-        http_client_memory_free(redirect_url);
-        return -1;
-    }
-
     code = http_client_escape(http_cli, cli->svr_resp.auth_code, strlen(cli->svr_resp.auth_code));
     if (!code) {
         http_client_memory_free(cli_id);
         http_client_memory_free(redirect_url);
-        http_client_memory_free(cli_secret);
         return -1;
     }
 
     rc = snprintf(req_body, sizeof(req_body),
         "client_id=%s&"
         "redirect_uri=%s&"
-        "client_secret=%s&"
         "code=%s&"
         "grant_type=authorization_code",
         cli_id,
         redirect_url,
-        cli_secret,
         code);
     http_client_memory_free(cli_id);
     http_client_memory_free(redirect_url);
-    http_client_memory_free(cli_secret);
     http_client_memory_free(code);
     if (rc < 0 || rc >= sizeof(req_body))
         return -1;
@@ -601,13 +578,94 @@ static int redeem_access_token(oauth_client_t *cli)
 #undef RESP_BODY_MAX_SZ
 }
 
+static void optrst(oauth_opt_t *opt)
+{
+#define FREE(ptr) \
+do { \
+   if (ptr) { \
+       free((void *)(ptr)); \
+       (ptr) = NULL; \
+   }  \
+} while (0)
+
+    FREE(opt->auth_url);
+    FREE(opt->token_url);
+    FREE(opt->scope);
+    FREE(opt->client_id);
+    FREE(opt->redirect_port);
+    FREE(opt->redirect_path);
+    FREE(opt->redirect_url);
+    opt->profile_path[0] = '\0';
+    opt->grant_authorize = NULL;
+
+#undef FREE
+}
+
 static void oauth_client_destructor(void *arg)
 {
     oauth_client_t *cli = (oauth_client_t *)arg;
 
+    optrst(&cli->opt);
     reset_svr_resp(&cli->svr_resp);
     pthread_mutex_destroy(&cli->lock);
     pthread_cond_destroy(&cli->cond);
+}
+
+static int optcpy(oauth_opt_t *dst, oauth_opt_t *src)
+{
+    int rc;
+
+    dst->auth_url = strdup(src->auth_url);
+    if (!dst->auth_url) {
+        optrst(dst);
+        return -1;
+    }
+
+    dst->token_url = strdup(src->token_url);
+    if (!dst->token_url) {
+        optrst(dst);
+        return -1;
+    }
+
+    dst->scope = strdup(src->scope);
+    if (!dst->scope) {
+        optrst(dst);
+        return -1;
+    }
+
+    dst->client_id = strdup(src->client_id);
+    if (!dst->client_id) {
+        optrst(dst);
+        return -1;
+    }
+
+    dst->redirect_port = strdup(src->redirect_port);
+    if (!dst->redirect_port) {
+        optrst(dst);
+        return -1;
+    }
+
+    dst->redirect_path = strdup(src->redirect_path);
+    if (!dst->redirect_path) {
+        optrst(dst);
+        return -1;
+    }
+
+    dst->redirect_url = strdup(src->redirect_url);
+    if (!dst->redirect_url) {
+        optrst(dst);
+        return -1;
+    }
+
+    rc = snprintf(dst->profile_path, sizeof(dst->profile_path), "%s", src->profile_path);
+    if (rc < 0 || rc >= sizeof(dst->profile_path)) {
+        optrst(dst);
+        return -1;
+    }
+
+    dst->grant_authorize = src->grant_authorize;
+
+    return 0;
 }
 
 oauth_client_t *oauth_client_new(oauth_opt_t *opt)
@@ -622,7 +680,12 @@ oauth_client_t *oauth_client_new(oauth_opt_t *opt)
     pthread_mutex_init(&cli->lock, NULL);
     pthread_cond_init(&cli->cond, NULL);
 
-    cli->opt = *opt;
+    rc = optcpy(&cli->opt, opt);
+    if (rc) {
+        deref(cli);
+        return NULL;
+    }
+
     if (!access(opt->profile_path, F_OK)) {
         rc = load_profile(cli);
         if (rc) {

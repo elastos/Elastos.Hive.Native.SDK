@@ -34,8 +34,7 @@ static oauth_opt_t onedrv_oauth_opt = {
     .auth_url      = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
     .token_url     = "https://login.microsoftonline.com/common/oauth2/v2.0/token",
     .scope         = "Files.ReadWrite.All offline_access",
-    .cli_id        = "32f221de-1a46-48da-98ad-c4508dab6f32",
-    .cli_secret    = "masmsCUE9741#)mrOMBM4|}",
+    .client_id     = "32f221de-1a46-48da-98ad-c4508dab6f32",
     .redirect_port = "33822",
     .redirect_path = "/auth-redirect",
     .redirect_url  = "http://localhost"
@@ -718,7 +717,7 @@ hive_t *hive_1drv_new(const hive_opt_t *base_opt)
     if (!realpath(opt->profile_path, oauth_opt.profile_path) && errno != ENOENT)
         return NULL;
 
-    oauth_opt.open_url = opt->open_oauth_url;
+    oauth_opt.grant_authorize = opt->open_oauth_url;
 
     onedrv = rc_zalloc(sizeof(hive_1drv_t), hive_1drv_destroy);
     if (!onedrv)
