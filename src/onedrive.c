@@ -550,13 +550,14 @@ static int hive_1drv_list(hive_t *hive, const char *path, char **result)
         }
 
         val_part = cJSON_GetObjectItemCaseSensitive(resp_part, "value");
-        if (!val_part || !cJSON_IsArray(val_part) || !(val_sz = cJSON_GetArraySize(val_part))) {
+        if (!val_part || !cJSON_IsArray(val_part)) {
             cJSON_Delete(resp);
             cJSON_Delete(resp_part);
             free(access_token);
             return -1;
         }
 
+        val_sz = cJSON_GetArraySize(val_part);
         for (int i = 0; i < val_sz; ++i) {
             elem = cJSON_DetachItemFromArray(val_part, 0);
             cJSON_AddItemToArray(val, elem);
