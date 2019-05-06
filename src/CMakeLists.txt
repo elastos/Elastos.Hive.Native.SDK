@@ -25,11 +25,16 @@ configure_file(
     "@ONLY")
 
 set(SRC
+    client.c
     hive.c
     oauth_cli.c
     onedrive.c
     sandbird/sandbird.c
-    http/http_client.c)
+    http/http_client.c
+    vendors/local/local_client.c
+    vendors/onedrive/onedrive_client.c
+    vendors/owncloud/owncloud.c
+    vendors/hiveipfs/hiveipfs.c)
 
 set(HEADERS
     hive.h)
@@ -45,6 +50,10 @@ include_directories(
     .
     http
     sandbird
+    vendors/local
+    vendors/onedrive
+    vendors/owncloud
+    vendors/hiveipfs
     ${CMAKE_CURRENT_BINARY_DIR}
     ${HIVE_INT_DIST_DIR}/include)
 
