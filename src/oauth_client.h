@@ -2,6 +2,9 @@
 #define __OAUTH_CLIENT_H__
 
 #include <limits.h>
+#if defined(_WIN32) || defined(_WIN64)
+#include <crystal.h>
+#endif
 
 #include "http_client.h"
 
