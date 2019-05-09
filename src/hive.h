@@ -64,6 +64,9 @@ hive_err_t hive_global_init();
 
 HIVE_API
 int hive_authorize(hive_t *hive);
+
+HIVE_API
+int hive_revoke(hive_t *hive);
 /******************************************************************************
  * Global-wide APIs
  *****************************************************************************/

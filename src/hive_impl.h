@@ -5,6 +5,7 @@ typedef struct hive hive_t;
 
 struct hive {
     int (*authorize)(hive_t *hive);
+    int (*revoke)(hive_t *hive);
     int (*makedir)(hive_t *hive, const char *path);
     int (*list)(hive_t *hive, const char *path, char **result);
     int (*copy)(hive_t *hive, const char *src_path, const char *dest_path);

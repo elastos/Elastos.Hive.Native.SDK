@@ -9,12 +9,35 @@
 #include "oauth_client.h"
 
 typedef struct OneDriveClient {
+    HiveClient base;
     oauth_client_t *oauth_client;
 } OneDriveClient;
 
 static void onedrive_client_destructor(void *obj)
 {
+    OneDriveClient *client = (OneDriveClient *)obj;
 
+    if (client->oauth_client)
+        oauth_client_delete(client->oauth_client);
+}
+
+static int onedrive_client_login(HiveClient *obj)
+{
+    OneDriveClient *client = (OneDriveClient *)obj;
+
+    return oauth_client_login(client->oauth_client);
+}
+
+static int onedrive_client_logout(HiveClient *obj)
+{
+    OneDriveClient *client = (OneDriveClient *)obj;
+
+    return oauth_client_logout(client->oauth_client);
+}
+
+static void onedrive_client_close(HiveClient *obj)
+{
+    deref(obj);
 }
 
 HiveClient *onedrive_client_new(const HiveOptions *options)
@@ -114,6 +137,10 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
         deref(onedrv_client);
         return NULL;
     }
+
+    onedrv_client->base.login           = &onedrive_client_login;
+    onedrv_client->base.logout          = &onedrive_client_logout;
+    onedrv_client->base.destructor_func = &onedrive_client_close;
 
     return (HiveClient *)onedrv_client;
 }
