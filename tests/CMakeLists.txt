@@ -4,10 +4,16 @@ include(HiveDefaults)
 include(CheckIncludeFile)
 include(CheckFunctionExists)
 
+check_include_file(unistd.h HAVE_UNISTD_H)
+if(HAVE_UNISTD_H)
+    add_definitions(-DHAVE_UNISTD_H=1)
+endif()
+
 set(SRC
     tests.c
     hive-new-test.c
     hive-authorize-test.c
+    hive-authorizing-test.c
     hive-mkdir-test.c
     hive-no-file-test.c
     hive-file-test.c

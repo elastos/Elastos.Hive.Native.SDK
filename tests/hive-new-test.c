@@ -11,10 +11,10 @@
 static hive_1drv_opt_t onedrv_option;
 
 static
-void onedrv_open_oauth_url(const char *url)
+int onedrv_open_oauth_url(const char *url)
 {
     ShellExecute(NULL, "open", url, NULL, NULL, SW_SHOWNORMAL);
-    return;
+    return 0;
 }
 
 static void test_hive_init(void)

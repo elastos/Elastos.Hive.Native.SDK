@@ -18,10 +18,10 @@ static hive_1drv_opt_t onedrv_option;
 static hive_t *hive = NULL;
 
 static
-void onedrv_open_oauth_url(const char *url)
+int onedrv_open_oauth_url(const char *url)
 {
     ShellExecute(NULL, "open", url, NULL, NULL, SW_SHOWNORMAL);
-    return;
+    return 0;
 }
 
 static void test_hive_mkdir_without_authorize(void)
@@ -41,14 +41,16 @@ static void test_hive_mkdir(void)
 {
     int rc;
 
+    sleep(2);
+
     rc = hive_authorize(hive);
     CU_ASSERT_EQUAL(rc, 0);
 
     rc = hive_mkdir(hive, file_path);
     CU_ASSERT_EQUAL(rc, 0);
 
-    //rc = hive_delete(hive, file_path);
-    //CU_ASSERT_EQUAL(rc, 0);
+    rc = hive_delete(hive, file_path);
+    CU_ASSERT_EQUAL(rc, 0);
 
     return;
 }
@@ -58,9 +60,6 @@ static int hive_mkdir_test_suite_init(void)
     onedrv_option.base.type = HIVE_TYPE_ONEDRIVE;
     strcpy(onedrv_option.profile_path, "hive1drv.json");
     onedrv_option.open_oauth_url = onedrv_open_oauth_url;
-
-   // if (hive_delete_profile_file(profile_name))
-       // return -1;
 
     if (hive_global_init())
         return -1;

@@ -13,7 +13,9 @@ extern const char *profile_name;
 extern const char *file_path;
 extern const char *file_newpath;
 extern const char *file_newname;
+extern const char *file_movepath;
 extern int hive_delete_profile_file(char* profile_name);
+extern void hive_ready_for_oauth(void);
 
 static hive_opt_t hive_option;
 static hive_1drv_opt_t onedrv_option;
@@ -21,11 +23,11 @@ static hive_t *hive = NULL;
 static char *result;
 
 static
-void onedrv_open_oauth_url(const char *url)
+int onedrv_open_oauth_url(const char *url)
 {
 
     ShellExecute(NULL, "open", url, NULL, NULL, SW_SHOWNORMAL);
-    return;
+    return 0;
 }
 
 static void test_hive_settime_without_mkdir(void)
@@ -87,7 +89,7 @@ static void test_hive_move_without_mkdir(void)
 {
     int rc;
 
-    rc = hive_move(hive, file_path, file_newname);
+    rc = hive_move(hive, file_path, file_movepath);
     CU_ASSERT_EQUAL(rc, -1);
 
     return;
@@ -99,9 +101,6 @@ static int hive_no_file_test_suite_init(void)
     strcpy(onedrv_option.profile_path, profile_name);
     onedrv_option.open_oauth_url = onedrv_open_oauth_url;
 
-    //if (hive_delete_profile_file(profile_name))
-       // return -1;
-
     if (hive_global_init())
         return -1;
 
@@ -109,6 +108,7 @@ static int hive_no_file_test_suite_init(void)
     if(!hive)
         return -1;
 
+    hive_ready_for_oauth();
     return hive_authorize(hive);
 }
 

@@ -1,5 +1,3 @@
-
-
 #include <pthread.h>
 #include <stdlib.h>
 #if defined(HAVE_UNISTD_H)
@@ -11,7 +9,6 @@
 #if defined(HAVE_SYS_TIME_H)
 #include <sys/time.h>
 #endif
-#include <crystal.h>
 #if defined(HAVE_IO_H)
 #include <io.h>
 #endif

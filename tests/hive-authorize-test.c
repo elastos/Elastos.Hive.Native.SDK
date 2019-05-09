@@ -11,27 +11,44 @@
 
 const char *profile_name = "hive1drv.json";
 const char *file_path = "/Documents/HiveTest/helloworld";
-const char *file_newpath = "/Documents/HiveTest_New/helloworld";
+const char *file_newpath = "/Documents/HiveTest_New/";
 const char *file_newname = "/byeworld";
 
 static hive_1drv_opt_t onedrv_option;
+static struct timeval end;
 
-int hive_delete_profile_file(char* profile_name)
+int hive_delete_profile_file(const char* profile_name)
 {
     int rc = 0;
 
-    if (access(profile_name, F_OK) == 0)
+    if (!access(profile_name, F_OK))
         rc = remove(profile_name);
 
     return rc;
 }
 
+void hive_ready_for_oauth(void)
+{
+    struct timeval start;
+
+    start.tv_sec = end.tv_sec;
+    start.tv_usec = end.tv_usec;
+
+    gettimeofday(&end, NULL);
+
+    int time_inter = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec)/1000000;
+    if (time_inter < 2 && time_inter >= 0)
+       Sleep(2-time_inter);
+
+    return;
+}
+
 static
-void onedrv_open_oauth_url(const char *url)
+int onedrv_open_oauth_url(const char *url)
 {
 
     ShellExecute(NULL, "open", url, NULL, NULL, SW_SHOWNORMAL);
-    return;
+    return 0;
 }
 
 static void test_hive_authorize_without_new(void)
@@ -53,18 +70,15 @@ static void test_hive_double_authorize(void)
     hive = hive_new((hive_opt_t *)(&onedrv_option));
     CU_ASSERT_PTR_NOT_NULL_FATAL(hive);
 
+    hive_ready_for_oauth();
     rc = hive_authorize(hive);
     CU_ASSERT_EQUAL(rc, 0);
 
+    hive_ready_for_oauth();
     rc = hive_authorize(hive);
     CU_ASSERT_EQUAL(rc, 0);
 
     hive_kill(hive);
-    return;
-}
-
-static void test_hive_authorizing(void)
-{
     return;
 }
 
@@ -90,7 +104,6 @@ static int hive_authorize_test_suite_cleanup(void)
 static CU_TestInfo cases[] = {
     {   "test_hive_authorize_without_new", test_hive_authorize_without_new },
     {   "test_hive_double_authorize",      test_hive_double_authorize      },
-    {   "test_hive_authorizing",           test_hive_authorizing           },
     {   NULL,                              NULL                            }
 };
 
