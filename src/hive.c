@@ -78,6 +78,20 @@ hive_t *hive_new(const hive_opt_t *opt)
     return hive_new_recipes[opt->type](opt);
 }
 
+int hive_set_expired(hive_t *hive)
+{
+    int rc;
+
+    if (!hive)
+        return -1;
+
+    ref(hive);
+    rc = hive->set_expired(hive);
+    deref(hive);
+
+    return rc;
+}
+
 int hive_authorize(hive_t *hive)
 {
     int rc;

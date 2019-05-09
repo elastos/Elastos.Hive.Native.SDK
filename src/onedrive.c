@@ -11,7 +11,7 @@
 #endif
 #include <string.h>
 
-#include "oauth_client.h"
+#include "oauth_client_internal.h"
 #include "http_client.h"
 #include "hive_impl.h"
 #include "onedrive.h"
@@ -20,14 +20,15 @@ struct hive_onedrive {
     hive_t base;
     oauth_client_t *oauth;
 };
-#define authorize base.authorize
-#define revoke    base.revoke
-#define makedir   base.makedir
-#define list      base.list
-#define copy      base.copy
-#define delete    base.delete
-#define move      base.move
-#define stat      base.stat
+#define authorize   base.authorize
+#define revoke      base.revoke
+#define makedir     base.makedir
+#define list        base.list
+#define copy        base.copy
+#define delete      base.delete
+#define move        base.move
+#define stat        base.stat
+#define set_expired base.set_expired
 
 #define ONEDRV_ROOT "https://graph.microsoft.com/v1.0/me"
 
@@ -138,6 +139,12 @@ retry:
     return 0;
 
 #undef RESP_BODY_MAX_SZ
+}
+static int hive_1drv_set_expired(hive_t *hive)
+{
+    hive_1drv_t *onedrv = (hive_1drv_t *)hive;
+
+    return oauth_client_set_expired(onedrv->oauth);
 }
 
 static int hive_1drv_move(hive_t *hive, const char *old, const char *new)
@@ -737,14 +744,15 @@ hive_t *hive_1drv_new(const hive_opt_t *base_opt)
         return NULL;
     }
 
-    onedrv->authorize = hive_1drv_authorize;
-    onedrv->revoke    = hive_1drv_revoke;
-    onedrv->makedir   = hive_1drv_mkdir;
-    onedrv->list      = hive_1drv_list;
-    onedrv->copy      = hive_1drv_copy;
-    onedrv->delete    = hive_1drv_delete;
-    onedrv->move      = hive_1drv_move;
-    onedrv->stat      = hive_1drv_stat;
+    onedrv->authorize   = hive_1drv_authorize;
+    onedrv->revoke      = hive_1drv_revoke;
+    onedrv->makedir     = hive_1drv_mkdir;
+    onedrv->list        = hive_1drv_list;
+    onedrv->copy        = hive_1drv_copy;
+    onedrv->delete      = hive_1drv_delete;
+    onedrv->move        = hive_1drv_move;
+    onedrv->stat        = hive_1drv_stat;
+    onedrv->set_expired = hive_1drv_set_expired;
 
     return (hive_t *)onedrv;
 }

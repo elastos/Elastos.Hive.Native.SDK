@@ -1,7 +1,10 @@
 #ifndef __HIVE_IMPL_H__
 #define __HIVE_IMPL_H__
 
-typedef struct hive hive_t;
+#include "hive.h"
+
+HIVE_API
+int hive_set_expired(hive_t *hive);
 
 struct hive {
     int (*authorize)(hive_t *hive);
@@ -12,6 +15,7 @@ struct hive {
     int (*delete)(hive_t *hive, const char *path);
     int (*move)(hive_t *hive, const char *old, const char *new);
     int (*stat)(hive_t *hive, const char *path, char **result);
+    int (*set_expired)(hive_t *hive);
 };
 
 #endif
