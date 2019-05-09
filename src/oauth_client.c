@@ -862,3 +862,22 @@ int oauth_client_refresh_access_token(oauth_client_t *cli, char **token)
 {
     return get_access_token(cli, true, token);
 }
+
+int oauth_client_set_expired(oauth_client_t *client)
+{
+    pthread_mutex_lock(&client->lock);
+
+    while (client->state == OAUTH_CLIENT_STATE_LOGGING_IN ||
+        client->state == OAUTH_CLIENT_STATE_REFRESHING)
+        pthread_cond_wait(&client->cond, &client->lock);
+
+    if (client->state != OAUTH_CLIENT_STATE_LOGGED_IN) {
+        pthread_mutex_unlock(&client->lock);
+        return -1;
+    }
+
+    client->svr_resp.expires_at.tv_sec = 0;
+    pthread_mutex_unlock(&client->lock);
+
+    return 0;
+}
