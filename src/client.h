@@ -5,7 +5,17 @@
 extern "C" {
 #endif
 
+#include "drive.h"
+
 typedef struct HiveClient HiveClient;
+struct HiveClient {
+    // TODO;
+    int (*login)(HiveClient *);
+    int (*logout)(HiveClient *);
+    void (*destructor_func)(HiveClient *);
+};
+
+typedef struct HiveClientInfo HiveClientInfo;
 
 struct HiveOAuthInfo {
     const char *client_id;
@@ -40,8 +50,13 @@ typedef struct OneDriveOptions {
 } OneDriveOptions;
 
 HiveClient *hive_client_new(const HiveOptions *options);
+int hive_client_close(HiveClient *);
 
-int hive_client_close(HiveClient *hive);
+int hive_client_login(HiveClient *);
+int hive_client_logout(HiveClient *);
+
+HiveDrive *hive_drive_new(HiveClient *, const HiveDriveOptions *options);
+int hive_client_get_info(HiveClient *client, HiveClientInfo *info);
 
 #ifdef __cplusplus
 } // extern "C"

@@ -42,6 +42,7 @@ configure_file(
 set(SRC
     client.c
     hive.c
+    drive.c
     oauth_client.c
     onedrive.c
     sandbird/sandbird.c

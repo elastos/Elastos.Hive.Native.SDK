@@ -24,7 +24,8 @@ typedef struct oauth_client oauth_client_t;
 
 oauth_client_t *oauth_client_new(oauth_opt_t *opt);
 void oauth_client_delete(oauth_client_t *client);
-int oauth_client_authorize(oauth_client_t *client);
+int oauth_client_login(oauth_client_t *client);
+int oauth_client_logout(oauth_client_t *client);
 int oauth_client_get_access_token(oauth_client_t *client, char **token);
 int oauth_client_refresh_access_token(oauth_client_t *client, char **token);
 

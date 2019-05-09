@@ -21,6 +21,7 @@ struct hive_onedrive {
     oauth_client_t *oauth;
 };
 #define authorize base.authorize
+#define revoke    base.revoke
 #define makedir   base.makedir
 #define list      base.list
 #define copy      base.copy
@@ -54,7 +55,14 @@ static int hive_1drv_authorize(hive_t *hive)
 {
     hive_1drv_t *onedrv = (hive_1drv_t *)hive;
 
-    return oauth_client_authorize(onedrv->oauth);
+    return oauth_client_login(onedrv->oauth);
+}
+
+static int hive_1drv_revoke(hive_t *hive)
+{
+    hive_1drv_t *onedrv = (hive_1drv_t *)hive;
+
+    return oauth_client_logout(onedrv->oauth);
 }
 
 static int hive_1drv_stat(hive_t *hive, const char *path, char **result)
@@ -730,6 +738,7 @@ hive_t *hive_1drv_new(const hive_opt_t *base_opt)
     }
 
     onedrv->authorize = hive_1drv_authorize;
+    onedrv->revoke    = hive_1drv_revoke;
     onedrv->makedir   = hive_1drv_mkdir;
     onedrv->list      = hive_1drv_list;
     onedrv->copy      = hive_1drv_copy;

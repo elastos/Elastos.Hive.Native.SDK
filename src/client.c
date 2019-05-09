@@ -6,12 +6,6 @@
 #include "owncloud.h"
 #include "hiveipfs.h"
 
-typedef struct HiveClient HiveClient;
-struct HiveClient {
-    // TODO;
-    void (*destructor_func)(HiveClient *);
-};
-
 typedef struct ClientFactoryMethod {
     int drive_type;
     HiveClient * (*factory_func)(const HiveOptions *);
@@ -52,8 +46,25 @@ HiveClient *hive_client_new(const HiveOptions *options)
 int hive_client_close(HiveClient *client)
 {
     if (!client)
-        return 0;
+        return -1;
 
     client->destructor_func(client);
     return 0;
 }
+
+int hive_client_login(HiveClient *client)
+{
+    if (!client)
+        return -1;
+
+    return client->login(client);
+}
+
+int hive_client_logout(HiveClient *client)
+{
+    if (!client)
+        return -1;
+
+    return client->logout(client);
+}
+

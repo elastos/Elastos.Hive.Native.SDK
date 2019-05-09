@@ -92,6 +92,20 @@ int hive_authorize(hive_t *hive)
     return rc;
 }
 
+int hive_revoke(hive_t *hive)
+{
+    int rc;
+
+    if (!hive)
+        return -1;
+
+    ref(hive);
+    rc = hive->revoke(hive);
+    deref(hive);
+
+    return rc;
+}
+
 void hive_kill(hive_t *hive)
 {
     if (!hive)
