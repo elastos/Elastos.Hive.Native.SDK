@@ -10,13 +10,12 @@
 #include <hive.h>
 
 extern const char *profile_name;
-extern const char *file_path;
-extern const char *file_newpath;
 extern int hive_delete_profile_file(char* profile_name);
 extern void hive_ready_for_oauth(void);
 
 static hive_1drv_opt_t onedrv_option;
 static hive_t *hive = NULL;
+static const char* test_file = "/Document/Test_Expired_Token";
 
 static
 int onedrv_open_oauth_url(const char *url)
@@ -25,37 +24,24 @@ int onedrv_open_oauth_url(const char *url)
     return 0;
 }
 
-static void test_hive_mkdir_without_authorize(void)
+static void test_hive_expired_token(void)
 {
     int rc;
 
-    rc = hive_mkdir(hive, file_path);
-    CU_ASSERT_EQUAL(rc, -1);
-
-    rc = hive_delete(hive, file_path);
-    CU_ASSERT_EQUAL(rc, -1);
-
-    return;
-}
-
-static void test_hive_mkdir(void)
-{
-    int rc;
-
-    hive_ready_for_oauth();
-    rc = hive_authorize(hive);
+    rc = hive_set_expired(hive);
     CU_ASSERT_EQUAL(rc, 0);
 
-    rc = hive_mkdir(hive, file_path);
+    rc = hive_mkdir(hive, test_file);
     CU_ASSERT_EQUAL(rc, 0);
 
-    rc = hive_delete(hive, file_path);
+    rc = hive_delete(hive, test_file);
     CU_ASSERT_EQUAL(rc, 0);
 
     return;
 }
 
-static int hive_mkdir_test_suite_init(void)
+
+static int hive_expired_token_test_suite_init(void)
 {
     onedrv_option.base.type = HIVE_TYPE_ONEDRIVE;
     strcpy(onedrv_option.profile_path, "hive1drv.json");
@@ -68,10 +54,14 @@ static int hive_mkdir_test_suite_init(void)
     if(!hive)
         return -1;
 
+    hive_ready_for_oauth();
+    if(hive_authorize(hive) != 0)
+        return -1;
+
     return 0;
 }
 
-static int hive_mkdir_test_suite_cleanup(void)
+static int hive_expired_token_test_suite_cleanup(void)
 {
     onedrv_option.base.type = HIVE_TYPE_NONEXIST;
     strcpy(onedrv_option.profile_path, "");
@@ -83,17 +73,16 @@ static int hive_mkdir_test_suite_cleanup(void)
 }
 
 static CU_TestInfo cases[] = {
-    {   "test_hive_mkdir_without_authorize",         test_hive_mkdir_without_authorize  },
-    {   "test_hive_mkdir",                           test_hive_mkdir                    },
-    {   NULL,                                        NULL                               }
+    {   "test_hive_expired_token",         test_hive_expired_token  },
+    {   NULL,                              NULL                     }
 };
 
 static CU_SuiteInfo suite[] = {
-    {   "hive mkdir test", hive_mkdir_test_suite_init, hive_mkdir_test_suite_cleanup, NULL, NULL, cases },
+    {   "hive expired token test", hive_expired_token_test_suite_init, hive_expired_token_test_suite_cleanup, NULL, NULL, cases },
     {    NULL,             NULL,                       NULL,                          NULL, NULL, NULL  }
 };
 
-CU_SuiteInfo* hive_mkidr_test_suite_info(void)
+CU_SuiteInfo* hive_expired_token_test_suite_info(void)
 {
     return suite;
 }

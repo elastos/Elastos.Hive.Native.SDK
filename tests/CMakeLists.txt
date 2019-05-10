@@ -15,6 +15,7 @@ set(SRC
     hive-authorize-test.c
     hive-authorizing-test.c
     hive-mkdir-test.c
+    hive-expired-token-test.c
     hive-no-file-test.c
     hive-file-test.c
     hive-asynctest.c
