@@ -24,7 +24,7 @@ else()
         ./configure)
 
     set(CONFIGURE_ARGS
-        "--prefix=${CARRIER_INT_DIST_DIR}"
+        "--prefix=${HIVE_INT_DIST_DIR}"
         "--enable-shared=no"
         "--disable-shared"
         "--enable-static=yes"
