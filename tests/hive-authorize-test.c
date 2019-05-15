@@ -50,12 +50,25 @@ void hive_ready_for_oauth(void)
     return;
 }
 
+int hive_authorize_record_time(hive_t * hive)
+{
+    int rc = -1;
+
+    if(!hive)
+        return -1;
+
+    rc = hive_authorize(hive);
+    gettimeofday(&end, NULL);
+
+    return rc;
+}
+
 static void test_hive_authorize_without_new(void)
 {
     int rc;
     hive_t *hive = NULL;
 
-    rc = hive_authorize(hive);
+    rc = hive_authorize_record_time(hive);
     CU_ASSERT_EQUAL(rc, -1);
 
     return;
@@ -70,11 +83,11 @@ static void test_hive_double_authorize(void)
     CU_ASSERT_PTR_NOT_NULL_FATAL(hive);
 
     hive_ready_for_oauth();
-    rc = hive_authorize(hive);
+    rc = hive_authorize_record_time(hive);
     CU_ASSERT_EQUAL(rc, 0);
 
     hive_ready_for_oauth();
-    rc = hive_authorize(hive);
+    rc = hive_authorize_record_time(hive);
     CU_ASSERT_EQUAL(rc, 0);
 
     hive_kill(hive);

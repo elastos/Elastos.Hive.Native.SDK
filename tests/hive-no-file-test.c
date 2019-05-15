@@ -22,6 +22,7 @@ extern const char *file_movepath;
 extern int hive_delete_profile_file(const char* profile_name);
 extern void hive_ready_for_oauth(void);
 extern int onedrv_open_oauth_url(const char *url);
+extern int hive_authorize_record_time(hive_t * hive);
 
 static hive_opt_t hive_option;
 static hive_1drv_opt_t onedrv_option;
@@ -107,7 +108,7 @@ static int hive_no_file_test_suite_init(void)
         return -1;
 
     hive_ready_for_oauth();
-    return hive_authorize(hive);
+    return hive_authorize_record_time(hive);
 }
 
 static int hive_no_file_test_suite_cleanup(void)
