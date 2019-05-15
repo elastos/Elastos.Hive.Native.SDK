@@ -2,12 +2,19 @@
 #include <stdio.h>
 #include <string.h>
 #include <CUnit/Basic.h>
+#if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
 #include <Shellapi.h>
-#if defined(HAVE_UNISTD_H)
+#endif
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
-#include <hive.h>
+#include <hive_impl.h>
+
+extern int onedrv_open_oauth_url(const char *url);
 
 const char *profile_name = "hive1drv.json";
 const char *file_path = "/Documents/HiveTest/helloworld";
@@ -38,17 +45,9 @@ void hive_ready_for_oauth(void)
 
     int time_inter = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec)/1000000;
     if (time_inter < 2 && time_inter >= 0)
-       Sleep(2-time_inter);
+       sleep(2-time_inter);
 
     return;
-}
-
-static
-int onedrv_open_oauth_url(const char *url)
-{
-
-    ShellExecute(NULL, "open", url, NULL, NULL, SW_SHOWNORMAL);
-    return 0;
 }
 
 static void test_hive_authorize_without_new(void)

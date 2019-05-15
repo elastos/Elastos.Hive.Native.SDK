@@ -2,25 +2,27 @@
 #include <stdio.h>
 #include <string.h>
 #include <CUnit/Basic.h>
+#include <pthread.h>
+#if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
 #include <Shellapi.h>
+#endif
 #if defined(HAVE_UNISTD_H)
 #include <unistd.h>
 #endif
-#include <pthread.h>
-#include <hive.h>
+#include <hive_impl.h>
 
 extern const char *profile_name;
 extern const char *file_path;
 extern const char *file_newpath;
 extern const char *file_newname;
-static int used_id = 0;
+extern int hive_delete_profile_file(const char* profile_name);
+extern void hive_ready_for_oauth(void);
+extern int onedrv_open_oauth_url(const char *url);
 
+static int used_id = 0;
 static hive_1drv_opt_t onedrv_option;
 static hive_t *hive;
-
-extern int hive_delete_profile_file(char* profile_name);
-extern void hive_ready_for_oauth(void);
 
 static int test_hive_second_authorize(void);
 
@@ -38,11 +40,9 @@ void* second_hive_authorize_entry(void *argv)
 }
 
 static
-int onedrv_open_oauth_url(const char *url)
+int hive_open_oauth_url(const char *url)
 {
-    int rc = 0;
-
-    ShellExecute(NULL, "open", url, NULL, NULL, SW_SHOWNORMAL);
+    int rc = onedrv_open_oauth_url(url);
 
     if (!used_id)
     {
@@ -81,7 +81,7 @@ static int hive_authorizing_test_suite_init(void)
 {
     onedrv_option.base.type = HIVE_TYPE_ONEDRIVE;
     strcpy(onedrv_option.profile_path, "hive1drv.json");
-    onedrv_option.open_oauth_url = onedrv_open_oauth_url;
+    onedrv_option.open_oauth_url = hive_open_oauth_url;
 
     if (hive_global_init() != 0)
         return -1;

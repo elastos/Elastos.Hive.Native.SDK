@@ -1,19 +1,28 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <CUnit/Basic.h>
+#if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
 #include <Shellapi.h>
+#endif
 #if defined(HAVE_UNISTD_H)
 #include <unistd.h>
 #endif
-#include <hive.h>
+#include <hive_impl.h>
 
 static hive_1drv_opt_t onedrv_option;
 
-static
 int onedrv_open_oauth_url(const char *url)
 {
-    ShellExecute(NULL, "open", url, NULL, NULL, SW_SHOWNORMAL);
+#if defined(_WIN32) || defined(_WIN64)
+   ShellExecute(NULL, "open", url, NULL, NULL, SW_SHOWNORMAL);
+#else
+    char open_url[PATH_MAX];
+    memcpy(open_url, "open ", 5);
+    memcpy(open_url+5, url, strlen(url)+1 );
+
+    system(open_url);
+#endif
     return 0;
 }
 
@@ -45,7 +54,7 @@ static void test_hive_double_init(void)
 static void test_hive_new(void)
 {
     int rc;
-    hive_t *hive = NULL;
+    hive_t *hive;
 
     rc = hive_global_init();
     CU_ASSERT_EQUAL_FATAL(rc, 0);
@@ -55,7 +64,7 @@ static void test_hive_new(void)
 
     hive_kill(hive);
     hive = NULL;
-
+	
     onedrv_option.base.type = HIVE_TYPE_NONEXIST;
 
     hive = hive_new((hive_opt_t *)(&onedrv_option));

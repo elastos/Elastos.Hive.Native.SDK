@@ -2,28 +2,24 @@
 #include <stdio.h>
 #include <string.h>
 #include <CUnit/Basic.h>
+#if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
 #include <Shellapi.h>
+#endif
 #if defined(HAVE_UNISTD_H)
 #include <unistd.h>
 #endif
-#include <hive.h>
+#include <hive_impl.h>
 
 extern const char *profile_name;
 extern const char *file_path;
 extern const char *file_newpath;
-extern int hive_delete_profile_file(char* profile_name);
+extern int hive_delete_profile_file(const char* profile_name);
 extern void hive_ready_for_oauth(void);
+extern int onedrv_open_oauth_url(const char *url);
 
 static hive_1drv_opt_t onedrv_option;
 static hive_t *hive = NULL;
-
-static
-int onedrv_open_oauth_url(const char *url)
-{
-    ShellExecute(NULL, "open", url, NULL, NULL, SW_SHOWNORMAL);
-    return 0;
-}
 
 static void test_hive_mkdir_without_authorize(void)
 {
