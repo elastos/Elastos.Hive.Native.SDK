@@ -14,46 +14,6 @@
 #include "onedrive.h"
 #include "http_client.h"
 
-
-static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-static enum {
-    HIVE_MODULE_STATE_UNINITIALIZED,
-    HIVE_MODULE_STATE_INITIALIZED,
-} state;
-
-void hive_global_cleanup()
-{
-    pthread_mutex_lock(&lock);
-    if (state != HIVE_MODULE_STATE_INITIALIZED) {
-        pthread_mutex_unlock(&lock);
-        return;
-    }
-
-    http_client_cleanup();
-
-    state = HIVE_MODULE_STATE_UNINITIALIZED;
-    pthread_mutex_unlock(&lock);
-}
-
-hive_err_t hive_global_init()
-{
-    pthread_mutex_lock(&lock);
-    if (state != HIVE_MODULE_STATE_UNINITIALIZED) {
-        pthread_mutex_unlock(&lock);
-        return 0;
-    }
-
-    if (http_client_init()) {
-        hive_global_cleanup();
-        return -1;
-    }
-
-    state = HIVE_MODULE_STATE_INITIALIZED;
-    pthread_mutex_unlock(&lock);
-
-    return 0;
-}
-
 const char *hive_get_version(void)
 {
     return NULL;
@@ -67,13 +27,6 @@ hive_t *hive_new(const hive_opt_t *opt)
 {
     if (!opt || opt->type < 0 || opt->type >= HIVE_TYPE_NONEXIST)
         return NULL;
-
-    pthread_mutex_lock(&lock);
-    if (state != HIVE_MODULE_STATE_INITIALIZED) {
-        pthread_mutex_unlock(&lock);
-        return NULL;
-    }
-    pthread_mutex_unlock(&lock);
 
     return hive_new_recipes[opt->type](opt);
 }

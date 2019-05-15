@@ -23,13 +23,6 @@ typedef enum {
 } http_version_t;
 
 /*
- * Http global APIs.
- */
-
-int  http_client_init(void);
-void http_client_cleanup(void);
-
-/*
  * Http client instance.
  */
 
@@ -45,34 +38,35 @@ void http_client_reset(http_client_t *client);
 int http_client_set_method(http_client_t *, http_method_t method);
 int http_client_set_url(http_client_t *, const char *url);
 int http_client_set_url_escape(http_client_t *, const char *url);
-int http_client_get_url_escape(http_client_t *, char **url);
-int http_client_get_scheme(http_client_t *, char **scheme);
-int http_client_get_host(http_client_t *, char **host);
-int http_client_get_port(http_client_t *, char **port);
-int http_client_get_path(http_client_t *, char **path);
 int http_client_set_path(http_client_t *, const char *path);
 int http_client_set_query(http_client_t *, const char *name, const char *value);
 int http_client_set_header(http_client_t *, const char *name, const char *value);
 int http_client_set_timeout(http_client_t *, int timeout /* seconds */);
 int http_client_set_version(http_client_t *, http_version_t version);
 
+int http_client_get_url_escape(http_client_t *, char **url);
+int http_client_get_scheme(http_client_t *, char **scheme);
+int http_client_get_host(http_client_t *, char **host);
+int http_client_get_port(http_client_t *, char **port);
+int http_client_get_path(http_client_t *, char **path);
+
 /*
  * Http client request/response body.
  */
 
 typedef size_t (*http_client_request_body_callback_t)(char *buffer,
-                                    size_t size, size_t nitems, void *userdata);
+    size_t size, size_t nitems, void *userdata);
 
 typedef size_t (*http_client_response_body_callback_t)(char *buffer,
-                                    size_t size, size_t nitems, void *userdata);
+    size_t size, size_t nitems, void *userdata);
 
 
 int http_client_set_request_body_instant(http_client_t *, void *data, size_t len);
 int http_client_set_response_body_instant(http_client_t *, void *data, size_t len);
 int http_client_set_request_body(http_client_t *,
-                      http_client_request_body_callback_t *cb, void *userdata);
+    http_client_request_body_callback_t *cb, void *userdata);
 int http_client_set_response_body(http_client_t *client,
-                      http_client_response_body_callback_t *cb, void *userdata);
+    http_client_response_body_callback_t *cb, void *userdata);
 size_t http_client_get_response_body_length(http_client_t *);
 int http_client_get_response_code(http_client_t *, long *response_code);
 
@@ -88,7 +82,7 @@ int http_client_request(http_client_t *client);
 char *http_client_escape(http_client_t *client, const char *data, size_t len);
 
 char *http_client_unescape(http_client_t *client, const char *data, size_t len,
-                           size_t *outlen);
+    size_t *outlen);
 
 void http_client_memory_free(void *ptr);
 
