@@ -23,10 +23,6 @@ int main()
 
     getchar();
 
-    rc = hive_global_init();
-    if (rc)
-        return -1;
-
     opt.base.type = HIVE_TYPE_ONEDRIVE;
     strcpy(opt.profile_path, "hive1drv.json");
     opt.open_oauth_url = open_url;
@@ -35,9 +31,12 @@ int main()
     if (!hive)
         return -1;
 
+    rc = hive_authorize(hive);
+    if (rc)
+        return -1;
+
     rc = hive_mkdir(hive, "/test/test");
     if (rc)
         return -1;
-    while (1) ;
     return 0;
 }

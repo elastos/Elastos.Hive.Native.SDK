@@ -57,12 +57,6 @@ typedef struct hive_onedrive_options {
 typedef int hive_err_t;
 
 HIVE_API
-void hive_global_cleanup();
-
-HIVE_API
-hive_err_t hive_global_init();
-
-HIVE_API
 int hive_authorize(hive_t *hive);
 
 HIVE_API
