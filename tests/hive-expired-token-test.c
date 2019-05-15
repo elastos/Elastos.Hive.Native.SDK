@@ -16,9 +16,8 @@
 
 extern const char *profile_name;
 extern int hive_delete_profile_file(const char* profile_name);
-extern void hive_ready_for_oauth(void);
 extern int onedrv_open_oauth_url(const char *url);
-extern int hive_authorize_record_time(hive_t * hive);
+extern int hive_authorize_record_time(hive_t * hive, bool isWait);
 
 static hive_1drv_opt_t onedrv_option;
 static hive_t *hive = NULL;
@@ -54,8 +53,7 @@ static int hive_expired_token_test_suite_init(void)
     if(!hive)
         return -1;
 
-    hive_ready_for_oauth();
-    if(hive_authorize_record_time(hive) != 0)
+    if(hive_authorize_record_time(hive,true) != 0)
         return -1;
 
     return 0;

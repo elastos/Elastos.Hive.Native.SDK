@@ -22,7 +22,6 @@ const char *file_newpath = "/Documents/HiveTest_New/";
 const char *file_newname = "/byeworld";
 
 static hive_1drv_opt_t onedrv_option;
-static struct timeval end;
 
 int hive_delete_profile_file(const char* profile_name)
 {
@@ -34,28 +33,28 @@ int hive_delete_profile_file(const char* profile_name)
     return rc;
 }
 
-void hive_ready_for_oauth(void)
+
+int hive_authorize_record_time(hive_t * hive, bool isWait)
 {
-    struct timeval start;
-
-    start.tv_sec = end.tv_sec;
-    start.tv_usec = end.tv_usec;
-
-    gettimeofday(&end, NULL);
-
-    int time_inter = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec)/1000000;
-    if (time_inter < 2 && time_inter >= 0)
-       sleep(2-time_inter);
-
-    return;
-}
-
-int hive_authorize_record_time(hive_t * hive)
-{
+    static struct timeval end;
     int rc = -1;
 
     if(!hive)
         return -1;
+
+    if(isWait)
+    {
+        struct timeval start;
+
+        start.tv_sec = end.tv_sec;
+        start.tv_usec = end.tv_usec;
+
+        gettimeofday(&end, NULL);
+
+        int time_inter = (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec)/1000000;
+        if (time_inter < 2 && time_inter >= 0)
+            sleep(2-time_inter);
+    }
 
     rc = hive_authorize(hive);
     gettimeofday(&end, NULL);
@@ -68,7 +67,7 @@ static void test_hive_authorize_without_new(void)
     int rc;
     hive_t *hive = NULL;
 
-    rc = hive_authorize_record_time(hive);
+    rc = hive_authorize_record_time(hive, true);
     CU_ASSERT_EQUAL(rc, -1);
 
     return;
@@ -82,12 +81,10 @@ static void test_hive_double_authorize(void)
     hive = hive_new((hive_opt_t *)(&onedrv_option));
     CU_ASSERT_PTR_NOT_NULL_FATAL(hive);
 
-    hive_ready_for_oauth();
-    rc = hive_authorize_record_time(hive);
+    rc = hive_authorize_record_time(hive, true);
     CU_ASSERT_EQUAL(rc, 0);
 
-    hive_ready_for_oauth();
-    rc = hive_authorize_record_time(hive);
+    rc = hive_authorize_record_time(hive, true);
     CU_ASSERT_EQUAL(rc, 0);
 
     hive_kill(hive);
