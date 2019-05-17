@@ -11,7 +11,7 @@
 #endif
 #include <string.h>
 
-#include "oauth_client_internal.h"
+#include "oauth_client_intl.h"
 #include "http_client.h"
 #include "hive_impl.h"
 #include "onedrive.h"
@@ -518,7 +518,7 @@ static int hive_1drv_list(hive_t *hive, const char *path, char **result)
 #define RESP_BODY_MAX_SZ 16384
     hive_1drv_t *onedrv = (hive_1drv_t *)hive;
     char url[MAXPATHLEN + 1];
-    int rc, val_sz;
+    int rc, val_sz, i;
     char *path_esc;
     char resp_body[RESP_BODY_MAX_SZ];
     size_t resp_body_len = sizeof(resp_body);
@@ -629,7 +629,7 @@ static int hive_1drv_list(hive_t *hive, const char *path, char **result)
         }
 
         val_sz = cJSON_GetArraySize(val_part);
-        for (int i = 0; i < val_sz; ++i) {
+        for (i = 0; i < val_sz; ++i) {
             elem = cJSON_DetachItemFromArray(val_part, 0);
             cJSON_AddItemToArray(val, elem);
         }
