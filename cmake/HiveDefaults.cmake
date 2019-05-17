@@ -39,21 +39,11 @@ if(CMAKE_CROSSCOMPILING)
     endif()
 endif()
 
-# Hive Version Defintions.
-set(HIVE_VERSION_MAJOR "5")
-set(HIVE_VERSION_MINOR "2")
-execute_process(
-    COMMAND git rev-parse master
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    OUTPUT_VARIABLE GIT_COMMIT_ID
-    ERROR_QUIET
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-if("${GIT_COMMIT_ID}" STREQUAL "")
-    # Not a git repository, maybe ectracted from downloaded tarball.
-    set(HIVE_VERSION_PATCH "unknown")
-else()
-    string(SUBSTRING ${GIT_COMMIT_ID} 0 6 HIVE_VERSION_PATCH)
-endif()
+# Rpath setup
+set(CMAKE_MACOSX_RPATH TRUE)
+set(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 
 # Third-party dependency tarballs directory
 set(HIVE_DEPS_TARBALL_DIR "${CMAKE_SOURCE_DIR}/build/.tarballs")
@@ -78,11 +68,6 @@ if(WIN32)
 else()
     set(PATCH_EXE "patch")
 endif()
-
-set(CMAKE_MACOSX_RPATH TRUE)
-set(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
-set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
-set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 
 ##Only suport for windows.
 if(WIN32)
