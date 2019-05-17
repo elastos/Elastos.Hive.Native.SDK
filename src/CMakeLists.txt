@@ -128,7 +128,10 @@ if(ENABLE_SHARED)
     add_dependencies(elahive-shared ${ELAHIVE_DEPENDS})
 
     target_compile_definitions(elahive-shared PRIVATE HIVE_DYNAMIC CRYSTAL_DYNAMIC)
-    set_target_properties(elahive-shared PROPERTIES OUTPUT_NAME elahive)
+    set_target_properties(elahive-shared PROPERTIES
+        LIBRARY_OUTPUT_NAME elahive
+        VERSION ${ELASTOS_HIVE_VERSION}
+        SOVERSION ${ELASTOS_HIVE_VERSION_MAJOR})
     if(WIN32)
         set_target_properties(elahive-shared PROPERTIES LINK_FLAGS /FORCE:MULTIPLE)
     endif()
