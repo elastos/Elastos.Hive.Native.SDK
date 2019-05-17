@@ -3,10 +3,31 @@ if(__hive_defaults_included)
 endif()
 set(__hive_defaults_included TRUE)
 
+if(NOT CMAKE_CROSSCOMPILING)
+    string(TOUPPER ${CMAKE_SYSTEM_NAME} CANONICAL_SYSTEM_NAME)
+    set(${CANONICAL_SYSTEM_NAME} TRUE)
+endif()
+
 # Global default variables defintions
 if("${CMAKE_BUILD_TYPE}" STREQUAL "")
     set(CMAKE_BUILD_TYPE "Debug")
 endif()
+
+if(WIN32)
+    set(CMAKE_CPP_FLAGS
+        "${CMAKE_CPP_FLAGS} -D_CRT_SECURE_NO_WARNINGS")
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+else()
+    set(CMAKE_C_FLAGS
+        "${CMAKE_C_FLAGS} -fPIC -fvisibility=hidden")
+
+    if(NOT (DARWIN OR IOS))
+        set(CMAKE_SHARED_LINKER_FLAGS
+            "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--exclude-libs,ALL")
+    endif()
+endif()
+set(CMAKE_CXX_FLAGS
+    "${CMAKE_C_FLAGS} -fexceptions")
 
 if(CMAKE_CROSSCOMPILING)
     if("${CMAKE_INSTALL_PREFIX}" STREQUAL "")
@@ -58,21 +79,10 @@ else()
     set(PATCH_EXE "patch")
 endif()
 
-if(APPLE)
-    set(CMAKE_INSTALL_RPATH "@execuable_path/Frameworks;@loader_path/Frameworks;@loader_path/../lib")
-else()
-    set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
-endif()
-set(CMAKE_MACOSX_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
-set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
-
-if (NOT WIN32)
-set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR TRUE)
-set(CMAKE_INSTALL_NAME_DIR "@rpath")
-
-set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG "-Wl,-rpath,")
-set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG_SEP ":")
-endif()
+set(CMAKE_MACOSX_RPATH TRUE)
+set(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
+set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 
 ##Only suport for windows.
 if(WIN32)
