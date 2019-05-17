@@ -3,11 +3,7 @@ if(__external_configure_args_included)
 endif()
 set(__external_configure_args_included TRUE)
 
-if(WIN32)
-    string(APPEND CMAKE_C_FLAGS_INIT " -D_CRT_SECURE_NO_WARNINGS ")
-else()
-    string(APPEND CMAKE_C_FLAGS_INIT " -fPIC -fvisibility=hidden ")
-endif()
+include(HiveDefaults)
 
 if(${CMAKE_CROSSCOMPILING})
     if(ANDROID)
@@ -24,12 +20,11 @@ if(${CMAKE_CROSSCOMPILING})
         set(XDK_STRIP "${XDK_TOOLCHAIN}/bin/${XDK_HOST}-ranlib")
 
         # Cross-compilation flags
-        string(APPEND CMAKE_C_FLAGS
-            " -D__${CMAKE_ANDROID_ARCH}__ --sysroot=${XDK_SYSROOT}")
-
-        set(XDK_C_FLAGS "${CMAKE_C_FLAGS_INIT} ${CMAKE_C_FLAGS}")
-        set(XDK_CXX_FLAGS "${XDK_C_FLAGS} -fexceptions")
-        set(XDK_C_LINK_FLAGS "${XDK_C_FLAGS}")
+        set(XDK_CPP_FLAGS
+            "${CMAKE_CPP_FLAGS} -D__${CMAKE_ANDROID_ARCH}__ --sysroot=${XDK_SYSROOT}")
+        set(XDK_C_FLAGS "${CMAKE_C_FLAGS}")
+        set(XDK_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+        set(XDK_C_LINK_FLAGS "${CMAKE_STATIC_LINKER_FLAGS}")
     endif()
 
     if(IOS)
@@ -50,9 +45,9 @@ if(${CMAKE_CROSSCOMPILING})
 
         # Cross compilation flags
         set(XDK_CPP_FLAGS "-isysroot ${CMAKE_OSX_SYSROOT} ${IOS_ARCH_FLAGS}")
-        set(XDK_C_FLAGS "${CMAKE_C_FLAGS_INIT} ${CMAKE_C_FLAGS}")
-        set(XDK_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions")
-        set(XDK_C_LINK_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_C_LINK_FLAGS_INIT}")
+        set(XDK_C_FLAGS "${CMAKE_C_FLAGS}")
+        set(XDK_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+        set(XDK_C_LINK_FLAGS "${CMAKE_STATIC_LINKER_FLAGS}")
     endif()
 
     if(RASPBERRYPI)
@@ -67,9 +62,10 @@ if(${CMAKE_CROSSCOMPILING})
         set(XDK_STRIP ${CMAKE_STRIP})
 
         # Cross compilation flags
-        set(XDK_C_FLAGS "${CMAKE_C_FLAGS_INIT} ${CMAKE_C_FLAGS}")
-        set(XDK_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions")
-        set(XDK_C_LINK_FLAGS "${CMAKE_C_FLAGS}")
+        unset(XDK_CPP_FLAGS)
+        set(XDK_C_FLAGS "${CMAKE_C_FLAGS}")
+        set(XDK_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+        set(XDK_C_LINK_FLAGS "${CMAKE_STATIC_LINKER_FLAGS}")
     endif()
 
 #[[
@@ -97,17 +93,14 @@ if(${CMAKE_CROSSCOMPILING})
         "AR=${XDK_AR}"
         "RANLIB=${XDK_RANLIB}"
         "STRIP=${XDK_STRIP}"
+        "CPPFLAGS=${XDK_CPP_FLAGS}"
         "CFLAGS=${XDK_C_FLAGS}"
         "CXXFLAGS=${XDK_CXX_FLAGS}"
         "LDFLAGS=${XDK_C_LINK_FLAGS}")
-    if(IOS)
-        set(CONFIGURE_ARGS_INIT ${CONFIGURE_ARGS_INIT} "CPPFLAGS=${XDK_CPP_FLAGS}")
-    endif()
 else()
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS_INIT} ${CMAKE_C_FLAGS}")
-
     set(CONFIGURE_ARGS_INIT
+        "CPPFLAGS=${CMAKE_CPP_FLAGS}"
         "CFLAGS=${CMAKE_C_FLAGS}"
-        "CXXFLAGS=${CMAKE_C_FLAGS} -fexceptions"
-        "LDFLAGS=${CMAKE_C_FLAGS}")
+        "CXXFLAGS=${CMAKE_CXX_FLAGS}"
+        "LDFLAGS=${CMAKE_STATIC_LINKER_FLAGS}")
 endif()
