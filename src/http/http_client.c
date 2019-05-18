@@ -5,6 +5,7 @@
 #ifdef HAVE_MALLOC_H
 #include <malloc.h>
 #endif
+#include <stdbool.h>
 
 #include <curl/curl.h>
 #include <crystal.h>
@@ -30,6 +31,56 @@ struct http_client {
     struct curl_slist *hdr;
     http_response_body_t response_body;
 };
+
+static bool initialized = false;
+
+#if defined(_WIN32) || defined(_WIN64)
+BOOL APIENTRY DllMain(
+    HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved)
+{
+    CURLcode rc;
+
+    if (ul_reason_for_call == DLL_PROCESS_ATTACH) {
+        rc = curl_global_init(CURL_GLOBAL_ALL);
+        if (rc != CURLE_OK)
+            vlogE("HttpClient: Initialize global curl error (%d)", rc);
+        else
+            initialized = true;
+        return rc == CURLE_OK ? TRUE : FALSE;
+    } else if (ul_reason_for_call == DLL_PROCESS_DETACH) {
+        curl_global_cleanup();
+        initialized = false;
+        return TRUE;
+    }
+    return TRUE;
+}
+#else
+__attribute__((constructor))
+static void initializer(int argc, char** argv, char** envp)
+{
+    CURLcode rc;
+
+    (void)argc;
+    (void)argv;
+    (void)envp;
+
+    rc = curl_global_init(CURL_GLOBAL_ALL);
+    if (rc != CURLE_OK)
+        vlogE("HttpClient: Initialize global curl error (%d)", rc);
+    else
+        initialized = true;
+}
+
+__attribute__((destructor))
+static void finalizer()
+{
+    if (!initialized)
+       return;
+
+    curl_global_cleanup();
+    initialized = false;
+}
+#endif
 
 static inline int __curlcode_to_error(CURLcode code)
 {
@@ -127,19 +178,14 @@ static void http_client_destroy(void *obj)
     if (client->hdr)
         curl_slist_free_all(client->hdr);
 
-    curl_global_cleanup();
 }
 
 http_client_t *http_client_new(void)
 {
     http_client_t *client;
-    CURLcode rc;
 
-    rc = curl_global_init(CURL_GLOBAL_ALL);
-    if (rc != CURLE_OK) {
-        vlogE("HttpClient: Initialize global curl error (%d)", rc);
+    if (!initialized)
         return NULL;
-    }
 
     client = (http_client_t *)rc_zalloc(sizeof(http_client_t), http_client_destroy);
     if (!client) {
