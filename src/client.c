@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
-#include "client.h"
+#include "client_impl.h"
 #include "local_client.h"
 #include "onedrive_client.h"
 #include "owncloud.h"
@@ -68,3 +68,28 @@ int hive_client_logout(HiveClient *client)
     return client->logout(client);
 }
 
+int hive_client_list_drives(HiveClient *client, char **result)
+{
+    if (!client)
+        return -1;
+
+    return client->list_drives(client, result);
+}
+
+HiveDrive *hive_drive_open(HiveClient *client, const HiveDriveOptions *options)
+{
+    if (!client || !options)
+        return NULL;
+
+    return client->drive_open(client, options);
+}
+
+int hive_client_get_access_token(HiveClient *client, char **access_token)
+{
+    return client->get_access_token(client, access_token);
+}
+
+int hive_client_refresh_access_token(HiveClient *client, char **access_token)
+{
+    return client->refresh_access_token(client, access_token);
+}
