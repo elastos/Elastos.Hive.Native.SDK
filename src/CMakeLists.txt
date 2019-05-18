@@ -135,6 +135,12 @@ if(ENABLE_SHARED)
     if(WIN32)
         set_target_properties(elahive-shared PROPERTIES LINK_FLAGS /FORCE:MULTIPLE)
     endif()
+    if(DARWIN OR IOS)
+        set_property(SOURCE ${SRC} APPEND PROPERTY
+            OBJECT_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/export_symbols.txt")
+        set_property(TARGET elahive-shared APPEND_STRING PROPERTY
+            LINK_FLAGS " -Wl,-exported_symbols_list,\"${CMAKE_CURRENT_SOURCE_DIR}/export_symbols.txt\"")
+    endif()
     target_link_libraries(elahive-shared ${LIBS} ${SYSTEM_LIBS})
 
     add_dependencies(ela-hive elahive-shared)
