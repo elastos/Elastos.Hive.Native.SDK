@@ -1,22 +1,18 @@
 # export list
 
-#_hive_client_new
-#_hive_client_close
-#_hive_client_login
-#_hive_client_logout
-#_hive_client_list_drives
-##_hive_client_get_info
-#_hive_drive_open
-##_hive_drive_getinfo
-#_hive_drive_file_stat
-#_hive_drive_list_files
-#_hive_drive_mkdir
-#_hive_drive_move_file
-#_hive_drive_copy_file
-#_hive_drive_delete_file
-#_hive_drive_close
-
-_hive_new
-_hive_authorize
-_hive_mkdir
+_hive_client_new
+_hive_client_close
+_hive_client_login
+_hive_client_logout
+_hive_client_list_drives
+#_hive_client_get_info
+_hive_drive_open
+#_hive_drive_getinfo
+_hive_drive_file_stat
+_hive_drive_list_files
+_hive_drive_mkdir
+_hive_drive_move_file
+_hive_drive_copy_file
+_hive_drive_delete_file
+_hive_drive_close
 

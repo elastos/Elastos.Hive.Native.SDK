@@ -9,6 +9,11 @@ if(HAVE_UNISTD_H)
     add_definitions(-DHAVE_UNISTD_H=1)
 endif()
 
+check_include_file(stdlib.h HAVE_STDLIB_H)
+if(HAVE_STDLIB_H)
+    add_definitions(-DHAVE_STDLIB_H=1)
+endif()
+
 check_include_file(malloc.h HAVE_MALLOC_H)
 if(HAVE_MALLOC_H)
     add_definitions(-DHAVE_MALLOC_H=1)
@@ -34,26 +39,21 @@ if(HAVE_SYS_PARAM_H)
     add_definitions(-DHAVE_SYS_PARAM_H=1)
 endif()
 
-configure_file(
-    version.h.in
-    version.h
-    "@ONLY")
-
 set(SRC
     client.c
-    hive.c
     drive.c
     oauth_client.c
-    onedrive.c
     sandbird/sandbird.c
     http/http_client.c
     vendors/local/local_client.c
     vendors/onedrive/onedrive_client.c
+    vendors/onedrive/onedrive_drive.c
     vendors/owncloud/owncloud.c
     vendors/hiveipfs/hiveipfs.c)
 
 set(HEADERS
-    hive.h)
+    client.h
+    drive.h)
 
 if(WIN32)
     set(SYSTEM_LIBS Ws2_32 Iphlpapi)
