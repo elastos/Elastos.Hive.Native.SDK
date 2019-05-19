@@ -548,7 +548,7 @@ static int onedrive_drive_delete_file(HiveDrive *obj, const char *path)
         return -1;
 
     void *args[] = {url};
-    rc = hive_drive_http_request(obj, delete_setup_req, args, &http_cli);
+    rc = hive_drive_http_request(obj, &delete_setup_req, args, &http_cli);
     if (rc)
         return -1;
 

@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.5)
 cmake_policy(VERSION 3.5)
 project(ELASTOS_HIVE
-        VERSION 1.0.0
-        LANGUAGES C)
+    VERSION 1.0.0
+    LANGUAGES C)
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 include(HiveDefaults)
@@ -37,5 +37,5 @@ add_subdirectory(src)
 # Alias target for package. But it fix issue about making package
 # inrelevant to udpatation of cmake scripts.
 add_custom_target(dist
-        COMMAND ${CMAKE_MAKE_PROGRAM} package
-        COMMENT "Package Hive Distrubtion")
+    COMMAND ${CMAKE_MAKE_PROGRAM} package
+    COMMENT "Package Hive Distrubtion")
