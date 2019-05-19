@@ -48,6 +48,9 @@ BOOL APIENTRY DllMain(
             initialized = true;
         return rc == CURLE_OK ? TRUE : FALSE;
     } else if (ul_reason_for_call == DLL_PROCESS_DETACH) {
+        if (!initialized)
+            return TRUE;
+
         curl_global_cleanup();
         initialized = false;
         return TRUE;

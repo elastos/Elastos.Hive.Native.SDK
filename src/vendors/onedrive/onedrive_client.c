@@ -69,8 +69,6 @@ static int onedrive_client_list_drives(HiveClient *obj, char **result)
     }
 
 retry:
-    http_client_reset(http_cli);
-
     http_client_set_url(http_cli, url);
     http_client_set_method(http_cli, HTTP_METHOD_GET);
     http_client_set_header(http_cli, "Authorization", access_token);
@@ -95,6 +93,7 @@ retry:
             http_client_close(http_cli);
             return -1;
         }
+        http_client_reset(http_cli);
         goto retry;
     }
 
@@ -139,8 +138,6 @@ static int validate_drive_id(OneDriveClient *client, const char *drive_id)
     }
 
 retry:
-    http_client_reset(http_cli);
-
     http_client_set_url(http_cli, url);
     http_client_set_method(http_cli, HTTP_METHOD_GET);
     http_client_set_header(http_cli, "Authorization", access_token);
@@ -164,11 +161,11 @@ retry:
             http_client_close(http_cli);
             return -1;
         }
+        http_client_reset(http_cli);
         goto retry;
     }
 
     http_client_close(http_cli);
-
     return 0;
 #undef RESP_BODY_MAX_SZ
 }
@@ -281,7 +278,8 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
         return NULL;
     }
 
-    onedrv_client = (OneDriveClient *)rc_zalloc(sizeof(OneDriveClient), &onedrive_client_destructor);
+    onedrv_client = (OneDriveClient *)rc_zalloc(sizeof(OneDriveClient),
+        &onedrive_client_destructor);
     if (!onedrv_client) {
         http_client_memory_free(redirect_port);
         http_client_memory_free(redirect_path);
