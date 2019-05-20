@@ -13,6 +13,10 @@
 #include <stdlib.h>
 #endif
 #include <string.h>
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#include <string.h>
 
 #include "onedrive_drive.h"
 #include "onedrive_common.h"
@@ -403,15 +407,92 @@ static int onedrive_drive_move_file(HiveDrive *obj, const char *old, const char 
 #undef is_dir
 }
 
+static size_t copy_resp_hdr_cb(
+    char *buffer, size_t size, size_t nitems, void *args)
+{
+    char *resp_hdr_buf = (char *)(((void **)args)[0]);
+    size_t resp_hdr_buf_sz = *(size_t *)(((void **)args)[1]);
+    size_t total_sz = size * nitems;
+    const char *loc_key = "Location: ";
+    size_t loc_key_sz = strlen(loc_key);
+    size_t loc_val_sz = total_sz - loc_key_sz - 2;
+
+    if (total_sz <= loc_key_sz)
+        return total_sz;
+
+    if (loc_val_sz >= resp_hdr_buf_sz)
+        return -1;
+
+    if (memcmp(buffer, loc_key, loc_key_sz))
+        return total_sz;
+
+    memcpy(resp_hdr_buf, buffer + loc_key_sz, loc_val_sz);
+    resp_hdr_buf[loc_val_sz] = '\0';
+    return total_sz;
+}
+
 static void copy_setup_req(http_client_t *req, void *args)
 {
-    const char *url = (const char *)((void **)args)[0];
-    const char *req_body = (const char *)((void **)args)[1];
+    const char *url = (const char *)(((void **)args)[0]);
+    const char *req_body = (const char *)(((void **)args)[1]);
 
     http_client_set_url_escape(req, url);
     http_client_set_method(req, HTTP_METHOD_POST);
     http_client_set_header(req, "Content-Type", "application/json");
     http_client_set_request_body_instant(req, (void *)req_body, strlen(req_body));
+    http_client_set_response_header(req, &copy_resp_hdr_cb, ((void **)args) + 2);
+}
+
+static int wait_til_complete(const char *prog_qry_url)
+{
+#define RESP_BODY_MAX_SZ 256
+    http_client_t *http_cli;
+    int rc;
+
+    http_cli = http_client_new();
+    if (!http_cli)
+        return -1;
+
+    while (true) {
+        cJSON *resp_body, *status;
+        char resp_body_buf[RESP_BODY_MAX_SZ];
+        size_t resp_body_buf_sz = sizeof(resp_body_buf);
+
+        http_client_set_url_escape(http_cli, prog_qry_url);
+        http_client_set_method(http_cli, HTTP_METHOD_GET);
+        http_client_set_response_body_instant(http_cli, resp_body_buf, resp_body_buf_sz);
+
+        rc = http_client_request(http_cli);
+        if (rc) {
+            http_client_close(http_cli);
+            return -1;
+        }
+
+        resp_body = cJSON_Parse(resp_body_buf);
+        if (!resp_body) {
+            http_client_close(http_cli);
+            return -1;
+        }
+
+        status = cJSON_GetObjectItemCaseSensitive(resp_body, "status");
+        if (!status || !cJSON_IsString(status)) {
+            cJSON_Delete(resp_body);
+            http_client_close(http_cli);
+            return -1;
+        }
+
+        if (strcmp(status->valuestring, "completed")) {
+            cJSON_Delete(resp_body);
+            http_client_reset(http_cli);
+            usleep(100 * 1000);
+            continue;
+        }
+
+        http_client_close(http_cli);
+        cJSON_Delete(resp_body);
+        return 0;
+    }
+#undef RESP_BODY_MAX_SZ
 }
 
 static int onedrive_drive_copy_file(HiveDrive *obj, const char *src_path, const char *dest_path)
@@ -419,6 +500,8 @@ static int onedrive_drive_copy_file(HiveDrive *obj, const char *src_path, const 
 #define is_dir(str) ((str)[strlen(str) - 1] == '/' || (str)[strlen(str) - 1] == '.')
     OneDriveDrive *drv = (OneDriveDrive *)obj;
     char url[MAXPATHLEN + 1];
+    char prog_qry_url[MAXPATHLEN + 1];
+    size_t prog_qry_url_sz = sizeof(prog_qry_url);
     int rc;
     http_client_t *http_cli;
     char *src_path_esc;
@@ -503,7 +586,7 @@ static int onedrive_drive_copy_file(HiveDrive *obj, const char *src_path, const 
     if (!req_body_str)
         return -1;
 
-    void *args[] = {url, req_body_str};
+    void *args[] = {url, req_body_str, prog_qry_url, &prog_qry_url_sz};
     rc = hive_drive_http_request(obj, &copy_setup_req, args, &http_cli);
     free(req_body_str);
     if (rc)
@@ -511,7 +594,11 @@ static int onedrive_drive_copy_file(HiveDrive *obj, const char *src_path, const 
 
     rc = http_client_get_response_code(http_cli, &resp_code);
     http_client_close(http_cli);
-    return !rc && resp_code == 202 ? 0 : -1;
+    if (rc || resp_code != 202) {
+        return -1;
+    }
+
+    return wait_til_complete(prog_qry_url);
 #undef is_dir
 }
 

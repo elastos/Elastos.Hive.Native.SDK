@@ -183,6 +183,17 @@ static void http_client_destroy(void *obj)
 
 }
 
+static size_t eat_output(char *ptr, size_t size,
+                         size_t nmemb,
+                         void *userdata)
+{
+    (void)ptr;
+    (void)size;
+    (void)nmemb;
+    (void)userdata;
+    return size * nmemb;
+}
+
 http_client_t *http_client_new(void)
 {
     http_client_t *client;
@@ -214,6 +225,7 @@ http_client_t *http_client_new(void)
     curl_easy_setopt(client->curl, CURLOPT_DEBUGFUNCTION, trace_func);
     curl_easy_setopt(client->curl, CURLOPT_VERBOSE, 1L);
 #endif
+    curl_easy_setopt(client->curl, CURLOPT_WRITEFUNCTION, &eat_output);
     curl_easy_setopt(client->curl, CURLOPT_CURLU, client->url);
     curl_easy_setopt(client->curl, CURLOPT_NOSIGNAL, 1L);
 #if defined(_WIN32) || defined(_WIN64)
@@ -247,6 +259,7 @@ void http_client_reset(http_client_t *client)
     curl_easy_setopt(client->curl, CURLOPT_DEBUGFUNCTION, trace_func);
     curl_easy_setopt(client->curl, CURLOPT_VERBOSE, 1L);
 #endif
+    curl_easy_setopt(client->curl, CURLOPT_WRITEFUNCTION, &eat_output);
     curl_easy_setopt(client->curl, CURLOPT_CURLU, client->url);
     curl_easy_setopt(client->curl, CURLOPT_NOSIGNAL, 1L);
 #if defined(_WIN32) || defined(_WIN64)
@@ -504,7 +517,7 @@ int http_client_set_request_body_instant(http_client_t *client,
 }
 
 int http_client_set_request_body(http_client_t *client,
-                                 http_client_request_body_callback_t *callback,
+                                 http_client_request_body_callback_t callback,
                                  void *userdata)
 {
     assert(client);
@@ -553,7 +566,7 @@ int http_client_set_response_body_instant(http_client_t *client,
 }
 
 int http_client_set_response_body(http_client_t *client,
-                                  http_client_response_body_callback_t *callback,
+                                  http_client_response_body_callback_t callback,
                                   void *userdata)
 {
     assert(client);
@@ -568,6 +581,19 @@ int http_client_set_response_body(http_client_t *client,
 size_t http_client_get_response_body_length(http_client_t *client)
 {
     return client->response_body.used;
+}
+
+int http_client_set_response_header(http_client_t *client,
+                                    http_client_response_header_callback_t callback,
+                                    void *userdata)
+{
+    assert(client);
+    assert(callback);
+
+    curl_easy_setopt(client->curl, CURLOPT_HEADERFUNCTION, callback);
+    curl_easy_setopt(client->curl, CURLOPT_HEADERDATA, userdata);
+
+    return 0;
 }
 
 int http_client_request(http_client_t *client)
