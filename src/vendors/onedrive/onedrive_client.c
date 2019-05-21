@@ -39,6 +39,72 @@ static int onedrive_client_logout(HiveClient *obj)
     return oauth_client_logout(client->oauth_client);
 }
 
+int onedrive_client_get_info(HiveClient *obj, char **result)
+{
+#define RESP_BODY_MAX_SZ 2048
+    OneDriveClient *client = (OneDriveClient *)obj;
+    int rc;
+    char resp_body[RESP_BODY_MAX_SZ];
+    size_t resp_body_len = sizeof(resp_body);
+    long resp_code;
+    http_client_t *http_cli;
+    char *access_token;
+
+    http_cli = http_client_new();
+    if (!http_cli)
+        return -1;
+
+    rc = oauth_client_get_access_token(client->oauth_client, &access_token);
+    if (rc) {
+        http_client_close(http_cli);
+        return -1;
+    }
+
+retry:
+    http_client_set_url(http_cli, ONEDRV_ME);
+    http_client_set_method(http_cli, HTTP_METHOD_GET);
+    http_client_set_header(http_cli, "Content-Type", "application/json");
+    http_client_set_header(http_cli, "Authorization", access_token);
+    http_client_set_response_body_instant(http_cli, resp_body, resp_body_len);
+    free(access_token);
+
+    rc = http_client_request(http_cli);
+    if (rc) {
+        http_client_close(http_cli);
+        return -1;
+    }
+
+    rc = http_client_get_response_code(http_cli, &resp_code);
+    if (rc < 0 || (resp_code != 200 && resp_code != 401)) {
+        http_client_close(http_cli);
+        return -1;
+    }
+
+    if (resp_code == 401) {
+        rc = oauth_client_refresh_access_token(client->oauth_client, &access_token);
+        if (rc) {
+            http_client_close(http_cli);
+            return -1;
+        }
+        http_client_reset(http_cli);
+        goto retry;
+    }
+
+    resp_body_len = http_client_get_response_body_length(http_cli);
+    http_client_close(http_cli);
+    if (resp_body_len == sizeof(resp_body))
+        return -1;
+    resp_body[resp_body_len] = '\0';
+
+    *result = malloc(resp_body_len + 1);
+    if (!*result)
+        return -1;
+    memcpy(*result, resp_body, resp_body_len + 1);
+
+    return 0;
+#undef RESP_BODY_MAX_SZ
+}
+
 static int onedrive_client_list_drives(HiveClient *obj, char **result)
 {
 #define RESP_BODY_MAX_SZ 2048
@@ -315,6 +381,7 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
 
     onedrv_client->base.login                = &onedrive_client_login;
     onedrv_client->base.logout               = &onedrive_client_logout;
+    onedrv_client->base.get_info             = &onedrive_client_get_info;
     onedrv_client->base.list_drives          = &onedrive_client_list_drives;
     onedrv_client->base.drive_open           = &onedrive_client_drive_open;
     onedrv_client->base.destructor_func      = &onedrive_client_close;

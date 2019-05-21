@@ -84,7 +84,7 @@ HIVE_API
 int hive_client_logout(HiveClient *);
 
 HIVE_API
-int hive_client_get_info(HiveClient *, HiveClientInfo *info);
+int hive_client_get_info(HiveClient *, char **result);
 
 HIVE_API
 int hive_client_list_drives(HiveClient *, char **result);
