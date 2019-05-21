@@ -27,6 +27,53 @@ typedef struct OneDriveDrive {
     char drv_url[0];
 } OneDriveDrive ;
 
+static void get_info_setup_req(http_client_t *req, void *args)
+{
+    const char *url = (const char *)((void **)args)[0];
+    char *resp_body = (char *)((void **)args)[1];
+    size_t *resp_body_len = (size_t *)((void **)args)[2];
+
+    http_client_set_url_escape(req, url);
+    http_client_set_method(req, HTTP_METHOD_GET);
+    http_client_set_response_body_instant(req, resp_body, *resp_body_len);
+}
+
+static int onedrive_drive_get_info(HiveDrive *obj, char **result)
+{
+#define RESP_BODY_MAX_SZ 512
+    OneDriveDrive *drv = (OneDriveDrive *)obj;
+    int rc;
+    char resp_body[RESP_BODY_MAX_SZ];
+    size_t resp_body_len = sizeof(resp_body);
+    long resp_code;
+    http_client_t *http_cli;
+
+    void *args[] = {drv->drv_url, resp_body, &resp_body_len};
+    rc = hive_drive_http_request(obj, &get_info_setup_req, args, &http_cli);
+    if (rc)
+        return -1;
+
+    rc = http_client_get_response_code(http_cli, &resp_code);
+    if (rc < 0 || resp_code != 200) {
+        http_client_close(http_cli);
+        return -1;
+    }
+
+    resp_body_len = http_client_get_response_body_length(http_cli);
+    http_client_close(http_cli);
+    if (resp_body_len == sizeof(resp_body))
+        return -1;
+    resp_body[resp_body_len] = '\0';
+
+    *result = malloc(resp_body_len + 1);
+    if (!*result)
+        return -1;
+
+    memcpy(*result, resp_body, resp_body_len + 1);
+    return 0;
+#undef RESP_BODY_MAX_SZ
+}
+
 static void stat_setup_req(http_client_t *req, void *args)
 {
     const char *url = (const char *)((void **)args)[0];
@@ -667,6 +714,7 @@ HiveDrive *onedrive_drive_open(HiveClient *onedrv_client, const char *drive_id)
     ref(onedrv_client);
     drv->base.client = onedrv_client;
 
+    drv->base.get_info    = &onedrive_drive_get_info;
     drv->base.file_stat   = &onedrive_drive_file_stat;
     drv->base.list_files  = &onedrive_drive_list_files;
     drv->base.makedir     = &onedrive_drive_mkdir;

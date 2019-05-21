@@ -6,6 +6,7 @@
 #include "http_client.h"
 
 struct HiveDrive {
+    int (*get_info)(HiveDrive *, char **result);
     int (*file_stat)(HiveDrive *, const char *file_path, char **result);
     int (*list_files)(HiveDrive *, const char *dir_path, char **result);
     int (*makedir)(HiveDrive *, const char *path);
