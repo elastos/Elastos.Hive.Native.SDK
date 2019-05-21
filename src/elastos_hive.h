@@ -96,7 +96,7 @@ HIVE_API
 void hive_drive_close(HiveDrive *);
 
 HIVE_API
-int hive_drive_getinfo(HiveDrive *, HiveDriveInfo *);
+int hive_drive_get_info(HiveDrive *, char **result);
 
 HIVE_API
 int hive_drive_file_stat(HiveDrive *, const char *file_path, char **result);

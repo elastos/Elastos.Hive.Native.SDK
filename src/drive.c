@@ -9,7 +9,19 @@
 
 #include "drive.h"
 
-int hive_drive_getinfo(HiveDrive *drive, HiveDriveInfo *info);
+int hive_drive_get_info(HiveDrive *drv, char **result)
+{
+    int rc;
+
+    if (!drv || !result)
+        return -1;
+
+    ref(drv);
+    rc = drv->get_info(drv, result);
+    deref(drv);
+
+    return rc;
+}
 
 int hive_drive_file_stat(HiveDrive *drv, const char *file_path, char **result)
 {
