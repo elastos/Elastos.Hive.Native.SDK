@@ -68,6 +68,14 @@ int hive_client_logout(HiveClient *client)
     return client->logout(client);
 }
 
+int hive_client_get_info(HiveClient *client, char **result)
+{
+    if (!client || !result)
+        return -1;
+
+    return client->get_info(client, result);
+}
+
 int hive_client_list_drives(HiveClient *client, char **result)
 {
     if (!client)
@@ -88,7 +96,7 @@ int hive_client_expire_access_token(HiveClient *client)
 {
     if (!client)
         return -1;
-    
+
     return client->expire_access_token(client);
 }
 
