@@ -55,7 +55,7 @@ static int onedrive_client_list_drives(HiveClient *obj, char **result)
     if (!http_cli)
         return -1;
 
-    rc = snprintf(url, sizeof(url), "%s/drives", ONEDRV_ROOT);
+    rc = snprintf(url, sizeof(url), "%s/drives", ONEDRV_ME);
     if (rc < 0 || rc >= sizeof(url)) {
         http_client_close(http_cli);
         return -1;
@@ -124,7 +124,7 @@ static int validate_drive_id(OneDriveClient *client, const char *drive_id)
     if (!http_cli)
         return -1;
 
-    rc = snprintf(url, sizeof(url), "%s/drives/%s", ONEDRV_ROOT, drive_id);
+    rc = snprintf(url, sizeof(url), "%s/drives/%s", ONEDRV_ME, drive_id);
     if (rc < 0 || rc >= sizeof(url)) {
         http_client_close(http_cli);
         return -1;
@@ -179,9 +179,11 @@ static HiveDrive *onedrive_client_drive_open(
     if (!*opt->drive_id || strlen(opt->drive_id) >= sizeof(opt->drive_id))
         return NULL;
 
-    rc = validate_drive_id(client, opt->drive_id);
-    if (rc)
-        return NULL;
+    if (strcmp(opt->drive_id, "default")) {
+        rc = validate_drive_id(client, opt->drive_id);
+        if (rc)
+            return NULL;
+    }
 
     return onedrive_drive_open(obj, opt->drive_id);
 }
