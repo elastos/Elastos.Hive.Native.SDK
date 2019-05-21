@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include <oauth_client.h>
 #include <crystal.h>
 #include <errno.h>
 #include <crystal.h>
@@ -11,7 +10,7 @@
 #include "onedrive_common.h"
 #include "onedrive_drive.h"
 #include "http_client.h"
-#include "oauth_client.h"
+#include "oauth_client_intl.h"
 
 typedef struct OneDriveClient {
     HiveClient base;
@@ -192,6 +191,13 @@ static void onedrive_client_close(HiveClient *obj)
     deref(obj);
 }
 
+static int onedrive_client_expire_access_token(HiveClient *obj)
+{
+    OneDriveClient *client = (OneDriveClient *)obj;
+
+    return oauth_client_set_expired(client->oauth_client);
+}
+
 static int onedrive_client_get_access_token(HiveClient *obj, char **access_token)
 {
     OneDriveClient *client = (OneDriveClient *)obj;
@@ -311,6 +317,7 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
     onedrv_client->base.drive_open           = &onedrive_client_drive_open;
     onedrv_client->base.destructor_func      = &onedrive_client_close;
 
+    onedrv_client->base.expire_access_token  = &onedrive_client_expire_access_token;
     onedrv_client->base.get_access_token     = &onedrive_client_get_access_token;
     onedrv_client->base.refresh_access_token = &onedrive_client_refresh_access_token;
 
