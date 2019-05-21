@@ -1,68 +1,24 @@
-#ifndef __HIVE_DRIVE_H__
-#define __HIVE_DRIVE_H__
+#ifndef __DRIVE_H__
+#define __DRIVE_H__
 
-#if defined(__APPLE__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdocumentation"
-#endif
+#include "elastos_hive.h"
+#include "client.h"
+#include "http_client.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+struct HiveDrive {
+    int (*file_stat)(HiveDrive *, const char *file_path, char **result);
+    int (*list_files)(HiveDrive *, const char *dir_path, char **result);
+    int (*makedir)(HiveDrive *, const char *path);
+    int (*move_file)(HiveDrive *, const char *old, const char *new);
+    int (*copy_file)(HiveDrive *, const char *src_path, const char *dest_path);
+    int (*delete_file)(HiveDrive *, const char *path);
+    void (*close)(HiveDrive *);
 
-#if defined(HIVE_STATIC)
-  #define HIVE_API
-#elif defined(HIVE_DYNAMIC)
-  #ifdef HIVE_BUILD
-    #if defined(_WIN32) || defined(_WIN64)
-      #define HIVE_API __declspec(dllexport)
-    #else
-      #define HIVE_API __attribute__((visibility("default")))
-    #endif
-  #else
-    #if defined(_WIN32) || defined(_WIN64)
-      #define HIVE_API __declspec(dllimport)
-    #else
-      #define HIVE_API
-    #endif
-  #endif
-#else
-  #define HIVE_API
-#endif
+    HiveClient *client;
+};
 
-typedef struct HiveDrive HiveDrive;
-typedef struct HiveDriveInfo HiveDriveInfo;
+int hive_drive_http_request(HiveDrive *,
+    void (*setup_req)(http_client_t *req, void *user_data),
+    void *user_data, http_client_t **resp);
 
-HIVE_API
-int hive_drive_getinfo(HiveDrive *, HiveDriveInfo *);
-
-HIVE_API
-int hive_drive_file_stat(HiveDrive *, const char *file_path, char **result);
-
-HIVE_API
-int hive_drive_list_files(HiveDrive *, const char *dir_path, char **result);
-
-HIVE_API
-int hive_drive_mkdir(HiveDrive *, const char *path);
-
-HIVE_API
-int hive_drive_move_file(HiveDrive *, const char *old, const char *new);
-
-HIVE_API
-int hive_drive_copy_file(HiveDrive *, const char *src_path, const char *dest_path);
-
-HIVE_API
-int hive_drive_delete_file(HiveDrive *, const char *path);
-
-HIVE_API
-void hive_drive_close(HiveDrive *);
-
-#ifdef __cplusplus
-} // extern "C"
-#endif
-
-#if defined(__APPLE__)
-#pragma GCC diagnostic pop
-#endif
-
-#endif // __HIVE_DRIVE_H__
+#endif // __DRIVE_H__

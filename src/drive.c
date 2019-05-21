@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #endif
 
-#include "drive_impl.h"
+#include "drive.h"
 
 int hive_drive_getinfo(HiveDrive *drive, HiveDriveInfo *info);
 

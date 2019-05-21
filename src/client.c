@@ -1,6 +1,6 @@
 #include <stdlib.h>
 
-#include "client_impl.h"
+#include "client.h"
 #include "local_client.h"
 #include "onedrive_client.h"
 #include "owncloud.h"
