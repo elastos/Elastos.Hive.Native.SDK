@@ -24,7 +24,7 @@
 
 typedef struct OneDriveDrive {
     HiveDrive base;
-    char id[0];
+    char drv_url[0];
 } OneDriveDrive ;
 
 static void stat_setup_req(http_client_t *req, void *args)
@@ -51,7 +51,7 @@ static int onedrive_drive_file_stat(HiveDrive *obj, const char *file_path, char 
     http_client_t *http_cli;
 
     if (!strcmp(file_path, "/"))
-        rc = snprintf(url, sizeof(url), "%s/drives/%s/root", ONEDRV_ROOT, drv->id);
+        rc = snprintf(url, sizeof(url), "%s/root", drv->drv_url);
     else {
         http_cli = http_client_new();
         if (!http_cli)
@@ -60,8 +60,7 @@ static int onedrive_drive_file_stat(HiveDrive *obj, const char *file_path, char 
         http_client_close(http_cli);
         if (!path_esc)
             return -1;
-        rc = snprintf(url, sizeof(url), "%s/drives/%s/root:%s:",
-            ONEDRV_ROOT, drv->id, path_esc);
+        rc = snprintf(url, sizeof(url), "%s/root:%s:", drv->drv_url, path_esc);
         http_client_memory_free(path_esc);
     }
     if (rc < 0 || rc >= sizeof(url))
@@ -118,8 +117,7 @@ static int onedrive_drive_list_files(HiveDrive *obj, const char *dir_path, char 
     http_client_t *http_cli;
 
     if (!strcmp(dir_path, "/"))
-        rc = snprintf(url, sizeof(url), "%s/drives/%s/root/children",
-            ONEDRV_ROOT, drv->id);
+        rc = snprintf(url, sizeof(url), "%s/root/children", drv->drv_url);
     else {
         http_cli = http_client_new();
         if (!http_cli)
@@ -128,8 +126,7 @@ static int onedrive_drive_list_files(HiveDrive *obj, const char *dir_path, char 
         http_client_close(http_cli);
         if (!path_esc)
             return -1;
-        rc = snprintf(url, sizeof(url), "%s/drives/%s/root:%s:/children",
-            ONEDRV_ROOT, drv->id, path_esc);
+        rc = snprintf(url, sizeof(url), "%s/root:%s:/children", drv->drv_url, path_esc);
         http_client_memory_free(path_esc);
     }
     if (rc < 0 || rc >= sizeof(url))
@@ -242,8 +239,7 @@ static int onedrive_drive_mkdir(HiveDrive *obj, const char *path)
 
     dir = dirname((char *)path);
     if (!strcmp(dir, "/"))
-        rc = snprintf(url, sizeof(url), "%s/drives/%s/root/children",
-            ONEDRV_ROOT, drv->id);
+        rc = snprintf(url, sizeof(url), "%s/root/children", drv->drv_url);
     else {
         http_cli = http_client_new();
         if (!http_cli)
@@ -252,8 +248,7 @@ static int onedrive_drive_mkdir(HiveDrive *obj, const char *path)
         http_client_close(http_cli);
         if (!dir_esc)
             return -1;
-        rc = snprintf(url, sizeof(url), "%s/drives/%s/root:%s:/children",
-            ONEDRV_ROOT, drv->id, dir_esc);
+        rc = snprintf(url, sizeof(url), "%s/root:%s:/children", drv->drv_url, dir_esc);
         http_client_memory_free(dir_esc);
     }
     if (rc < 0 || rc >= sizeof(url))
@@ -336,8 +331,7 @@ static int onedrive_drive_move_file(HiveDrive *obj, const char *old, const char 
         return -1;
 
     if (!strcmp(old, "/"))
-        rc = snprintf(url, sizeof(url), "%s/drives/%s/root",
-            ONEDRV_ROOT, drv->id);
+        rc = snprintf(url, sizeof(url), "%s/root", drv->drv_url);
     else {
         http_cli = http_client_new();
         if (!http_cli)
@@ -346,8 +340,7 @@ static int onedrive_drive_move_file(HiveDrive *obj, const char *old, const char 
         http_client_close(http_cli);
         if (!old_esc)
             return -1;
-        rc = snprintf(url, sizeof(url), "%s/drives/%s/root:%s:",
-            ONEDRV_ROOT, drv->id, old_esc);
+        rc = snprintf(url, sizeof(url), "%s/root:%s:", drv->drv_url, old_esc);
         http_client_memory_free(old_esc);
     }
     if (rc < 0 || rc >= sizeof(url))
@@ -361,11 +354,12 @@ static int onedrive_drive_move_file(HiveDrive *obj, const char *old, const char 
         char parent_dir[MAXPATHLEN + 1];
 
         if (new[0] == '/')
-            rc = snprintf(parent_dir, sizeof(parent_dir), "/drives/%s/root:%s",
-                drv->id, dst_dir);
+            rc = snprintf(parent_dir, sizeof(parent_dir), "%s/root:%s",
+                drv->drv_url + strlen(ONEDRV_ME), dst_dir);
         else
-            rc = snprintf(parent_dir, sizeof(parent_dir), "/drives/%s/root:%s/%s",
-                drv->id, !strcmp(src_dir, "/") ? "" : src_dir, dst_dir);
+            rc = snprintf(parent_dir, sizeof(parent_dir), "%s/root:%s/%s",
+                drv->drv_url + strlen(ONEDRV_ME),
+                !strcmp(src_dir, "/") ? "" : src_dir, dst_dir);
         if (rc < 0 || rc >= sizeof(parent_dir)) {
             cJSON_Delete(req_body);
             return -1;
@@ -527,8 +521,7 @@ static int onedrive_drive_copy_file(HiveDrive *obj, const char *src_path, const 
         return -1;
 
     if (!strcmp(src_path, "/"))
-        rc = snprintf(url, sizeof(url), "%s/drives/%s/root/copy",
-            ONEDRV_ROOT, drv->id);
+        rc = snprintf(url, sizeof(url), "%s/root/copy", drv->drv_url);
     else {
         http_cli = http_client_new();
         if (!http_cli)
@@ -537,8 +530,7 @@ static int onedrive_drive_copy_file(HiveDrive *obj, const char *src_path, const 
         http_client_close(http_cli);
         if (!src_path_esc)
             return -1;
-        rc = snprintf(url, sizeof(url), "%s/drives/%s/root:%s:/copy",
-            ONEDRV_ROOT, drv->id, src_path_esc);
+        rc = snprintf(url, sizeof(url), "%s/root:%s:/copy", drv->drv_url, src_path_esc);
         http_client_memory_free(src_path_esc);
     }
     if (rc < 0 || rc >= sizeof(url))
@@ -552,11 +544,12 @@ static int onedrive_drive_copy_file(HiveDrive *obj, const char *src_path, const 
         char parent_dir[MAXPATHLEN + 1];
 
         if (dest_path[0] == '/')
-            rc = snprintf(parent_dir, sizeof(parent_dir), "/drives/%s/root:%s",
-                drv->id, dst_dir);
+            rc = snprintf(parent_dir, sizeof(parent_dir), "%s/root:%s",
+                drv->drv_url + strlen(ONEDRV_ME), dst_dir);
         else
-            rc = snprintf(parent_dir, sizeof(parent_dir), "/drives/%s/root:%s/%s",
-                drv->id, !strcmp(src_dir, "/") ? "" : src_dir, dst_dir);
+            rc = snprintf(parent_dir, sizeof(parent_dir), "%s/root:%s/%s",
+                drv->drv_url + strlen(ONEDRV_ME),
+                !strcmp(src_dir, "/") ? "" : src_dir, dst_dir);
         if (rc < 0 || rc >= sizeof(parent_dir)) {
             cJSON_Delete(req_body);
             return -1;
@@ -628,8 +621,7 @@ static int onedrive_drive_delete_file(HiveDrive *obj, const char *path)
     if (!path_esc)
         return -1;
 
-    rc = snprintf(url, sizeof(url), "%s/drives/%s/root:%s:",
-        ONEDRV_ROOT, drv->id, path_esc);
+    rc = snprintf(url, sizeof(url), "%s/root:%s:", drv->drv_url, path_esc);
     http_client_memory_free(path_esc);
     if (rc < 0 || rc >= sizeof(url))
         return -1;
@@ -658,12 +650,19 @@ static void onedrive_drive_destructor(void *obj)
 
 HiveDrive *onedrive_drive_open(HiveClient *onedrv_client, const char *drive_id)
 {
+    bool def_drv = !strcmp(drive_id, "default") ? true : false;
+    size_t drv_url_len =
+        strlen(ONEDRV_ME) + strlen("/") +
+        (def_drv ? strlen("drive") : strlen("drives/") + strlen(drive_id));
     OneDriveDrive *drv = (OneDriveDrive *)rc_zalloc(
-        sizeof(OneDriveDrive) + strlen(drive_id) + 1, &onedrive_drive_destructor);
+        sizeof(OneDriveDrive) + drv_url_len + 1, &onedrive_drive_destructor);
     if (!drv)
         return NULL;
 
-    strcpy(drv->id, drive_id);
+    sprintf(drv->drv_url, "%s/%s%s",
+        ONEDRV_ME,
+        def_drv ? "drive" : "drives/",
+        def_drv ? "" : drive_id);
 
     ref(onedrv_client);
     drv->base.client = onedrv_client;
