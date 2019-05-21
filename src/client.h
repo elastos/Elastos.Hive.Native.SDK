@@ -10,9 +10,12 @@ struct HiveClient {
     HiveDrive *(*drive_open)(HiveClient *, const HiveDriveOptions *);
     void (*destructor_func)(HiveClient *);
 
+    int (*expire_access_token)(HiveClient *);
     int (*get_access_token)(HiveClient *, char **access_token);
     int (*refresh_access_token)(HiveClient *, char **access_token);
 };
+
+int hive_client_expire_access_token(HiveClient *);
 
 int hive_client_get_access_token(HiveClient *, char **access_token);
 
