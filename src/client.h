@@ -6,8 +6,8 @@
 struct HiveClient {
     int (*login)(HiveClient *);
     int (*logout)(HiveClient *);
-    int (*get_info)(HiveClient *, char **);
-    int (*list_drives)(HiveClient *, char **);
+    int (*get_info)(HiveClient *, char **result);
+    int (*list_drives)(HiveClient *, char **result);
     HiveDrive *(*drive_open)(HiveClient *, const HiveDriveOptions *);
     void (*destructor_func)(HiveClient *);
 

@@ -4,7 +4,7 @@
 #include "local_client.h"
 #include "onedrive_client.h"
 #include "owncloud.h"
-#include "hiveipfs.h"
+#include "hiveipfs_client.h"
 
 typedef struct ClientFactoryMethod {
     int drive_type;
@@ -78,7 +78,7 @@ int hive_client_get_info(HiveClient *client, char **result)
 
 int hive_client_list_drives(HiveClient *client, char **result)
 {
-    if (!client)
+    if (!client || !result)
         return -1;
 
     return client->list_drives(client, result);

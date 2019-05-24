@@ -10,6 +10,8 @@
 extern "C" {
 #endif
 
+#include <sys/types.h>
+
 #if defined(HIVE_STATIC)
 #define HIVE_API
 #elif defined(HIVE_DYNAMIC)
@@ -55,6 +57,7 @@ typedef struct HiveOptions {
     char *persistent_location;
     int  drive_type;
 } HiveOptions;
+
 typedef void HiveDriveOptions;
 
 typedef struct OneDriveOptions {
@@ -66,6 +69,14 @@ typedef struct OneDriveOptions {
 
     int (*grant_authorize)(const char *request_url);
 } OneDriveOptions;
+
+typedef struct HiveIpfsOptions {
+    HiveOptions base;
+
+    char *uid;
+    size_t bootstraps_size;
+    const char *bootstraps_ip[0];
+} HiveIpfsOptions ;
 
 typedef struct OneDriveDriveOptions {
     char drive_id[256];
