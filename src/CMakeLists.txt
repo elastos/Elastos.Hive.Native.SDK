@@ -49,7 +49,8 @@ set(SRC
     vendors/onedrive/onedrive_client.c
     vendors/onedrive/onedrive_drive.c
     vendors/owncloud/owncloud.c
-    vendors/hiveipfs/hiveipfs.c)
+    vendors/hiveipfs/hiveipfs_client.c
+    vendors/hiveipfs/hiveipfs_drive.c)
 
 set(HEADERS
     elastos_hive.h)
