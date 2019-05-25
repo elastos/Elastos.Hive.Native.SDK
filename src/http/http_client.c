@@ -21,7 +21,7 @@ static long curl_http_versions[] = {
 
 typedef struct http_response_body {
     size_t used;
-    size_t unused;
+    size_t sz;
     void *data;
 } http_response_body_t;
 
@@ -174,6 +174,8 @@ static void http_client_destroy(void *obj)
 
     assert(client);
 
+    if (client->response_body.data)
+        free(client->response_body.data);
     if (client->curl)
         curl_easy_cleanup(client->curl);
     if (client->url)
@@ -253,7 +255,7 @@ void http_client_reset(http_client_t *client)
         client->hdr = NULL;
     }
 
-    memset(&client->response_body, 0, sizeof(http_response_body_t));
+    client->response_body.used = 0;
 
 #ifndef NDEBUG
     curl_easy_setopt(client->curl, CURLOPT_DEBUGFUNCTION, trace_func);
@@ -529,42 +531,6 @@ int http_client_set_request_body(http_client_t *client,
     return 0;
 }
 
-static
-size_t http_response_body_write_callback(char *ptr, size_t size, size_t nmemb,
-                                         void *userdata)
-{
-    http_response_body_t *response = (http_response_body_t *)userdata;
-    size_t length = size * nmemb;
-
-    if (response->unused < length)
-        return (size_t)-1;
-
-    memcpy((char *)response->data + response->used, ptr, length);
-    response->unused -= length;
-    response->used += length;
-
-    return length;
-}
-
-int http_client_set_response_body_instant(http_client_t *client,
-                                          void *data, size_t len)
-{
-    assert(client);
-    assert(data);
-    assert(len);
-
-    client->response_body.used = 0;
-    client->response_body.unused = len;
-    client->response_body.data = data;
-
-    curl_easy_setopt(client->curl, CURLOPT_WRITEFUNCTION,
-                     http_response_body_write_callback);
-
-    curl_easy_setopt(client->curl, CURLOPT_WRITEDATA,
-                     &client->response_body);
-    return 0;
-}
-
 int http_client_set_response_body(http_client_t *client,
                                   http_client_response_body_callback_t callback,
                                   void *userdata)
@@ -576,6 +542,81 @@ int http_client_set_response_body(http_client_t *client,
     curl_easy_setopt(client->curl, CURLOPT_WRITEDATA, userdata);
 
     return 0;
+}
+
+static size_t http_response_body_write_callback(char *ptr, size_t size, size_t nmemb,
+                                                void *userdata)
+{
+    http_response_body_t *response = (http_response_body_t *)userdata;
+    size_t length = size * nmemb;
+
+    if (response->sz - response->used < length) {
+        size_t new_sz;
+        size_t last_try;
+        void *new_data;
+
+        if (response->sz + length < response->sz) {
+            response->used = 0;
+            return -1;
+        }
+
+        for (new_sz = response->sz ? response->sz << 1 : 512, last_try = response->sz;
+            new_sz > last_try && new_sz <= response->sz + length;
+            last_try = new_sz, new_sz <<= 1) ;
+
+        if (new_sz <= last_try)
+            new_sz = response->sz + length;
+
+        new_data = realloc(response->data, new_sz);
+        if (!new_data) {
+            response->used = 0;
+            return -1;
+        }
+
+        response->data = new_data;
+        response->sz = new_sz;
+    }
+
+    memcpy((char *)response->data + response->used, ptr, length);
+    response->used += length;
+
+    return length;
+}
+
+int http_client_enable_response_body(http_client_t *client)
+{
+    curl_easy_setopt(client->curl, CURLOPT_WRITEFUNCTION,
+                     http_response_body_write_callback);
+
+    curl_easy_setopt(client->curl, CURLOPT_WRITEDATA,
+                     &client->response_body);
+    return 0;
+}
+
+const char *http_client_get_response_body(http_client_t *client)
+{
+    return client->response_body.used ? client->response_body.data : NULL;
+}
+
+char *http_client_move_response_body(http_client_t *client, size_t *len)
+{
+    char *resp;
+
+    if (!client->response_body.used) {
+        *len = 0;
+        return NULL;
+    }
+
+    if (len) {
+        *len = client->response_body.used;
+    }
+    resp = client->response_body.data;
+
+    client->response_body.data = NULL;
+    client->response_body.used = 0;
+    client->response_body.sz = 0;
+
+    return resp;
 }
 
 size_t http_client_get_response_body_length(http_client_t *client)

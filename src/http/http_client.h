@@ -64,7 +64,6 @@ typedef size_t (*http_client_response_header_callback_t)(char *buffer,
     size_t size, size_t nitems, void *userdata);
 
 int http_client_set_request_body_instant(http_client_t *, void *data, size_t len);
-int http_client_set_response_body_instant(http_client_t *, void *data, size_t len);
 int http_client_set_request_body(http_client_t *,
     http_client_request_body_callback_t cb, void *userdata);
 int http_client_set_response_header(http_client_t *client,
@@ -72,7 +71,10 @@ int http_client_set_response_header(http_client_t *client,
 size_t http_client_get_response_header_length(http_client_t *);
 int http_client_set_response_body(http_client_t *client,
     http_client_response_body_callback_t cb, void *userdata);
+int http_client_enable_response_body(http_client_t *);
+const char *http_client_get_response_body(http_client_t *);
 size_t http_client_get_response_body_length(http_client_t *);
+char *http_client_move_response_body(http_client_t *, size_t *len);
 int http_client_get_response_code(http_client_t *, long *response_code);
 
 

@@ -104,13 +104,10 @@ static int ipfs_client_logout(HiveClient *obj)
 
 static int ipfs_client_get_info(HiveClient *obj, char **result)
 {
-#define RESP_BODY_MAX_SZ 256
     IpfsClient *client = (IpfsClient *)obj;
     int rc;
     http_client_t *http_client;
     char url[MAXPATHLEN + 1];
-    char resp_body[RESP_BODY_MAX_SZ];
-    size_t resp_body_len = sizeof(resp_body);
     long resp_code;
 
     rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/uid/info",
@@ -124,7 +121,7 @@ static int ipfs_client_get_info(HiveClient *obj, char **result)
 
     http_client_set_url(http_client, url);
     http_client_set_query(http_client, "uid", client->uid);
-    http_client_set_response_body_instant(http_client, resp_body, resp_body_len);
+    http_client_enable_response_body(http_client);
 
     rc = http_client_request(http_client);
     if (rc) {
@@ -138,28 +135,19 @@ static int ipfs_client_get_info(HiveClient *obj, char **result)
         return -1;
     }
 
-    resp_body_len = http_client_get_response_body_length(http_client);
+    *result = http_client_move_response_body(http_client, NULL);
     http_client_close(http_client);
-    if (result) {
-        *result = (char *)malloc(resp_body_len + 1);
-        if (!*result)
-            return -1;
-        memcpy(*result, resp_body, resp_body_len);
-        (*result)[resp_body_len] = '\0';
-    }
+    if (!*result)
+        return -1;
     return 0;
-#undef RESP_BODY_MAX_SZ
 }
 
 static int ipfs_client_list_drives(HiveClient *obj, char **result)
 {
-#define RESP_BODY_MAX_SZ 512
     IpfsClient *client = (IpfsClient *)obj;
     int rc;
     http_client_t *http_client;
     char url[MAXPATHLEN + 1];
-    char resp_body[RESP_BODY_MAX_SZ];
-    size_t resp_body_len = sizeof(resp_body);
     long resp_code;
 
     pthread_mutex_lock(&client->lock);
@@ -183,7 +171,7 @@ static int ipfs_client_list_drives(HiveClient *obj, char **result)
     http_client_set_url(http_client, url);
     http_client_set_query(http_client, "uid", client->uid);
     http_client_set_query(http_client, "path", "/");
-    http_client_set_response_body_instant(http_client, resp_body, resp_body_len);
+    http_client_enable_response_body(http_client);
 
     rc = http_client_request(http_client);
     if (rc) {
@@ -197,16 +185,11 @@ static int ipfs_client_list_drives(HiveClient *obj, char **result)
         return -1;
     }
 
-    resp_body_len = http_client_get_response_body_length(http_client);
+    *result = http_client_move_response_body(http_client, NULL);
     http_client_close(http_client);
-    *result = (char *)malloc(resp_body_len + 1);
     if (!*result)
         return -1;
-
-    memcpy(*result, resp_body, resp_body_len);
-    (*result)[resp_body_len] = '\0';
     return 0;
-#undef RESP_BODY_MAX_SZ
 }
 
 static HiveDrive *ipfs_client_drive_open(HiveClient *obj, const HiveDriveOptions *options)

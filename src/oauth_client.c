@@ -176,7 +176,7 @@ static void save_profile(oauth_client_t *cli)
     }
 }
 
-static int perform_token_tsx(oauth_client_t *cli, char *req_body, void *resp_body, size_t *resp_body_len)
+static int perform_token_tsx(oauth_client_t *cli, char *req_body, char **resp_body)
 {
     http_client_t *http_cli;
     long resp_code;
@@ -189,7 +189,7 @@ static int perform_token_tsx(oauth_client_t *cli, char *req_body, void *resp_bod
     http_client_set_url(http_cli, cli->opt.token_url);
     http_client_set_method(http_cli, HTTP_METHOD_POST);
     http_client_set_request_body_instant(http_cli, req_body, strlen(req_body));
-    http_client_set_response_body_instant(http_cli, resp_body, *resp_body_len);
+    http_client_enable_response_body(http_cli);
 
     rc = http_client_request(http_cli);
     if (rc) {
@@ -203,8 +203,11 @@ static int perform_token_tsx(oauth_client_t *cli, char *req_body, void *resp_bod
         return -1;
     }
 
-    *resp_body_len = http_client_get_response_body_length(http_cli);
+    *resp_body = http_client_move_response_body(http_cli, NULL);
     http_client_close(http_cli);
+    if (!*resp_body)
+        return -1;
+
     return 0;
 }
 
@@ -294,10 +297,8 @@ succeed:
 static int refresh_token(oauth_client_t *cli)
 {
 #define REQ_BODY_MAX_SZ 2048
-#define RESP_BODY_MAX_SZ 2048
     char req_body[REQ_BODY_MAX_SZ];
-    char resp_body[RESP_BODY_MAX_SZ];
-    size_t resp_body_len = sizeof(resp_body);
+    char *resp_body;
     int rc;
     char redirect_url_raw[128];
     http_client_t *http_cli;
@@ -349,21 +350,17 @@ static int refresh_token(oauth_client_t *cli)
     if (rc < 0 || rc >= sizeof(req_body))
         return -1;
 
-    rc = perform_token_tsx(cli, req_body, resp_body, &resp_body_len);
+    rc = perform_token_tsx(cli, req_body, &resp_body);
     if (rc)
         return -1;
 
-    if (resp_body_len == sizeof(resp_body))
-        return -1;
-    resp_body[resp_body_len] = '\0';
-
     rc = decode_access_token_resp(cli, resp_body, false);
+    free(resp_body);
     if (rc)
         return -1;
 
     return 0;
 #undef REQ_BODY_MAX_SZ
-#undef RESP_BODY_MAX_SZ
 }
 
 static int load_profile(oauth_client_t *cli)
@@ -522,10 +519,8 @@ static int get_auth_code(oauth_client_t *cli)
 static int redeem_access_token(oauth_client_t *cli)
 {
 #define REQ_BODY_MAX_SZ 512
-#define RESP_BODY_MAX_SZ 2048
     char req_body[REQ_BODY_MAX_SZ];
-    char resp_body[RESP_BODY_MAX_SZ];
-    size_t resp_body_len = sizeof(resp_body);
+    char *resp_body;
     int rc;
     char redirect_url_raw[128];
     http_client_t *http_cli;
@@ -577,21 +572,17 @@ static int redeem_access_token(oauth_client_t *cli)
     if (rc < 0 || rc >= sizeof(req_body))
         return -1;
 
-    rc = perform_token_tsx(cli, req_body, resp_body, &resp_body_len);
+    rc = perform_token_tsx(cli, req_body, &resp_body);
     if (rc)
         return -1;
 
-    if (resp_body_len == sizeof(resp_body))
-        return -1;
-    resp_body[resp_body_len] = '\0';
-
     rc = decode_access_token_resp(cli, resp_body, false);
+    free(resp_body);
     if (rc)
         return -1;
 
     return 0;
 #undef REQ_BODY_MAX_SZ
-#undef RESP_BODY_MAX_SZ
 }
 
 static void optrst(oauth_opt_t *opt)
