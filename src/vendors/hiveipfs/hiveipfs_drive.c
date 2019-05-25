@@ -2,10 +2,14 @@
 
 #include "hiveipfs_drive.h"
 
-HiveDrive *ipfs_drive_open(HiveClient *client, const char *svr_addr, const char *uid)
+typedef struct ipfs_drive {
+    HiveDrive base;
+} ipfs_drv_t;
+
+
+
+HiveDrive *ipfs_drive_open(HiveClient *client)
 {
     (void)client;
-    (void)svr_addr;
-    (void)uid;
     return NULL;
 }

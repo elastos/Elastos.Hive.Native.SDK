@@ -3,6 +3,8 @@
 
 #include "elastos_hive.h"
 
+typedef void client_tsx_t;
+
 struct HiveClient {
     int (*login)(HiveClient *);
     int (*logout)(HiveClient *);
@@ -11,15 +13,12 @@ struct HiveClient {
     HiveDrive *(*drive_open)(HiveClient *, const HiveDriveOptions *);
     void (*destructor_func)(HiveClient *);
 
-    int (*expire_access_token)(HiveClient *);
-    int (*get_access_token)(HiveClient *, char **access_token);
-    int (*refresh_access_token)(HiveClient *, char **access_token);
+    int (*perform_tsx)(HiveClient *, client_tsx_t *);
+    int (*invalidate_credential)(HiveClient *);
 };
 
-int hive_client_expire_access_token(HiveClient *);
+int hive_client_invalidate_credential(HiveClient *);
 
-int hive_client_get_access_token(HiveClient *, char **access_token);
-
-int hive_client_refresh_access_token(HiveClient *, char **access_token);
+int hive_client_perform_transaction(HiveClient *, client_tsx_t *);
 
 #endif // __CLIENT_H__

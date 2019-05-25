@@ -3,6 +3,12 @@
 
 #include "client.h"
 
+typedef struct ipfs_transaction {
+    void (*setup_req)(http_client_t *, void *);
+    void *user_data;
+    http_client_t *resp;
+} ipfs_tsx_t;
+
 HiveClient *hiveipfs_client_new(const HiveOptions *);
 
 #endif // __HIVE_IPFS_CLIENT_H__

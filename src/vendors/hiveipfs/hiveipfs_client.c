@@ -224,7 +224,7 @@ static HiveDrive *ipfs_client_drive_open(HiveClient *obj, const HiveDriveOptions
     }
     pthread_mutex_unlock(&client->lock);
 
-    return ipfs_drive_open((HiveClient *)client, client->svr_addr, client->uid);
+    return ipfs_drive_open((HiveClient *)client);
 }
 
 static void ipfs_client_close(HiveClient *obj)
@@ -232,34 +232,49 @@ static void ipfs_client_close(HiveClient *obj)
     deref(obj);
 }
 
-static int ipfs_client_expire_access_token(HiveClient *obj)
-{
-    (void)obj;
-    return 0;
-}
-
-static int ipfs_client_get_access_token(HiveClient *obj, char **access_token)
+static int ipfs_client_perform_tsx(HiveClient *obj, client_tsx_t *base)
 {
     IpfsClient *client = (IpfsClient *)obj;
-    int rc = 0;
-
-    (void)access_token;
+    ipfs_tsx_t *tsx = (ipfs_tsx_t *)base;
+    int rc;
+    http_client_t *http_client;
+    char url[MAXPATHLEN + 1];
 
     pthread_mutex_lock(&client->lock);
     while (client->state == LOGGING_IN)
         pthread_cond_wait(&client->cond, &client->lock);
-    if (client->state != LOGGED_IN)
-        rc = -1;
+    if (client->state != LOGGED_IN) {
+        pthread_mutex_unlock(&client->lock);
+        return -1;
+    }
     pthread_mutex_unlock(&client->lock);
 
-    return rc;
+    rc = snprintf(url, sizeof(url), "http://%s:%d", client->svr_addr, NODE_API_PORT);
+    if (rc < 0 || rc >= sizeof(url))
+        return -1;
+
+    http_client = http_client_new();
+    if (!http_client)
+        return -1;
+
+    http_client_set_url(http_client, url);
+    http_client_set_query(http_client, "uid", client->uid);
+    tsx->setup_req(http_client, tsx->user_data);
+
+    rc = http_client_request(http_client);
+    if (rc) {
+        http_client_close(http_client);
+        return -1;
+    }
+
+    tsx->resp = http_client;
+    return 0;
 }
 
-static int ipfs_client_refresh_access_token(HiveClient *obj, char **access_token)
+static int ipfs_client_invalidate_credential(HiveClient *obj)
 {
     (void)obj;
-    (void)access_token;
-    return -1;
+    return 0;
 }
 
 static int test_reachable(const char *ip)
@@ -344,16 +359,15 @@ HiveClient *hiveipfs_client_new(const HiveOptions * options)
     pthread_mutex_init(&client->lock, NULL);
     pthread_cond_init(&client->cond, NULL);
 
-    client->base.login                = &ipfs_client_login;
-    client->base.logout               = &ipfs_client_logout;
-    client->base.get_info             = &ipfs_client_get_info;
-    client->base.list_drives          = &ipfs_client_list_drives;
-    client->base.drive_open           = &ipfs_client_drive_open;
-    client->base.destructor_func      = &ipfs_client_close;
+    client->base.login                 = &ipfs_client_login;
+    client->base.logout                = &ipfs_client_logout;
+    client->base.get_info              = &ipfs_client_get_info;
+    client->base.list_drives           = &ipfs_client_list_drives;
+    client->base.drive_open            = &ipfs_client_drive_open;
+    client->base.destructor_func       = &ipfs_client_close;
 
-    client->base.expire_access_token  = &ipfs_client_expire_access_token;
-    client->base.get_access_token     = &ipfs_client_get_access_token;
-    client->base.refresh_access_token = &ipfs_client_refresh_access_token;
+    client->base.perform_tsx           = &ipfs_client_perform_tsx;
+    client->base.invalidate_credential = &ipfs_client_invalidate_credential;
 
     rc = ipfs_client_get_info((HiveClient *)client, NULL);
     if (rc) {
