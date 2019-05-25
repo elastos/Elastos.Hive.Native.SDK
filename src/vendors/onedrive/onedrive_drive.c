@@ -20,6 +20,7 @@
 
 #include "onedrive_drive.h"
 #include "onedrive_common.h"
+#include "onedrive_client.h"
 #include "http_client.h"
 
 typedef struct OneDriveDrive {
@@ -46,21 +47,25 @@ static int onedrive_drive_get_info(HiveDrive *obj, char **result)
     char resp_body[RESP_BODY_MAX_SZ];
     size_t resp_body_len = sizeof(resp_body);
     long resp_code;
-    http_client_t *http_cli;
 
     void *args[] = {drv->drv_url, resp_body, &resp_body_len};
-    rc = hive_drive_http_request(obj, &get_info_setup_req, args, &http_cli);
+    onedrv_tsx_t tsx = {
+        .setup_req = &get_info_setup_req,
+        .user_data = args
+    };
+
+    rc = hive_client_perform_transaction(drv->base.client, &tsx);
     if (rc)
         return -1;
 
-    rc = http_client_get_response_code(http_cli, &resp_code);
+    rc = http_client_get_response_code(tsx.resp, &resp_code);
     if (rc < 0 || resp_code != 200) {
-        http_client_close(http_cli);
+        http_client_close(tsx.resp);
         return -1;
     }
 
-    resp_body_len = http_client_get_response_body_length(http_cli);
-    http_client_close(http_cli);
+    resp_body_len = http_client_get_response_body_length(tsx.resp);
+    http_client_close(tsx.resp);
     if (resp_body_len == sizeof(resp_body))
         return -1;
     resp_body[resp_body_len] = '\0';
@@ -114,18 +119,23 @@ static int onedrive_drive_file_stat(HiveDrive *obj, const char *file_path, char 
         return -1;
 
     void *args[] = {url, resp_body, &resp_body_len};
-    rc = hive_drive_http_request(obj, &stat_setup_req, args, &http_cli);
+    onedrv_tsx_t tsx = {
+        .setup_req = &stat_setup_req,
+        .user_data = args
+    };
+
+    rc = hive_client_perform_transaction(drv->base.client, &tsx);
     if (rc)
         return -1;
 
-    rc = http_client_get_response_code(http_cli, &resp_code);
+    rc = http_client_get_response_code(tsx.resp, &resp_code);
     if (rc < 0 || resp_code != 200) {
-        http_client_close(http_cli);
+        http_client_close(tsx.resp);
         return -1;
     }
 
-    resp_body_len = http_client_get_response_body_length(http_cli);
-    http_client_close(http_cli);
+    resp_body_len = http_client_get_response_body_length(tsx.resp);
+    http_client_close(tsx.resp);
     if (resp_body_len == sizeof(resp_body))
         return -1;
     resp_body[resp_body_len] = '\0';
@@ -191,21 +201,26 @@ static int onedrive_drive_list_files(HiveDrive *obj, const char *dir_path, char 
 
     while (true) {
         void *args[] = {url, resp_body, &resp_body_len};
-        rc = hive_drive_http_request(obj, &list_setup_req, args, &http_cli);
+        onedrv_tsx_t tsx = {
+            .setup_req = &list_setup_req,
+            .user_data = args
+        };
+
+        rc = hive_client_perform_transaction(drv->base.client, &tsx);
         if (rc) {
             cJSON_Delete(resp);
             return -1;
         }
 
-        rc = http_client_get_response_code(http_cli, &resp_code);
+        rc = http_client_get_response_code(tsx.resp, &resp_code);
         if (rc < 0 || resp_code != 200) {
             cJSON_Delete(resp);
-            http_client_close(http_cli);
+            http_client_close(tsx.resp);
             return -1;
         }
 
-        resp_body_len = http_client_get_response_body_length(http_cli);
-        http_client_close(http_cli);
+        resp_body_len = http_client_get_response_body_length(tsx.resp);
+        http_client_close(tsx.resp);
         if (resp_body_len == sizeof(resp_body)) {
             cJSON_Delete(resp);
             return -1;
@@ -326,13 +341,18 @@ static int onedrive_drive_mkdir(HiveDrive *obj, const char *path)
         return -1;
 
     void *args[] = {url, req_body_str, resp_body, &resp_body_len};
-    rc = hive_drive_http_request(obj, &mkdir_setup_req, args, &http_cli);
+    onedrv_tsx_t tsx = {
+        .setup_req = &mkdir_setup_req,
+        .user_data = args
+    };
+
+    rc = hive_client_perform_transaction(drv->base.client, &tsx);
     free(req_body_str);
     if (rc)
         return -1;
 
-    rc = http_client_get_response_code(http_cli, &resp_code);
-    http_client_close(http_cli);
+    rc = http_client_get_response_code(tsx.resp, &resp_code);
+    http_client_close(tsx.resp);
     return !rc && resp_code == 201 ? 0 : -1;
 #undef RESP_BODY_MAX_SZ
 }
@@ -437,13 +457,18 @@ static int onedrive_drive_move_file(HiveDrive *obj, const char *old, const char 
         return -1;
 
     void *args[] = {url, req_body_str};
-    rc = hive_drive_http_request(obj, &move_setup_req, args, &http_cli);
+    onedrv_tsx_t tsx = {
+        .setup_req = &move_setup_req,
+        .user_data = args
+    };
+
+    rc = hive_client_perform_transaction(drv->base.client, &tsx);
     free(req_body_str);
     if (rc)
         return -1;
 
-    rc = http_client_get_response_code(http_cli, &resp_code);
-    http_client_close(http_cli);
+    rc = http_client_get_response_code(tsx.resp, &resp_code);
+    http_client_close(tsx.resp);
     return !rc && resp_code == 200 ? 0 : -1;
 #undef is_dir
 }
@@ -627,13 +652,18 @@ static int onedrive_drive_copy_file(HiveDrive *obj, const char *src_path, const 
         return -1;
 
     void *args[] = {url, req_body_str, prog_qry_url, &prog_qry_url_sz};
-    rc = hive_drive_http_request(obj, &copy_setup_req, args, &http_cli);
+    onedrv_tsx_t tsx = {
+        .setup_req = &copy_setup_req,
+        .user_data = args
+    };
+
+    rc = hive_client_perform_transaction(drv->base.client, &tsx);
     free(req_body_str);
     if (rc)
         return -1;
 
-    rc = http_client_get_response_code(http_cli, &resp_code);
-    http_client_close(http_cli);
+    rc = http_client_get_response_code(tsx.resp, &resp_code);
+    http_client_close(tsx.resp);
     if (rc || resp_code != 202) {
         return -1;
     }
@@ -674,11 +704,16 @@ static int onedrive_drive_delete_file(HiveDrive *obj, const char *path)
         return -1;
 
     void *args[] = {url};
-    rc = hive_drive_http_request(obj, &delete_setup_req, args, &http_cli);
+    onedrv_tsx_t tsx = {
+        .setup_req = &delete_setup_req,
+        .user_data = args
+    };
+
+    rc = hive_client_perform_transaction(drv->base.client, &tsx);
     if (rc)
         return -1;
 
-    rc = http_client_get_response_code(http_cli, &resp_code);
+    rc = http_client_get_response_code(tsx.resp, &resp_code);
     http_client_close(http_cli);
     return !rc && resp_code == 204 ? 0 : -1;
 }

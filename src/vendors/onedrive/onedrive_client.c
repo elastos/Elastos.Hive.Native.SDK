@@ -39,59 +39,93 @@ static int onedrive_client_logout(HiveClient *obj)
     return oauth_client_logout(client->oauth_client);
 }
 
-int onedrive_client_get_info(HiveClient *obj, char **result)
+static int onedrive_client_perform_tsx(HiveClient *obj, client_tsx_t *base)
 {
-#define RESP_BODY_MAX_SZ 2048
     OneDriveClient *client = (OneDriveClient *)obj;
+    onedrv_tsx_t *tsx = (onedrv_tsx_t *)base;
     int rc;
-    char resp_body[RESP_BODY_MAX_SZ];
-    size_t resp_body_len = sizeof(resp_body);
     long resp_code;
-    http_client_t *http_cli;
     char *access_token;
+    http_client_t *http_client;
 
-    http_cli = http_client_new();
-    if (!http_cli)
+    http_client = http_client_new();
+    if (!http_client)
         return -1;
 
     rc = oauth_client_get_access_token(client->oauth_client, &access_token);
     if (rc) {
-        http_client_close(http_cli);
+        http_client_close(http_client);
         return -1;
     }
 
-retry:
-    http_client_set_url(http_cli, ONEDRV_ME);
-    http_client_set_method(http_cli, HTTP_METHOD_GET);
-    http_client_set_header(http_cli, "Content-Type", "application/json");
-    http_client_set_header(http_cli, "Authorization", access_token);
-    http_client_set_response_body_instant(http_cli, resp_body, resp_body_len);
-    free(access_token);
+    while (true) {
+        tsx->setup_req(http_client, tsx->user_data);
+        http_client_set_header(http_client, "Authorization", access_token);
+        free(access_token);
 
-    rc = http_client_request(http_cli);
-    if (rc) {
-        http_client_close(http_cli);
-        return -1;
-    }
-
-    rc = http_client_get_response_code(http_cli, &resp_code);
-    if (rc < 0 || (resp_code != 200 && resp_code != 401)) {
-        http_client_close(http_cli);
-        return -1;
-    }
-
-    if (resp_code == 401) {
-        rc = oauth_client_refresh_access_token(client->oauth_client, &access_token);
+        rc = http_client_request(http_client);
         if (rc) {
-            http_client_close(http_cli);
+            http_client_close(http_client);
             return -1;
         }
-        http_client_reset(http_cli);
-        goto retry;
+
+        rc = http_client_get_response_code(http_client, &resp_code);
+        if (rc) {
+            http_client_close(http_client);
+            return -1;
+        }
+
+        if (resp_code == 401) {
+            rc = oauth_client_refresh_access_token(client->oauth_client, &access_token);
+            if (rc) {
+                http_client_close(http_client);
+                return -1;
+            }
+            http_client_reset(http_client);
+            continue;
+        }
+
+        tsx->resp = http_client;
+        return 0;
+    }
+}
+
+static void get_info_setup_req(http_client_t *req, void *args)
+{
+    char *resp_body = (char *)((void **)args)[0];
+    size_t *resp_body_len = (size_t *)((void **)args)[1];
+
+    http_client_set_url(req, ONEDRV_ME);
+    http_client_set_method(req, HTTP_METHOD_GET);
+    http_client_set_header(req, "Content-Type", "application/json");
+    http_client_set_response_body_instant(req, resp_body, *resp_body_len);
+}
+
+static int onedrive_client_get_info(HiveClient *obj, char **result)
+{
+#define RESP_BODY_MAX_SZ 2048
+    int rc;
+    char resp_body[RESP_BODY_MAX_SZ];
+    size_t resp_body_len = sizeof(resp_body);
+    long resp_code;
+    void *args[] = {resp_body, &resp_body_len};
+    onedrv_tsx_t tsx = {
+        .setup_req = &get_info_setup_req,
+        .user_data = args
+    };
+
+    rc = onedrive_client_perform_tsx(obj, &tsx);
+    if (rc)
+        return -1;
+
+    rc = http_client_get_response_code(tsx.resp, &resp_code);
+    if (rc < 0 || resp_code != 200) {
+        http_client_close(tsx.resp);
+        return -1;
     }
 
-    resp_body_len = http_client_get_response_body_length(http_cli);
-    http_client_close(http_cli);
+    resp_body_len = http_client_get_response_body_length(tsx.resp);
+    http_client_close(tsx.resp);
     if (resp_body_len == sizeof(resp_body))
         return -1;
     resp_body[resp_body_len] = '\0';
@@ -105,65 +139,48 @@ retry:
 #undef RESP_BODY_MAX_SZ
 }
 
+static void list_drives_setup_req(http_client_t *req, void *args)
+{
+    const char *url = (const char *)((void **)args)[0];
+    char *resp_body = (char *)((void **)args)[1];
+    size_t *resp_body_len = (size_t *)((void **)args)[2];
+
+    http_client_set_url_escape(req, url);
+    http_client_set_method(req, HTTP_METHOD_GET);
+    http_client_set_response_body_instant(req, resp_body, *resp_body_len);
+}
+
 static int onedrive_client_list_drives(HiveClient *obj, char **result)
 {
 #define RESP_BODY_MAX_SZ 2048
-    OneDriveClient *client = (OneDriveClient *)obj;
     char url[MAXPATHLEN + 1];
     int rc;
     char resp_body[RESP_BODY_MAX_SZ];
     size_t resp_body_len = sizeof(resp_body);
     long resp_code;
-    http_client_t *http_cli;
-    char *access_token;
-
-    http_cli = http_client_new();
-    if (!http_cli)
-        return -1;
 
     rc = snprintf(url, sizeof(url), "%s/drives", ONEDRV_ME);
-    if (rc < 0 || rc >= sizeof(url)) {
-        http_client_close(http_cli);
+    if (rc < 0 || rc >= sizeof(url))
+        return -1;
+
+    void *args[] = {url, resp_body, &resp_body_len};
+    onedrv_tsx_t tsx = {
+        .setup_req = &list_drives_setup_req,
+        .user_data = args
+    };
+
+    rc = onedrive_client_perform_tsx(obj, &tsx);
+    if (rc)
+        return -1;
+
+    rc = http_client_get_response_code(tsx.resp, &resp_code);
+    if (rc < 0 || resp_code != 200) {
+        http_client_close(tsx.resp);
         return -1;
     }
 
-    rc = oauth_client_get_access_token(client->oauth_client, &access_token);
-    if (rc) {
-        http_client_close(http_cli);
-        return -1;
-    }
-
-retry:
-    http_client_set_url(http_cli, url);
-    http_client_set_method(http_cli, HTTP_METHOD_GET);
-    http_client_set_header(http_cli, "Authorization", access_token);
-    http_client_set_response_body_instant(http_cli, resp_body, resp_body_len);
-    free(access_token);
-
-    rc = http_client_request(http_cli);
-    if (rc) {
-        http_client_close(http_cli);
-        return -1;
-    }
-
-    rc = http_client_get_response_code(http_cli, &resp_code);
-    if (rc < 0 || (resp_code != 200 && resp_code != 401)) {
-        http_client_close(http_cli);
-        return -1;
-    }
-
-    if (resp_code == 401) {
-        rc = oauth_client_refresh_access_token(client->oauth_client, &access_token);
-        if (rc) {
-            http_client_close(http_cli);
-            return -1;
-        }
-        http_client_reset(http_cli);
-        goto retry;
-    }
-
-    resp_body_len = http_client_get_response_body_length(http_cli);
-    http_client_close(http_cli);
+    resp_body_len = http_client_get_response_body_length(tsx.resp);
+    http_client_close(tsx.resp);
     if (resp_body_len == sizeof(resp_body))
         return -1;
     resp_body[resp_body_len] = '\0';
@@ -175,6 +192,14 @@ retry:
 
     return 0;
 #undef RESP_BODY_MAX_SZ
+}
+
+static void validate_drive_setup_req(http_client_t *req, void *args)
+{
+    const char *url = (const char *)args;
+
+    http_client_set_url_escape(req, url);
+    http_client_set_method(req, HTTP_METHOD_GET);
 }
 
 static int validate_drive_id(OneDriveClient *client, const char *drive_id)
@@ -183,54 +208,24 @@ static int validate_drive_id(OneDriveClient *client, const char *drive_id)
     char url[MAXPATHLEN + 1];
     int rc;
     long resp_code;
-    http_client_t *http_cli;
-    char *access_token;
-
-    http_cli = http_client_new();
-    if (!http_cli)
-        return -1;
 
     rc = snprintf(url, sizeof(url), "%s/drives/%s", ONEDRV_ME, drive_id);
-    if (rc < 0 || rc >= sizeof(url)) {
-        http_client_close(http_cli);
+    if (rc < 0 || rc >= sizeof(url))
         return -1;
-    }
 
-    rc = oauth_client_get_access_token(client->oauth_client, &access_token);
-    if (rc) {
-        http_client_close(http_cli);
+    onedrv_tsx_t tsx = {
+        .setup_req = &validate_drive_setup_req,
+        .user_data = url
+    };
+
+    rc = onedrive_client_perform_tsx((HiveClient *)client, &tsx);
+    if (rc)
         return -1;
-    }
 
-retry:
-    http_client_set_url(http_cli, url);
-    http_client_set_method(http_cli, HTTP_METHOD_GET);
-    http_client_set_header(http_cli, "Authorization", access_token);
-    free(access_token);
-
-    rc = http_client_request(http_cli);
-    if (rc) {
-        http_client_close(http_cli);
+    rc = http_client_get_response_code(tsx.resp, &resp_code);
+    http_client_close(tsx.resp);
+    if (rc < 0 || resp_code != 200)
         return -1;
-    }
-
-    rc = http_client_get_response_code(http_cli, &resp_code);
-    if (rc < 0 || (resp_code != 200 && resp_code != 401)) {
-        http_client_close(http_cli);
-        return -1;
-    }
-
-    if (resp_code == 401) {
-        rc = oauth_client_refresh_access_token(client->oauth_client, &access_token);
-        if (rc) {
-            http_client_close(http_cli);
-            return -1;
-        }
-        http_client_reset(http_cli);
-        goto retry;
-    }
-
-    http_client_close(http_cli);
     return 0;
 #undef RESP_BODY_MAX_SZ
 }
@@ -259,25 +254,11 @@ static void onedrive_client_close(HiveClient *obj)
     deref(obj);
 }
 
-static int onedrive_client_expire_access_token(HiveClient *obj)
+static int onedrive_client_invalidate_credential(HiveClient *obj)
 {
     OneDriveClient *client = (OneDriveClient *)obj;
 
     return oauth_client_set_expired(client->oauth_client);
-}
-
-static int onedrive_client_get_access_token(HiveClient *obj, char **access_token)
-{
-    OneDriveClient *client = (OneDriveClient *)obj;
-
-    return oauth_client_get_access_token(client->oauth_client, access_token);
-}
-
-static int onedrive_client_refresh_access_token(HiveClient *obj, char **access_token)
-{
-    OneDriveClient *client = (OneDriveClient *)obj;
-
-    return oauth_client_refresh_access_token(client->oauth_client, access_token);
 }
 
 HiveClient *onedrive_client_new(const HiveOptions *options)
@@ -379,16 +360,15 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
         return NULL;
     }
 
-    onedrv_client->base.login                = &onedrive_client_login;
-    onedrv_client->base.logout               = &onedrive_client_logout;
-    onedrv_client->base.get_info             = &onedrive_client_get_info;
-    onedrv_client->base.list_drives          = &onedrive_client_list_drives;
-    onedrv_client->base.drive_open           = &onedrive_client_drive_open;
-    onedrv_client->base.destructor_func      = &onedrive_client_close;
+    onedrv_client->base.login                 = &onedrive_client_login;
+    onedrv_client->base.logout                = &onedrive_client_logout;
+    onedrv_client->base.get_info              = &onedrive_client_get_info;
+    onedrv_client->base.list_drives           = &onedrive_client_list_drives;
+    onedrv_client->base.drive_open            = &onedrive_client_drive_open;
+    onedrv_client->base.destructor_func       = &onedrive_client_close;
 
-    onedrv_client->base.expire_access_token  = &onedrive_client_expire_access_token;
-    onedrv_client->base.get_access_token     = &onedrive_client_get_access_token;
-    onedrv_client->base.refresh_access_token = &onedrive_client_refresh_access_token;
+    onedrv_client->base.perform_tsx           = &onedrive_client_perform_tsx;
+    onedrv_client->base.invalidate_credential = &onedrive_client_invalidate_credential;
 
     return (HiveClient *)onedrv_client;
 }

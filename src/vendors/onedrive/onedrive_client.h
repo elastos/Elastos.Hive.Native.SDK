@@ -2,6 +2,13 @@
 #define __ONEDRIVE_CLIENT_H__
 
 #include "client.h"
+#include "http_client.h"
+
+typedef struct onedrive_transaction {
+    void (*setup_req)(http_client_t *, void *);
+    void *user_data;
+    http_client_t *resp;
+} onedrv_tsx_t;
 
 HiveClient *onedrive_client_new(const HiveOptions *);
 

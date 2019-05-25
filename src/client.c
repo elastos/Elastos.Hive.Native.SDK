@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <assert.h>
 
 #include "client.h"
 #include "local_client.h"
@@ -92,20 +93,19 @@ HiveDrive *hive_drive_open(HiveClient *client, const HiveDriveOptions *options)
     return client->drive_open(client, options);
 }
 
-int hive_client_expire_access_token(HiveClient *client)
+int hive_client_invalidate_credential(HiveClient *client)
 {
     if (!client)
         return -1;
 
-    return client->expire_access_token(client);
+    return client->invalidate_credential(client);
 }
 
-int hive_client_get_access_token(HiveClient *client, char **access_token)
+int hive_client_perform_transaction(HiveClient *client, client_tsx_t *tsx)
 {
-    return client->get_access_token(client, access_token);
+    assert(client);
+    assert(tsx);
+
+    return client->perform_tsx(client, tsx);
 }
 
-int hive_client_refresh_access_token(HiveClient *client, char **access_token)
-{
-    return client->refresh_access_token(client, access_token);
-}
