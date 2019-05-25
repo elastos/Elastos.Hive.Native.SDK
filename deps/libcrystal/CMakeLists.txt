@@ -8,9 +8,9 @@ ExternalProject_Add(
     libcrystal
 
     PREFIX ${HIVE_DEPS_BUILD_PREFIX}
-    URL "https://github.com/iwhisperio/libcrystal/archive/master.zip"
-    URL_HASH SHA256=70cf1b4f5fc1a59af45881d78749357245e1cf53c73019e34d7eb95b17110b7a
-    DOWNLOAD_NAME "libcrystal-master.zip"
+    URL "https://github.com/iwhisperio/libcrystal/archive/release-v1.0.5.tar.gz"
+    URL_HASH SHA256=6256713f34bb341d718a38b5f3a108c6d9c1db93e6391f670108de1cd09b3cee
+    DOWNLOAD_NAME "libcrystal-v1.0.5.tar.gz"
     DOWNLOAD_DIR ${HIVE_DEPS_TARBALL_DIR}
     DOWNLOAD_NO_PROGRESS 1
 
