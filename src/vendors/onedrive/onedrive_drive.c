@@ -30,28 +30,21 @@ typedef struct OneDriveDrive {
 
 static void get_info_setup_req(http_client_t *req, void *args)
 {
-    const char *url = (const char *)((void **)args)[0];
-    char *resp_body = (char *)((void **)args)[1];
-    size_t *resp_body_len = (size_t *)((void **)args)[2];
+    const char *url = (const char *)args;
 
     http_client_set_url_escape(req, url);
     http_client_set_method(req, HTTP_METHOD_GET);
-    http_client_set_response_body_instant(req, resp_body, *resp_body_len);
+    http_client_enable_response_body(req);
 }
 
 static int onedrive_drive_get_info(HiveDrive *obj, char **result)
 {
-#define RESP_BODY_MAX_SZ 512
     OneDriveDrive *drv = (OneDriveDrive *)obj;
     int rc;
-    char resp_body[RESP_BODY_MAX_SZ];
-    size_t resp_body_len = sizeof(resp_body);
     long resp_code;
-
-    void *args[] = {drv->drv_url, resp_body, &resp_body_len};
     onedrv_tsx_t tsx = {
         .setup_req = &get_info_setup_req,
-        .user_data = args
+        .user_data = drv->drv_url
     };
 
     rc = hive_client_perform_transaction(drv->base.client, &tsx);
@@ -64,41 +57,28 @@ static int onedrive_drive_get_info(HiveDrive *obj, char **result)
         return -1;
     }
 
-    resp_body_len = http_client_get_response_body_length(tsx.resp);
+    *result = http_client_move_response_body(tsx.resp, NULL);
     http_client_close(tsx.resp);
-    if (resp_body_len == sizeof(resp_body))
-        return -1;
-    resp_body[resp_body_len] = '\0';
-
-    *result = malloc(resp_body_len + 1);
     if (!*result)
         return -1;
-
-    memcpy(*result, resp_body, resp_body_len + 1);
     return 0;
-#undef RESP_BODY_MAX_SZ
 }
 
 static void stat_setup_req(http_client_t *req, void *args)
 {
-    const char *url = (const char *)((void **)args)[0];
-    char *resp_body = (char *)((void **)args)[1];
-    size_t *resp_body_len = (size_t *)((void **)args)[2];
+    const char *url = (const char *)args;
 
     http_client_set_url_escape(req, url);
     http_client_set_method(req, HTTP_METHOD_GET);
-    http_client_set_response_body_instant(req, resp_body, *resp_body_len);
+    http_client_enable_response_body(req);
 }
 
 static int onedrive_drive_file_stat(HiveDrive *obj, const char *file_path, char **result)
 {
-#define RESP_BODY_MAX_SZ 16384
     OneDriveDrive *drv = (OneDriveDrive *)obj;
     char url[MAXPATHLEN + 1];
     int rc;
     char *path_esc;
-    char resp_body[RESP_BODY_MAX_SZ];
-    size_t resp_body_len = sizeof(resp_body);
     long resp_code;
     http_client_t *http_cli;
 
@@ -118,10 +98,9 @@ static int onedrive_drive_file_stat(HiveDrive *obj, const char *file_path, char 
     if (rc < 0 || rc >= sizeof(url))
         return -1;
 
-    void *args[] = {url, resp_body, &resp_body_len};
     onedrv_tsx_t tsx = {
         .setup_req = &stat_setup_req,
-        .user_data = args
+        .user_data = url
     };
 
     rc = hive_client_perform_transaction(drv->base.client, &tsx);
@@ -134,41 +113,28 @@ static int onedrive_drive_file_stat(HiveDrive *obj, const char *file_path, char 
         return -1;
     }
 
-    resp_body_len = http_client_get_response_body_length(tsx.resp);
+    *result = http_client_move_response_body(tsx.resp, NULL);
     http_client_close(tsx.resp);
-    if (resp_body_len == sizeof(resp_body))
-        return -1;
-    resp_body[resp_body_len] = '\0';
-
-    *result = malloc(resp_body_len + 1);
     if (!*result)
         return -1;
-
-    memcpy(*result, resp_body, resp_body_len + 1);
     return 0;
-#undef RESP_BODY_MAX_SZ
 }
 
 static void list_setup_req(http_client_t *req, void *args)
 {
-    const char *url = (const char *)((void **)args)[0];
-    char *resp_body = (char *)((void **)args)[1];
-    size_t *resp_body_len = (size_t *)((void **)args)[2];
+    const char *url = (const char *)args;
 
     http_client_set_url_escape(req, url);
     http_client_set_method(req, HTTP_METHOD_GET);
-    http_client_set_response_body_instant(req, resp_body, *resp_body_len);
+    http_client_enable_response_body(req);
 }
 
 static int onedrive_drive_list_files(HiveDrive *obj, const char *dir_path, char **result)
 {
-#define RESP_BODY_MAX_SZ 16384
     OneDriveDrive *drv = (OneDriveDrive *)obj;
     char url[MAXPATHLEN + 1];
     int rc, val_sz, i;
     char *path_esc;
-    char resp_body[RESP_BODY_MAX_SZ];
-    size_t resp_body_len = sizeof(resp_body);
     long resp_code;
     cJSON *resp_part, *next_link, *resp, *val_part, *elem, *val;
     http_client_t *http_cli;
@@ -200,11 +166,11 @@ static int onedrive_drive_list_files(HiveDrive *obj, const char *dir_path, char 
     }
 
     while (true) {
-        void *args[] = {url, resp_body, &resp_body_len};
         onedrv_tsx_t tsx = {
             .setup_req = &list_setup_req,
-            .user_data = args
+            .user_data = url
         };
+        char *resp_body_str;
 
         rc = hive_client_perform_transaction(drv->base.client, &tsx);
         if (rc) {
@@ -219,15 +185,15 @@ static int onedrive_drive_list_files(HiveDrive *obj, const char *dir_path, char 
             return -1;
         }
 
-        resp_body_len = http_client_get_response_body_length(tsx.resp);
+        resp_body_str = http_client_move_response_body(tsx.resp, NULL);
         http_client_close(tsx.resp);
-        if (resp_body_len == sizeof(resp_body)) {
+        if (!resp_body_str) {
             cJSON_Delete(resp);
             return -1;
         }
-        resp_body[resp_body_len] = '\0';
 
-        resp_part = cJSON_Parse(resp_body);
+        resp_part = cJSON_Parse(resp_body_str);
+        free(resp_body_str);
         if (!resp_part) {
             cJSON_Delete(resp);
             return -1;
@@ -259,7 +225,6 @@ static int onedrive_drive_list_files(HiveDrive *obj, const char *dir_path, char 
                 cJSON_Delete(resp);
                 return -1;
             }
-            resp_body_len = sizeof(resp_body);
             continue;
         }
 
@@ -267,32 +232,25 @@ static int onedrive_drive_list_files(HiveDrive *obj, const char *dir_path, char 
         cJSON_Delete(resp);
         return *result ? 0 : -1;
     }
-#undef RESP_BODY_MAX_SZ
 }
 
 static void mkdir_setup_req(http_client_t *req, void *args)
 {
     const char *url = (const char *)((void **)args)[0];
     const char *req_body = (const char *)((void **)args)[1];
-    char *resp_body = (char *)((void **)args)[2];
-    size_t *resp_body_len = (size_t *)((void **)args)[3];
 
     http_client_set_url_escape(req, url);
     http_client_set_method(req, HTTP_METHOD_POST);
     http_client_set_header(req, "Content-Type", "application/json");
     http_client_set_request_body_instant(req, (void *)req_body, strlen(req_body));
-    http_client_set_response_body_instant(req, resp_body, *resp_body_len);
 }
 
 static int onedrive_drive_mkdir(HiveDrive *obj, const char *path)
 {
-#define RESP_BODY_MAX_SZ 2048
     OneDriveDrive *drv = (OneDriveDrive *)obj;
     char url[MAXPATHLEN + 1];
     cJSON *req_body;
     int rc;
-    char resp_body[RESP_BODY_MAX_SZ];
-    size_t resp_body_len = sizeof(resp_body);
     long resp_code;
     char *req_body_str;
     char *dir;
@@ -340,7 +298,7 @@ static int onedrive_drive_mkdir(HiveDrive *obj, const char *path)
     if (!req_body_str)
         return -1;
 
-    void *args[] = {url, req_body_str, resp_body, &resp_body_len};
+    void *args[] = {url, req_body_str};
     onedrv_tsx_t tsx = {
         .setup_req = &mkdir_setup_req,
         .user_data = args
@@ -354,7 +312,6 @@ static int onedrive_drive_mkdir(HiveDrive *obj, const char *path)
     rc = http_client_get_response_code(tsx.resp, &resp_code);
     http_client_close(tsx.resp);
     return !rc && resp_code == 201 ? 0 : -1;
-#undef RESP_BODY_MAX_SZ
 }
 
 static void move_setup_req(http_client_t *req, void *args)
@@ -511,7 +468,6 @@ static void copy_setup_req(http_client_t *req, void *args)
 
 static int wait_til_complete(const char *prog_qry_url)
 {
-#define RESP_BODY_MAX_SZ 256
     http_client_t *http_cli;
     int rc;
 
@@ -521,15 +477,20 @@ static int wait_til_complete(const char *prog_qry_url)
 
     while (true) {
         cJSON *resp_body, *status;
-        char resp_body_buf[RESP_BODY_MAX_SZ];
-        size_t resp_body_buf_sz = sizeof(resp_body_buf);
+        const char *resp_body_buf;
 
         http_client_set_url_escape(http_cli, prog_qry_url);
         http_client_set_method(http_cli, HTTP_METHOD_GET);
-        http_client_set_response_body_instant(http_cli, resp_body_buf, resp_body_buf_sz);
+        http_client_enable_response_body(http_cli);
 
         rc = http_client_request(http_cli);
         if (rc) {
+            http_client_close(http_cli);
+            return -1;
+        }
+
+        resp_body_buf = http_client_get_response_body(http_cli);
+        if (!resp_body_buf) {
             http_client_close(http_cli);
             return -1;
         }
@@ -558,7 +519,6 @@ static int wait_til_complete(const char *prog_qry_url)
         cJSON_Delete(resp_body);
         return 0;
     }
-#undef RESP_BODY_MAX_SZ
 }
 
 static int onedrive_drive_copy_file(HiveDrive *obj, const char *src_path, const char *dest_path)
