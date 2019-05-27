@@ -111,10 +111,11 @@ int hive_drive_delete_file(HiveDrive *drv, const char *path)
     return rc;
 }
 
-void hive_drive_close(HiveDrive *drv)
+int hive_drive_close(HiveDrive *drv)
 {
     if (!drv)
-        return;
+        return -1;
 
     drv->close(drv);
+    return 0;
 }
