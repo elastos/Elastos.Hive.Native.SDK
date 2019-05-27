@@ -12,29 +12,30 @@
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
-#include <hive_impl.h>
+#include <elastos_hive.h>
+#include <client.h>
+#include "config.h"
 
-extern const char *profile_name;
-extern int hive_delete_profile_file(const char* profile_name);
-extern void hive_ready_for_oauth(void);
+extern void hive_ready_for_login(void);
 extern int onedrv_open_oauth_url(const char *url);
-extern int hive_authorize_record_time(hive_t * hive);
+extern int hive_login_record_time(HiveClient * client);
 
-static hive_1drv_opt_t onedrv_option;
-static hive_t *hive = NULL;
-static const char* test_file = "/Documents/Test_Expired_Token";
+static OneDriveOptions onedrv_option;
+static OneDriveDriveOptions drv_options;
+static HiveClient *client;
+static HiveDrive *drive;
 
 static void test_hive_expired_token(void)
 {
     int rc;
 
-    rc = hive_set_expired(hive);
+    rc = hive_client_invalidate_credential(client);
     CU_ASSERT_EQUAL(rc, 0);
 
-    rc = hive_mkdir(hive, test_file);
+    rc = hive_drive_mkdir(drive, global_config.files.file_path);
     CU_ASSERT_EQUAL(rc, 0);
 
-    rc = hive_delete(hive, test_file);
+    rc = hive_drive_delete_file(drive, global_config.files.file_path);
     CU_ASSERT_EQUAL(rc, 0);
 
     return;
@@ -43,19 +44,26 @@ static void test_hive_expired_token(void)
 
 static int hive_expired_token_test_suite_init(void)
 {
-    onedrv_option.base.type = HIVE_TYPE_ONEDRIVE;
-    strcpy(onedrv_option.profile_path, "hive1drv.json");
-    onedrv_option.open_oauth_url = onedrv_open_oauth_url;
+    int rc;
 
-    if (hive_global_init())
+    strcpy(onedrv_option.base.persistent_location, global_config.profile);
+    onedrv_option.base.drive_type = HiveDriveType_OneDrive;
+    onedrv_option.client_id = global_config.oauthinfo.client_id;
+    onedrv_option.scope = global_config.oauthinfo.scope;
+    onedrv_option.redirect_url = global_config.oauthinfo.redirect_url;
+    onedrv_option.grant_authorize = onedrv_open_oauth_url;
+
+    strcpy(drv_options.drive_id, "default");
+
+    client = hive_client_new((HiveOptions*)(&onedrv_option));
+    if (!client)
         return -1;
 
-    hive = hive_new((hive_opt_t *)(&onedrv_option));
-    if(!hive)
-        return -1;
+    hive_ready_for_login();
+    rc = hive_login_record_time(client);
 
-    hive_ready_for_oauth();
-    if(hive_authorize_record_time(hive) != 0)
+    drive = hive_drive_open(client, (HiveDriveOptions*)(&drv_options));
+    if(!drive)
         return -1;
 
     return 0;
@@ -63,13 +71,24 @@ static int hive_expired_token_test_suite_init(void)
 
 static int hive_expired_token_test_suite_cleanup(void)
 {
-    onedrv_option.base.type = HIVE_TYPE_NONEXIST;
-    strcpy(onedrv_option.profile_path, "");
+    int rc;
 
-    hive_kill(hive);
-    hive_global_cleanup();
+    onedrv_option.base.drive_type = HiveDriveType_Butt;
+    onedrv_option.client_id = "";
+    onedrv_option.scope = "";
+    onedrv_option.redirect_url = "";
+    onedrv_option.grant_authorize = NULL;
+    onedrv_option.base.persistent_location = "";
 
-    return hive_delete_profile_file(profile_name);
+    rc = hive_drive_close(drive);
+    if(rc)
+        return -1;
+
+    rc = hive_client_logout(client);
+    if(rc)
+        return rc;
+
+    return hive_client_close(client);
 }
 
 static CU_TestInfo cases[] = {

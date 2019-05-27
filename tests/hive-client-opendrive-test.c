@@ -10,13 +10,14 @@
 #include <unistd.h>
 #endif
 #include <elastos_hive.h>
+#include "config.h"
 
 extern void hive_ready_for_login(void);
 extern int onedrv_open_oauth_url(const char *url);
-extern int hive_login_record_time(HiveClient * client);
+extern int hive_login_record_time(HiveClient *client);
 
 static OneDriveOptions onedrv_option;
-static HiveDriveOptions drv_options;
+static OneDriveDriveOptions drv_options;
 static HiveClient *client;
 
 static void test_hive_client_opendrive_without_new(void)
@@ -59,7 +60,7 @@ static int hive_client_opendrive_test_suite_init(void)
     onedrv_option.redirect_url = global_config.oauthinfo.redirect_url;
     onedrv_option.grant_authorize = onedrv_open_oauth_url;
 
-    drv_options.drive_id = "default";
+    strcpy(drv_options.drive_id, "default");
 
     client = hive_client_new((HiveOptions*)(&onedrv_option));
     if (!client)
@@ -71,11 +72,13 @@ static int hive_client_opendrive_test_suite_init(void)
 
 static int hive_client_opendrive_test_suite_cleanup(void)
 {
+    int rc;
+
     onedrv_option.base.drive_type = HiveDriveType_Butt;
     onedrv_option.client_id = "";
     onedrv_option.scope = "";
     onedrv_option.redirect_url = "";
-    onedrv_option.grant_authorize = "";
+    onedrv_option.grant_authorize = NULL;
     onedrv_option.base.persistent_location = "";
 
     rc = hive_client_logout(client);

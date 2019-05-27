@@ -22,14 +22,19 @@ endif()
 set(SRC
     config.c
     tests.c
-    hive-new-test.c
-    hive-authorize-test.c
-    hive-authorizing-test.c
-    hive-mkdir-test.c
+    hive-client-new-test.c
+    hive-client-getinfo-test.c
+    hive-client-login-test.c
+    hive-client-logining-test.c
+    hive-client-opendrive-test.c
+    hive-client-drivelist-test.c
+    hive-drive-getinfo-test.c
+    hive-drive_mkdir-test.c
+    hive-drive-filestat-test.c
+    hive-drive-filelist-test.c
+    hive-drive-copy-test.c
+    hive-drive-move-test.c
     hive-expired-token-test.c
-    hive-no-file-test.c
-    hive-file-test.c
-    hive-asynctest.c
     )
 
 add_definitions(-DLIBCONFIG_STATIC)
@@ -41,7 +46,7 @@ else()
 endif()
 
 set(LIBS
-    elahive
+    elahive-shared
     crystal)
 
 set(DEPS

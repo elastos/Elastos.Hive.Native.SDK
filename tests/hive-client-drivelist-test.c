@@ -10,6 +10,7 @@
 #include <unistd.h>
 #endif
 #include <elastos_hive.h>
+#include "config.h"
 
 extern void hive_ready_for_login(void);
 extern int onedrv_open_oauth_url(const char *url);
@@ -75,7 +76,7 @@ static int hive_client_drivelist_test_suite_cleanup(void)
     onedrv_option.client_id = "";
     onedrv_option.scope = "";
     onedrv_option.redirect_url = "";
-    onedrv_option.grant_authorize = "";
+    onedrv_option.grant_authorize = NULL;
     onedrv_option.base.persistent_location = "";
 
     rc = hive_client_logout(client);

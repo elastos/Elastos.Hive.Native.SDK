@@ -19,8 +19,8 @@
 #endif
 #include <crystal.h>
 
-#include "config.h"
 #include "suites.h"
+#include "config.h"
 
 #define CONFIG_NAME   "tests.conf"
 

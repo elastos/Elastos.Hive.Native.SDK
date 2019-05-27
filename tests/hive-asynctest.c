@@ -31,7 +31,7 @@ static CU_TestInfo cases[] = {
 
 static CU_SuiteInfo suite[] = {
     {   "hive async test", hive_asynctest_suite_init, hive_asynctest_suite_cleanup, NULL, NULL, cases },
-    {    NULL,       NULL,                      NULL,                         NULL, NULL, NULL}
+    {    NULL,             NULL,                      NULL,                         NULL, NULL, NULL  }
 };
 
 CU_SuiteInfo* hive_asynctest_suite_info(void)

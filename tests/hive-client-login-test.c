@@ -13,6 +13,7 @@
 #include <unistd.h>
 #endif
 #include <elastos_hive.h>
+#include "config.h"
 
 extern int onedrv_open_oauth_url(const char *url);
 
@@ -37,7 +38,9 @@ void hive_ready_for_login(void)
 
 int hive_login_record_time(HiveClient *client)
 {
-    int rc = hive_client_login(client);
+    int rc;
+
+    rc = hive_client_login(client);
     gettimeofday(&end, NULL);
 
     return rc;
@@ -47,7 +50,7 @@ static void test_hive_client_login_without_new(void)
 {
     int rc;
 
-    rc = hive_authorize_record_time(NULL);
+    rc = hive_login_record_time(NULL);
     CU_ASSERT_EQUAL(rc, -1);
 
     return;
@@ -70,6 +73,7 @@ static void test_hive_client_login(void)
 
     rc = hive_client_close(client);
     CU_ASSERT_EQUAL(rc, 0);
+
     return;
 }
 
@@ -116,17 +120,17 @@ static int hive_client_login_test_suite_cleanup(void)
     onedrv_option.client_id = "";
     onedrv_option.scope = "";
     onedrv_option.redirect_url = "";
-    onedrv_option.grant_authorize = "";
+    onedrv_option.grant_authorize = NULL;
     onedrv_option.base.persistent_location = "";
 
     return 0;
 }
 
 static CU_TestInfo cases[] = {
-    {   "test_hive_login_without_new", test_hive_login_without_new },
-    {   "test_hive_login",             test_hive_login             },
-    {   "test_hive_double_login",      test_hive_double_login      },
-    {   NULL,                          NULL                        }
+    {   "test_hive_client_login_without_new", test_hive_client_login_without_new },
+    {   "test_hive_client_login",             test_hive_client_login             },
+    {   "test_hive_client_double_login",      test_hive_client_double_login      },
+    {   NULL,                                 NULL                               }
 };
 
 static CU_SuiteInfo suite[] = {

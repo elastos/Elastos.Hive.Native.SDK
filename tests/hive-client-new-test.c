@@ -48,9 +48,9 @@ static void test_hive_client_new_with_default_type(void)
     int rc;
     HiveClient *client;
 
-    onedrv_option.base.type = HiveDriveType_Butt;
+    onedrv_option.base.drive_type = HiveDriveType_Butt;
 
-    client = hive_client_new((hive_opt_t *)(&onedrv_option));
+    client = hive_client_new((HiveOptions*)(&onedrv_option));
     CU_ASSERT_PTR_NULL(client);
 
     rc = hive_client_close(client);
@@ -76,21 +76,21 @@ static int hive_client_new_test_suite_cleanup(void)
     onedrv_option.client_id = "";
     onedrv_option.scope = "";
     onedrv_option.redirect_url = "";
-    onedrv_option.grant_authorize = "";
+    onedrv_option.grant_authorize = NULL;
     onedrv_option.base.persistent_location = "";
 
     return 0;
 }
 
 static CU_TestInfo cases[] = {
-    {   "test_client_hive_new",                   test_client_hive_new                   },
-    {   "test_client_hive_new_with_default_type", test_clinet_hive_new_with_default_type },
-    {   NULL,                                     NULL                            }
+    {   "test_hive_client_new",                   test_hive_client_new                   },
+    {   "test_hive_client_new_with_default_type", test_hive_client_new_with_default_type },
+    {   NULL,                                     NULL                                   }
 };
 
 static CU_SuiteInfo suite[] = {
     {   "hive client new test", hive_client_new_test_suite_init, hive_client_new_test_suite_cleanup, NULL, NULL, cases },
-    {    NULL,                  NULL,                            NULL,                              NULL, NULL, NULL  }
+    {    NULL,                  NULL,                            NULL,                               NULL, NULL, NULL  }
 };
 
 CU_SuiteInfo* hive_client_new_test_suite_info(void)
