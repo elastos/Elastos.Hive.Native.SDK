@@ -15,4 +15,4 @@ _hive_drive_move_file
 _hive_drive_copy_file
 _hive_drive_delete_file
 _hive_drive_close
-
+_hive_client_invalidate_credential

@@ -17,6 +17,7 @@ struct HiveClient {
     int (*invalidate_credential)(HiveClient *);
 };
 
+HIVE_API
 int hive_client_invalidate_credential(HiveClient *);
 
 int hive_client_perform_transaction(HiveClient *, client_tsx_t *);
