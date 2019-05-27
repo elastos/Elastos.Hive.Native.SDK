@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <assert.h>
 #include <crystal.h>
+#include <stdlib.h>
 
 #include "hiveipfs_drive.h"
 #include "hiveipfs_client.h"
@@ -274,8 +275,43 @@ static int ipfs_drive_delete_file(HiveDrive *obj, const char *path)
     return 0;
 }
 
+static void publish_setup_req(http_client_t *req, void *args)
+{
+    const char *req_path = (const char *)((void **)args)[0];
+    const char *path = (const char *)((void **)args)[1];
+
+    http_client_set_path(req, req_path);
+    http_client_set_query(req, "path", path);
+    http_client_set_method(req, HTTP_METHOD_POST);
+}
+
+static int ipfs_drive_publish(HiveDrive *obj, const char *path)
+{
+    ipfs_drv_t *drv = (ipfs_drv_t *)obj;
+    const char *req_path = "/api/v0/name/publish";
+    void *args[] = {(void *)req_path, (void *)path};
+    ipfs_tsx_t tsx = {
+        .setup_req = &publish_setup_req,
+        .user_data = args
+    };
+    int rc;
+    long resp_code;
+
+    rc = hive_client_perform_transaction(drv->base.client, &tsx);
+    if (rc)
+        return -1;
+
+    rc = http_client_get_response_code(tsx.resp, &resp_code);
+    http_client_close(tsx.resp);
+    if (rc || resp_code != 200)
+        return -1;
+
+    return 0;
+}
+
 static void ipfs_drive_close(HiveDrive *obj)
 {
+    ipfs_drive_publish(obj, "/");
     deref(obj);
 }
 
