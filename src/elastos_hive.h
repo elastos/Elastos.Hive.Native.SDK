@@ -104,7 +104,7 @@ HIVE_API
 HiveDrive *hive_drive_open(HiveClient *, const HiveDriveOptions *options);
 
 HIVE_API
-void hive_drive_close(HiveDrive *);
+int hive_drive_close(HiveDrive *);
 
 HIVE_API
 int hive_drive_get_info(HiveDrive *, char **result);

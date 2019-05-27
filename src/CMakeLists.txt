@@ -129,7 +129,7 @@ if(ENABLE_SHARED)
 
     target_compile_definitions(elahive-shared PRIVATE HIVE_DYNAMIC CRYSTAL_DYNAMIC)
     set_target_properties(elahive-shared PROPERTIES
-        LIBRARY_OUTPUT_NAME elahive
+        OUTPUT_NAME elahive
         VERSION ${ELASTOS_HIVE_VERSION}
         SOVERSION ${ELASTOS_HIVE_VERSION_MAJOR})
     if(WIN32)
