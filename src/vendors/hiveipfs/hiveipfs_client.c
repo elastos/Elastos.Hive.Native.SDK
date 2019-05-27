@@ -6,6 +6,7 @@
 #include <sys/param.h>
 #include <http_client.h>
 #include <stdlib.h>
+#include <cjson/cJSON.h>
 
 #endif
 
@@ -32,13 +33,136 @@ typedef struct IpfsClient {
 #define CLUSTER_API_PORT (9094)
 #define NODE_API_PORT (9095)
 
+static int ipfs_client_get_info(HiveClient *obj, char **result);
+
+static int ipfs_client_resolve_peer_id(const char *svr_addr, const char *peer_id, char **result)
+{
+    int rc;
+    http_client_t *http_client;
+    char url[MAXPATHLEN + 1];
+    long resp_code;
+
+    rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/name/resolve",
+        svr_addr, NODE_API_PORT);
+    if (rc < 0 || rc >= sizeof(url))
+        return -1;
+
+    http_client = http_client_new();
+    if (!http_client)
+        return -1;
+
+    http_client_set_url(http_client, url);
+    http_client_set_query(http_client, "arg", peer_id);
+    http_client_set_method(http_client, HTTP_METHOD_GET);
+    http_client_enable_response_body(http_client);
+
+    rc = http_client_request(http_client);
+    if (rc) {
+        http_client_close(http_client);
+        return -1;
+    }
+
+    rc = http_client_get_response_code(http_client, &resp_code);
+    if (rc || resp_code != 200) {
+        http_client_close(http_client);
+        return -1;
+    }
+
+    *result = http_client_move_response_body(http_client, NULL);
+    http_client_close(http_client);
+    if (!*result)
+        return -1;
+    return 0;
+}
+
+static int ipfs_client_synchronize_intl(IpfsClient *client)
+{
+    char url[MAXPATHLEN + 1];
+    long resp_code;
+    char *resp;
+    cJSON *json = NULL;
+    cJSON *peer_id;
+    cJSON *hash;
+    http_client_t *http_client = NULL;
+    int rc;
+    int ret = -1;
+
+    rc = ipfs_client_get_info((HiveClient *)client, &resp);
+    if (rc)
+        goto end;
+
+    json = cJSON_Parse(resp);
+    free(resp);
+    if (!json)
+        goto end;
+
+    peer_id = cJSON_GetObjectItemCaseSensitive(json, "PeerID");
+    if (!cJSON_IsString(peer_id) || !peer_id->valuestring || !*peer_id->valuestring)
+        goto end;
+
+    rc = ipfs_client_resolve_peer_id(client->svr_addr, peer_id->valuestring, &resp);
+    if (rc)
+        goto end;
+    cJSON_Delete(json);
+
+    json = cJSON_Parse(resp);
+    free(resp);
+    if (!json)
+        goto end;
+
+    hash = cJSON_GetObjectItemCaseSensitive(json, "Path");
+    if (!cJSON_IsString(hash) || !hash->valuestring || !*hash->valuestring)
+        goto end;
+
+    rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/uid/login",
+        client->svr_addr, NODE_API_PORT);
+    if (rc < 0 || rc >= sizeof(url))
+        goto end;
+
+    http_client = http_client_new();
+    if (!http_client)
+        goto end;
+
+    http_client_set_url(http_client, url);
+    http_client_set_query(http_client, "uid", client->uid);
+    http_client_set_query(http_client, "hash", hash->valuestring);
+    http_client_set_method(http_client, HTTP_METHOD_POST);
+
+    rc = http_client_request(http_client);
+    if (rc)
+        goto end;
+
+    rc = http_client_get_response_code(http_client, &resp_code);
+    if (rc || resp_code != 200)
+        goto end;
+
+    ret = 0;
+end:
+    if (json)
+        cJSON_Delete(json);
+    if (http_client)
+        http_client_close(http_client);
+    return ret;
+}
+
+int ipfs_client_synchronize(HiveClient *obj)
+{
+    IpfsClient *client = (IpfsClient *)obj;
+
+    pthread_mutex_lock(&client->lock);
+    if (client->state != LOGGED_IN) {
+        pthread_mutex_unlock(&client->lock);
+        return -1;
+    }
+    pthread_mutex_unlock(&client->lock);
+
+    return ipfs_client_synchronize_intl(client);
+}
+
 static int ipfs_client_login(HiveClient *obj)
 {
     IpfsClient *client = (IpfsClient *)obj;
     int rc;
-    char url[MAXPATHLEN + 1];
-    http_client_t *http_client = NULL;
-    long resp_code;
     state_t state_to_set = ERRORED;
 
     pthread_mutex_lock(&client->lock);
@@ -52,31 +176,13 @@ static int ipfs_client_login(HiveClient *obj)
     client->state = LOGGING_IN;
     pthread_mutex_unlock(&client->lock);
 
-    rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/uid/login",
-        client->svr_addr, NODE_API_PORT);
-    if (rc < 0 || rc >= sizeof(url))
-        goto end;
-
-    http_client = http_client_new();
-    if (!http_client)
-        goto end;
-
-    http_client_set_url(http_client, url);
-    http_client_set_query(http_client, "uid", client->uid);
-
-    rc = http_client_request(http_client);
+    rc = ipfs_client_synchronize_intl(client);
     if (rc)
-        goto end;
-
-    rc = http_client_get_response_code(http_client, &resp_code);
-    if (rc || resp_code != 200)
         goto end;
 
     state_to_set = LOGGED_IN;
 
 end:
-    if (http_client)
-        http_client_close(http_client);
     pthread_mutex_lock(&client->lock);
     if (client->state == LOGGING_IN) {
         client->state = state_to_set;
@@ -121,6 +227,7 @@ static int ipfs_client_get_info(HiveClient *obj, char **result)
 
     http_client_set_url(http_client, url);
     http_client_set_query(http_client, "uid", client->uid);
+    http_client_set_method(http_client, HTTP_METHOD_POST);
     http_client_enable_response_body(http_client);
 
     rc = http_client_request(http_client);
@@ -159,6 +266,10 @@ static int ipfs_client_list_drives(HiveClient *obj, char **result)
     }
     pthread_mutex_unlock(&client->lock);
 
+    rc = ipfs_client_synchronize_intl(client);
+    if (rc)
+        return -1;
+
     rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/files/stat",
         client->svr_addr, NODE_API_PORT);
     if (rc < 0 || rc >= sizeof(url))
@@ -171,6 +282,7 @@ static int ipfs_client_list_drives(HiveClient *obj, char **result)
     http_client_set_url(http_client, url);
     http_client_set_query(http_client, "uid", client->uid);
     http_client_set_query(http_client, "path", "/");
+    http_client_set_method(http_client, HTTP_METHOD_POST);
     http_client_enable_response_body(http_client);
 
     rc = http_client_request(http_client);
@@ -277,6 +389,7 @@ static int test_reachable(const char *ip)
         return -1;
 
     http_client_set_url(http_client, url);
+    http_client_set_method(http_client, HTTP_METHOD_POST);
 
     rc = http_client_request(http_client);
     if (rc) {

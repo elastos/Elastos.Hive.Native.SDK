@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <assert.h>
 #include <crystal.h>
+#include <stdlib.h>
 
 #include "hiveipfs_drive.h"
 #include "hiveipfs_client.h"
@@ -10,6 +11,39 @@ typedef struct ipfs_drive {
 } ipfs_drv_t;
 
 #define FILES_API "/api/v0/files"
+
+static void publish_setup_req(http_client_t *req, void *args)
+{
+    const char *req_path = (const char *)((void **)args)[0];
+    const char *path = (const char *)((void **)args)[1];
+
+    http_client_set_path(req, req_path);
+    http_client_set_query(req, "path", path);
+    http_client_set_method(req, HTTP_METHOD_POST);
+}
+
+static int ipfs_drive_publish(ipfs_drv_t *drv, const char *path)
+{
+    const char *req_path = "/api/v0/name/publish";
+    void *args[] = {(void *)req_path, (void *)path};
+    ipfs_tsx_t tsx = {
+        .setup_req = &publish_setup_req,
+        .user_data = args
+    };
+    int rc;
+    long resp_code;
+
+    rc = hive_client_perform_transaction(drv->base.client, &tsx);
+    if (rc)
+        return -1;
+
+    rc = http_client_get_response_code(tsx.resp, &resp_code);
+    http_client_close(tsx.resp);
+    if (rc || resp_code != 200)
+        return -1;
+
+    return 0;
+}
 
 static void get_info_setup_req(http_client_t *req, void *args)
 {
@@ -31,6 +65,10 @@ static int ipfs_drive_get_info(HiveDrive *obj, char **result)
     };
     int rc;
     long resp_code;
+
+    rc = ipfs_client_synchronize(drv->base.client);
+    if (rc)
+        return -1;
 
     rc = hive_client_perform_transaction(drv->base.client, &tsx);
     if (rc)
@@ -73,6 +111,10 @@ static int ipfs_drive_file_stat(HiveDrive *obj, const char *file_path, char **re
     int rc;
     long resp_code;
 
+    rc = ipfs_client_synchronize(drv->base.client);
+    if (rc)
+        return -1;
+
     rc = hive_client_perform_transaction(drv->base.client, &tsx);
     if (rc)
         return -1;
@@ -113,6 +155,10 @@ static int ipfs_drive_list_files(HiveDrive *obj, const char *dir_path, char **re
     };
     int rc;
     long resp_code;
+
+    rc = ipfs_client_synchronize(drv->base.client);
+    if (rc)
+        return -1;
 
     rc = hive_client_perform_transaction(drv->base.client, &tsx);
     if (rc)
@@ -155,6 +201,10 @@ static int ipfs_drive_makedir(HiveDrive *obj, const char *path)
     int rc;
     long resp_code;
 
+    rc = ipfs_client_synchronize(drv->base.client);
+    if (rc)
+        return -1;
+
     rc = hive_client_perform_transaction(drv->base.client, &tsx);
     if (rc)
         return -1;
@@ -164,7 +214,8 @@ static int ipfs_drive_makedir(HiveDrive *obj, const char *path)
     if (rc || resp_code != 200)
         return -1;
 
-    return 0;
+    rc = ipfs_drive_publish(drv, "/");
+    return rc;
 }
 
 static void move_file_setup_req(http_client_t *req, void *args)
@@ -191,6 +242,10 @@ static int ipfs_drive_move_file(HiveDrive *obj, const char *old, const char *new
     int rc;
     long resp_code;
 
+    rc = ipfs_client_synchronize(drv->base.client);
+    if (rc)
+        return -1;
+
     rc = hive_client_perform_transaction(drv->base.client, &tsx);
     if (rc)
         return -1;
@@ -200,7 +255,8 @@ static int ipfs_drive_move_file(HiveDrive *obj, const char *old, const char *new
     if (rc || resp_code != 200)
         return -1;
 
-    return 0;
+    rc = ipfs_drive_publish(drv, "/");
+    return rc;
 }
 
 static void copy_file_setup_req(http_client_t *req, void *args)
@@ -227,6 +283,10 @@ static int ipfs_drive_copy_file(HiveDrive *obj, const char *src_path, const char
     int rc;
     long resp_code;
 
+    rc = ipfs_client_synchronize(drv->base.client);
+    if (rc)
+        return -1;
+
     rc = hive_client_perform_transaction(drv->base.client, &tsx);
     if (rc)
         return -1;
@@ -236,7 +296,8 @@ static int ipfs_drive_copy_file(HiveDrive *obj, const char *src_path, const char
     if (rc || resp_code != 200)
         return -1;
 
-    return 0;
+    rc = ipfs_drive_publish(drv, "/");
+    return rc;
 }
 
 static void delete_file_setup_req(http_client_t *req, void *args)
@@ -262,6 +323,10 @@ static int ipfs_drive_delete_file(HiveDrive *obj, const char *path)
     int rc;
     long resp_code;
 
+    rc = ipfs_client_synchronize(drv->base.client);
+    if (rc)
+        return -1;
+
     rc = hive_client_perform_transaction(drv->base.client, &tsx);
     if (rc)
         return -1;
@@ -271,7 +336,8 @@ static int ipfs_drive_delete_file(HiveDrive *obj, const char *path)
     if (rc || resp_code != 200)
         return -1;
 
-    return 0;
+    rc = ipfs_drive_publish(drv, "/");
+    return rc;
 }
 
 static void ipfs_drive_close(HiveDrive *obj)
