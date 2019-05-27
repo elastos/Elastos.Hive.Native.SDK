@@ -12,4 +12,6 @@ typedef struct ipfs_transaction {
 
 HiveClient *hiveipfs_client_new(const HiveOptions *);
 
+int ipfs_client_synchronize(HiveClient *);
+
 #endif // __HIVE_IPFS_CLIENT_H__
