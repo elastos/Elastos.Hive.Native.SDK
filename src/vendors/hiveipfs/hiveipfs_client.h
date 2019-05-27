@@ -2,6 +2,7 @@
 #define __HIVE_IPFS_CLIENT_H__
 
 #include "client.h"
+#include "http_client.h"
 
 typedef struct ipfs_transaction {
     void (*setup_req)(http_client_t *, void *);
