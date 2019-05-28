@@ -19,6 +19,11 @@ if(HAVE_SYS_TIME_H)
     add_definitions(-DHAVE_SYS_TIME_H=1)
 endif()
 
+check_include_file(libgen.h HAVE_LIBGEN_H)
+if(HAVE_LIBGEN_H)
+    add_definitions(-DHAVE_LIBGEN_H=1)
+endif()
+
 set(SRC
     config.c
     tests.c

@@ -9,6 +9,9 @@
 #if defined(HAVE_UNISTD_H)
 #include <unistd.h>
 #endif
+#if defined(HAVE_LIBGEN_H)
+#include <libgen.h>
+#endif
 #include <elastos_hive.h>
 #include "config.h"
 
