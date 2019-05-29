@@ -4,11 +4,10 @@
 #include <crystal.h>
 #ifdef HAVE_SYS_PARAM_H
 #include <sys/param.h>
+#endif
 #include <http_client.h>
 #include <stdlib.h>
 #include <cjson/cJSON.h>
-
-#endif
 
 #include "hiveipfs_client.h"
 #include "hiveipfs_drive.h"

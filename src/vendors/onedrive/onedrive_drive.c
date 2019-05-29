@@ -674,7 +674,7 @@ static int onedrive_drive_delete_file(HiveDrive *obj, const char *path)
         return -1;
 
     rc = http_client_get_response_code(tsx.resp, &resp_code);
-    http_client_close(http_cli);
+    http_client_close(tsx.resp);
     return !rc && resp_code == 204 ? 0 : -1;
 }
 
