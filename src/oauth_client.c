@@ -51,12 +51,22 @@ typedef struct oauth_client {
     pthread_cond_t  cond;
 } oauth_client_t;
 
-#define reset_svr_resp(resp) do { \
-        if ((resp)->auth_code) free((resp)->auth_code); \
-        if ((resp)->token_type) free((resp)->token_type); \
-        if ((resp)->scope) free((resp)->scope); \
-        if ((resp)->access_token) free((resp)->access_token); \
-        if ((resp)->refresh_token) free((resp)->refresh_token); \
+
+#define reset_field(field) \
+    do {                   \
+       if (field) {        \
+           free(field);    \
+           (field) = NULL; \
+       }                   \
+    } while (0)
+
+#define reset_svr_resp(resp)                \
+    do {                                    \
+        reset_field((resp)->auth_code);     \
+        reset_field((resp)->token_type);    \
+        reset_field((resp)->scope);         \
+        reset_field((resp)->access_token);  \
+        reset_field((resp)->refresh_token); \
     } while (0)
 
 static char *encode_profile(oauth_client_t *cli)
