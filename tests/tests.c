@@ -91,6 +91,10 @@ int main(int argc, char *argv[])
     int opt;
     int idx;
 
+    getchar();
+    //add by chenyu
+    //printf("\nget argc = %d, argv = %s\n", argc, argv);
+
     struct option options[] = {
         { "debug",          no_argument,        NULL, 1   },
         { "config",         required_argument,  NULL, 'c' },

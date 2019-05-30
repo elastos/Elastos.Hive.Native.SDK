@@ -53,7 +53,7 @@ static void test_hive_client_drivelist(void)
 
 static int hive_client_drivelist_test_suite_init(void)
 {
-    strcpy(onedrv_option.base.persistent_location, global_config.profile);
+    onedrv_option.base.persistent_location = global_config.profile;
     onedrv_option.base.drive_type = HiveDriveType_OneDrive;
     onedrv_option.client_id = global_config.oauthinfo.client_id;
     onedrv_option.scope = global_config.oauthinfo.scope;

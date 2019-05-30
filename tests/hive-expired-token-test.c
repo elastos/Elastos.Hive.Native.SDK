@@ -46,7 +46,7 @@ static int hive_expired_token_test_suite_init(void)
 {
     int rc;
 
-    strcpy(onedrv_option.base.persistent_location, global_config.profile);
+    onedrv_option.base.persistent_location = global_config.profile;
     onedrv_option.base.drive_type = HiveDriveType_OneDrive;
     onedrv_option.client_id = global_config.oauthinfo.client_id;
     onedrv_option.scope = global_config.oauthinfo.scope;

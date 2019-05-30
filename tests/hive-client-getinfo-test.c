@@ -13,6 +13,8 @@
 #include "config.h"
 
 extern int onedrv_open_oauth_url(const char *url);
+extern void hive_ready_for_login(void);
+extern int hive_login_record_time(HiveClient *client);
 
 static OneDriveOptions onedrv_option;
 static HiveClient *client;
@@ -52,7 +54,9 @@ static void test_hive_client_getinfo(void)
 
 static int hive_client_getinfo_test_suite_init(void)
 {
-    strcpy(onedrv_option.base.persistent_location, global_config.profile);
+    int rc;
+
+    onedrv_option.base.persistent_location = global_config.profile;
     onedrv_option.base.drive_type = HiveDriveType_OneDrive;
     onedrv_option.client_id = global_config.oauthinfo.client_id;
     onedrv_option.scope = global_config.oauthinfo.scope;
@@ -63,17 +67,28 @@ static int hive_client_getinfo_test_suite_init(void)
     if (!client)
         return -1;
 
+    hive_ready_for_login();
+    rc = hive_login_record_time(client);
+    if(rc)
+        return -1;
+
     return 0;
 }
 
 static int hive_client_getinfo_test_suite_cleanup(void)
 {
+    int rc;
+
     onedrv_option.base.drive_type = HiveDriveType_Butt;
     onedrv_option.client_id = "";
     onedrv_option.scope = "";
     onedrv_option.redirect_url = "";
     onedrv_option.grant_authorize = NULL;
     onedrv_option.base.persistent_location = "";
+
+    rc = hive_client_logout(client);
+    if(rc)
+        return -1;
 
     return hive_client_close(client);
 }
