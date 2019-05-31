@@ -321,9 +321,10 @@ static HiveDrive *ipfs_client_drive_open(HiveClient *obj, const HiveDriveOptions
     return ipfs_drive_open((HiveClient *)client);
 }
 
-static void ipfs_client_close(HiveClient *obj)
+static int ipfs_client_close(HiveClient *obj)
 {
     deref(obj);
+    return 0;
 }
 
 static int ipfs_client_perform_tsx(HiveClient *obj, client_tsx_t *base)
@@ -459,7 +460,7 @@ HiveClient *hiveipfs_client_new(const HiveOptions * options)
     client->base.get_info              = &ipfs_client_get_info;
     client->base.list_drives           = &ipfs_client_list_drives;
     client->base.drive_open            = &ipfs_client_drive_open;
-    client->base.destructor_func       = &ipfs_client_close;
+    client->base.finalize              = &ipfs_client_close;
 
     client->base.perform_tsx           = &ipfs_client_perform_tsx;
     client->base.invalidate_credential = &ipfs_client_invalidate_credential;
