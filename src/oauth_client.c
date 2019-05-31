@@ -37,36 +37,28 @@ typedef struct server_response {
 } svr_resp_t;
 
 typedef struct oauth_client {
-    enum {
-        OAUTH_CLIENT_STATE_NOT_LOGGED_IN,
-        OAUTH_CLIENT_STATE_LOGGING_IN,
-        OAUTH_CLIENT_STATE_LOGGED_IN,
-        OAUTH_CLIENT_STATE_REFRESHING,
-        OAUTH_CLIENT_STATE_STOPPED,
-        OAUTH_CLIENT_STATE_FAILED
-    } state;
     oauth_opt_t     opt;
     svr_resp_t      svr_resp;
     pthread_mutex_t lock;
-    pthread_cond_t  cond;
+    bool            logging_in;
+    bool            logged_in;
 } oauth_client_t;
 
 
-#define reset_field(field) \
-    do {                   \
-       if (field) {        \
-           free(field);    \
-           (field) = NULL; \
-       }                   \
+#define set_ptr_field(field, val) \
+    do {                          \
+       if (field)                 \
+           free(field);           \
+       (field) = (val);           \
     } while (0)
 
-#define reset_svr_resp(resp)                \
-    do {                                    \
-        reset_field((resp)->auth_code);     \
-        reset_field((resp)->token_type);    \
-        reset_field((resp)->scope);         \
-        reset_field((resp)->access_token);  \
-        reset_field((resp)->refresh_token); \
+#define reset_svr_resp(resp)                        \
+    do {                                            \
+        set_ptr_field((resp)->auth_code, NULL);     \
+        set_ptr_field((resp)->token_type, NULL);    \
+        set_ptr_field((resp)->scope, NULL);         \
+        set_ptr_field((resp)->access_token, NULL);  \
+        set_ptr_field((resp)->refresh_token, NULL); \
     } while (0)
 
 static char *encode_profile(oauth_client_t *cli)
@@ -84,13 +76,14 @@ static char *encode_profile(oauth_client_t *cli)
     if (!json)
         goto end;
 
+    pthread_mutex_lock(&cli->lock);
     auth_code = cJSON_CreateStringReference(cli->svr_resp.auth_code);
-    if (!auth_code)
+    if (!cli->svr_resp.auth_code || !auth_code)
         goto end;
     cJSON_AddItemToObject(json, "auth_code", auth_code);
 
     token_type = cJSON_CreateStringReference(cli->svr_resp.token_type);
-    if (!token_type)
+    if (!cli->svr_resp.token_type || !token_type)
         goto end;
     cJSON_AddItemToObject(json, "token_type", token_type);
 
@@ -100,23 +93,24 @@ static char *encode_profile(oauth_client_t *cli)
     cJSON_AddItemToObject(json, "expires_at", expires_at);
 
     scope = cJSON_CreateStringReference(cli->svr_resp.scope);
-    if (!scope)
+    if (!cli->svr_resp.scope || !scope)
         goto end;
     cJSON_AddItemToObject(json, "scope", scope);
 
     access_token = cJSON_CreateStringReference(cli->svr_resp.access_token);
-    if (!access_token)
+    if (!cli->svr_resp.access_token || !access_token)
         goto end;
     cJSON_AddItemToObject(json, "access_token", access_token);
 
     refresh_token = cJSON_CreateStringReference(cli->svr_resp.refresh_token);
-    if (!refresh_token)
+    if (!cli->svr_resp.refresh_token || !refresh_token)
         goto end;
     cJSON_AddItemToObject(json, "refresh_token", refresh_token);
 
     json_str = cJSON_PrintUnformatted(json);
 
 end:
+    pthread_mutex_unlock(&cli->lock);
     if (json)
         cJSON_Delete(json);
     return json_str;
@@ -146,13 +140,13 @@ static void save_profile(oauth_client_t *cli)
     if (!json_str)
         return;
 
-    fd = open(new_prof, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR);
+    fd = open(new_prof, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
     if (fd < 0) {
         free(json_str);
         return;
     }
 
-    nleft = strlen(json_str) + 1;
+    nleft = strlen(json_str);
     while (nleft) {
         ssize_t nwr = write(fd, json_str, nleft);
         if (nwr < 0) {
@@ -287,13 +281,15 @@ static int decode_access_token_resp(oauth_client_t *cli, const char *json_str, b
     resp.refresh_token = refresh_token->valuestring;
     refresh_token->valuestring = NULL;
 
+    pthread_mutex_lock(&cli->lock);
     if (load_profile)
-        cli->svr_resp.auth_code = resp.auth_code;
-    cli->svr_resp.access_token = resp.access_token;
-    cli->svr_resp.refresh_token = resp.refresh_token;
-    cli->svr_resp.scope = resp.scope;
+        set_ptr_field(cli->svr_resp.auth_code, resp.auth_code);
+    set_ptr_field(cli->svr_resp.access_token, resp.access_token);
+    set_ptr_field(cli->svr_resp.refresh_token, resp.refresh_token);
+    set_ptr_field(cli->svr_resp.scope, resp.scope);
     cli->svr_resp.expires_at = resp.expires_at;
-    cli->svr_resp.token_type = resp.token_type;
+    set_ptr_field(cli->svr_resp.token_type, resp.token_type);
+    pthread_mutex_unlock(&cli->lock);
     goto succeed;
 
 fail:
@@ -317,7 +313,7 @@ static int refresh_token(oauth_client_t *cli)
     char *redirect_url;
 
     rc = snprintf(redirect_url_raw, sizeof(redirect_url_raw), "%s:%s%s",
-                  cli->opt.redirect_url, cli->opt.redirect_port, cli->opt.redirect_path);
+         cli->opt.redirect_url, cli->opt.redirect_port, cli->opt.redirect_path);
     if (rc < 0 || rc >= sizeof(redirect_url_raw))
         return -1;
 
@@ -338,7 +334,13 @@ static int refresh_token(oauth_client_t *cli)
         return -1;
     }
 
+    pthread_mutex_lock(&cli->lock);
+    if (!cli->svr_resp.refresh_token) {
+        pthread_mutex_unlock(&cli->lock);
+        return -1;
+    }
     refresh_token = http_client_escape(http_cli, cli->svr_resp.refresh_token, strlen(cli->svr_resp.refresh_token));
+    pthread_mutex_unlock(&cli->lock);
     http_client_close(http_cli);
     if (!refresh_token) {
         http_client_memory_free(cli_id);
@@ -413,12 +415,6 @@ static int load_profile(oauth_client_t *cli)
         nleft -= nrd;
     }
 
-    if (json_str[sbuf.st_size - 1]) {
-        close(fd);
-        free(json_str);
-        return -1;
-    }
-
     rc = decode_access_token_resp(cli, json_str, true);
 
     close(fd);
@@ -446,11 +442,18 @@ static int handle_auth_redirect(sb_Event *e)
     if (rc != SB_ESUCCESS)
         return SB_RES_OK;
 
+    pthread_mutex_lock(&cli->lock);
+    if (cli->svr_resp.auth_code)
+        free(cli->svr_resp.auth_code);
+
     cli->svr_resp.auth_code = (char *)malloc(strlen(code) + 1);
-    if (!cli->svr_resp.auth_code)
+    if (!cli->svr_resp.auth_code) {
+        pthread_mutex_unlock(&cli->lock);
         return SB_RES_OK;
+    }
 
     strcpy(cli->svr_resp.auth_code, code);
+    pthread_mutex_unlock(&cli->lock);
     sb_send_status(e->stream, 200, "OK");
     return SB_RES_OK;
 }
@@ -560,7 +563,9 @@ static int redeem_access_token(oauth_client_t *cli)
         return -1;
     }
 
+    pthread_mutex_lock(&cli->lock);
     code = http_client_escape(http_cli, cli->svr_resp.auth_code, strlen(cli->svr_resp.auth_code));
+    pthread_mutex_unlock(&cli->lock);
     http_client_close(http_cli);
     if (!code) {
         http_client_memory_free(cli_id);
@@ -625,7 +630,6 @@ static void oauth_client_destructor(void *arg)
     optrst(&cli->opt);
     reset_svr_resp(&cli->svr_resp);
     pthread_mutex_destroy(&cli->lock);
-    pthread_cond_destroy(&cli->cond);
 }
 
 static int optcpy(oauth_opt_t *dst, oauth_opt_t *src)
@@ -695,7 +699,6 @@ oauth_client_t *oauth_client_new(oauth_opt_t *opt)
         return NULL;
 
     pthread_mutex_init(&cli->lock, NULL);
-    pthread_cond_init(&cli->cond, NULL);
 
     rc = optcpy(&cli->opt, opt);
     if (rc) {
@@ -709,7 +712,7 @@ oauth_client_t *oauth_client_new(oauth_opt_t *opt)
             deref(cli);
             return NULL;
         }
-        cli->state = OAUTH_CLIENT_STATE_LOGGED_IN;
+        cli->logged_in = true;
     }
 
     return cli;
@@ -717,12 +720,6 @@ oauth_client_t *oauth_client_new(oauth_opt_t *opt)
 
 void oauth_client_delete(oauth_client_t *cli)
 {
-    pthread_mutex_lock(&cli->lock);
-    if (cli->state < OAUTH_CLIENT_STATE_STOPPED) {
-        cli->state = OAUTH_CLIENT_STATE_STOPPED;
-        pthread_cond_broadcast(&cli->cond);
-    }
-    pthread_mutex_unlock(&cli->lock);
     deref(cli);
 }
 
@@ -730,80 +727,44 @@ int oauth_client_login(oauth_client_t *client)
 {
     int rc;
 
-    pthread_mutex_lock(&client->lock);
+    if (client->logged_in || client->logging_in)
+        return client->logged_in ? 0 : -1;
 
-    while (client->state == OAUTH_CLIENT_STATE_LOGGING_IN)
-        pthread_cond_wait(&client->cond, &client->lock);
-
-    if (client->state != OAUTH_CLIENT_STATE_NOT_LOGGED_IN) {
-        rc = client->state == OAUTH_CLIENT_STATE_LOGGED_IN ||
-            client->state == OAUTH_CLIENT_STATE_REFRESHING ? 0 : -1;
-        pthread_mutex_unlock(&client->lock);
-        return rc;
-    }
-
-    client->state = OAUTH_CLIENT_STATE_LOGGING_IN;
-    pthread_mutex_unlock(&client->lock);
+    client->logging_in = true;
 
     rc = get_auth_code(client);
-    pthread_mutex_lock(&client->lock);
-    if (client->state != OAUTH_CLIENT_STATE_LOGGING_IN) {
-        pthread_mutex_unlock(&client->lock);
-        return -1;
-    } else if (rc) {
-        client->state = OAUTH_CLIENT_STATE_FAILED;
-        pthread_mutex_unlock(&client->lock);
-        pthread_cond_broadcast(&client->cond);
+    if (rc) {
+        client->logging_in = false;
         return -1;
     }
-    pthread_mutex_unlock(&client->lock);
 
     rc = redeem_access_token(client);
-    pthread_mutex_lock(&client->lock);
-    if (client->state != OAUTH_CLIENT_STATE_LOGGING_IN) {
-        pthread_mutex_unlock(&client->lock);
-        return -1;
-    } else if (rc) {
-        client->state = OAUTH_CLIENT_STATE_FAILED;
-        pthread_mutex_unlock(&client->lock);
-        pthread_cond_broadcast(&client->cond);
+    if (rc) {
+        client->logging_in = false;
         return -1;
     }
 
-    client->state = OAUTH_CLIENT_STATE_LOGGED_IN;
+    client->logging_in = false;
+    client->logged_in = true;
     save_profile(client);
-    pthread_mutex_unlock(&client->lock);
-    pthread_cond_broadcast(&client->cond);
 
     return 0;
 }
 
 int oauth_client_logout(oauth_client_t *client)
 {
-    int rc;
+    if (client->logging_in)
+        return -1;
+
+    if (!client->logged_in)
+        return 0;
+
+    remove(client->opt.profile_path);
 
     pthread_mutex_lock(&client->lock);
-
-    while (client->state == OAUTH_CLIENT_STATE_LOGGING_IN ||
-        client->state == OAUTH_CLIENT_STATE_REFRESHING)
-        pthread_cond_wait(&client->cond, &client->lock);
-
-    if (client->state != OAUTH_CLIENT_STATE_LOGGED_IN) {
-        rc = client->state == OAUTH_CLIENT_STATE_NOT_LOGGED_IN ? 0 : -1;
-        pthread_mutex_unlock(&client->lock);
-        return rc;
-    }
-
-    rc = remove(client->opt.profile_path);
-    if (rc) {
-        pthread_mutex_unlock(&client->lock);
-        return -1;
-    }
-
     reset_svr_resp(&client->svr_resp);
-    client->state = OAUTH_CLIENT_STATE_NOT_LOGGED_IN;
     pthread_mutex_unlock(&client->lock);
-    pthread_cond_broadcast(&client->cond);
+    client->logged_in = false;
 
     return 0;
 }
@@ -819,42 +780,20 @@ static bool token_expired(struct timeval *expires_at)
 
 static int get_access_token(oauth_client_t *cli, bool force_refresh, char **token)
 {
-#define just_got_token (old_state != OAUTH_CLIENT_STATE_LOGGED_IN)
     int rc;
-    int old_state;
 
-    pthread_mutex_lock(&cli->lock);
+    if (force_refresh || token_expired(&cli->svr_resp.expires_at)) {
+        rc = refresh_token(cli);
+        if (rc)
+            return -1;
 
-    old_state = cli->state;
-    while (cli->state == OAUTH_CLIENT_STATE_LOGGING_IN ||
-        cli->state == OAUTH_CLIENT_STATE_REFRESHING)
-        pthread_cond_wait(&cli->cond, &cli->lock);
-
-    if (cli->state != OAUTH_CLIENT_STATE_LOGGED_IN) {
-        pthread_mutex_unlock(&cli->lock);
-        return -1;
+        save_profile(cli);
     }
 
-    if (!just_got_token &&
-        (force_refresh || token_expired(&cli->svr_resp.expires_at))) {
-        cli->state = OAUTH_CLIENT_STATE_REFRESHING;
+    pthread_mutex_lock(&cli->lock) ;
+    if (!cli->svr_resp.token_type || !cli->svr_resp.access_token) {
         pthread_mutex_unlock(&cli->lock);
-
-        rc = refresh_token(cli);
-
-        pthread_mutex_lock(&cli->lock);
-        if (cli->state != OAUTH_CLIENT_STATE_REFRESHING) {
-            pthread_mutex_unlock(&cli->lock);
-            return -1;
-        }
-        pthread_cond_broadcast(&cli->cond);
-        if (rc) {
-            cli->state = OAUTH_CLIENT_STATE_FAILED;
-            pthread_mutex_unlock(&cli->lock);
-            return -1;
-        }
-        cli->state = OAUTH_CLIENT_STATE_LOGGED_IN;
-        save_profile(cli);
+        return -1;
     }
 
     *token = malloc(strlen(cli->svr_resp.token_type) +
@@ -867,7 +806,6 @@ static int get_access_token(oauth_client_t *cli, bool force_refresh, char **toke
     pthread_mutex_unlock(&cli->lock);
 
     return 0;
-#undef just_got_token
 }
 
 int oauth_client_get_access_token(oauth_client_t *cli, char **token)
@@ -882,19 +820,7 @@ int oauth_client_refresh_access_token(oauth_client_t *cli, char **token)
 
 int oauth_client_set_expired(oauth_client_t *client)
 {
-    pthread_mutex_lock(&client->lock);
-
-    while (client->state == OAUTH_CLIENT_STATE_LOGGING_IN ||
-        client->state == OAUTH_CLIENT_STATE_REFRESHING)
-        pthread_cond_wait(&client->cond, &client->lock);
-
-    if (client->state != OAUTH_CLIENT_STATE_LOGGED_IN) {
-        pthread_mutex_unlock(&client->lock);
-        return -1;
-    }
-
     client->svr_resp.expires_at.tv_sec = 0;
-    pthread_mutex_unlock(&client->lock);
 
     return 0;
 }
