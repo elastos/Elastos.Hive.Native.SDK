@@ -824,3 +824,11 @@ int oauth_client_set_expired(oauth_client_t *client)
 
     return 0;
 }
+
+char *token_get_access_token(oauth_client_t *client)
+{
+    assert(client);
+    assert(client->svr_resp.access_token);
+
+    return client->svr_resp.access_token;
+}

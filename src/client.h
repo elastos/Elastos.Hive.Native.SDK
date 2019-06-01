@@ -25,6 +25,6 @@ int hive_client_invalidate_credential(HiveClient *);
 
 int hive_client_perform_transaction(HiveClient *, client_tsx_t *);
 
-inline static void hive_set_error(int errno) { }
+inline static void hive_set_error(int error) { }
 
 #endif // __HIVE_CLIENT_H__
