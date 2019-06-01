@@ -22,9 +22,11 @@
 #include "onedrive_common.h"
 #include "onedrive_client.h"
 #include "http_client.h"
+#include "oauth_client.h"
 
 typedef struct OneDriveDrive {
     HiveDrive base;
+    oauth_client_t *oauth_client;
     char drv_url[0];
 } OneDriveDrive ;
 
@@ -234,84 +236,127 @@ static int onedrive_drive_list_files(HiveDrive *obj, const char *dir_path, char 
     }
 }
 
-static void mkdir_setup_req(http_client_t *req, void *args)
+static char *create_request_body(char *path)
 {
-    const char *url = (const char *)((void **)args)[0];
-    const char *req_body = (const char *)((void **)args)[1];
+    cJSON *body;
+    cJSON *rc;
+    char *str;
 
-    http_client_set_url_escape(req, url);
-    http_client_set_method(req, HTTP_METHOD_POST);
-    http_client_set_header(req, "Content-Type", "application/json");
-    http_client_set_request_body_instant(req, (void *)req_body, strlen(req_body));
+    body = cJSON_CreateObject();
+    if (!body) {
+        hive_set_error(-1);
+        return NULL;
+    }
+
+    rc = cJSON_AddStringToObject(body,  "name", basename(path));
+    if (!rc)
+        goto error_exit;
+
+    rc = cJSON_AddObjectToObject(body, "folder");
+    if (!rc)
+        goto error_exit;
+
+    rc = cJSON_AddStringToObject(body, "@microsoft.graph.conflictBehavior", "rename");
+    if (!rc)
+        goto error_exit;
+
+    str = cJSON_PrintUnformatted(body);
+    cJSON_Delete(body);
+
+    if (!str) {
+        hive_set_error(-1);
+        return NULL;
+    }
+
+    return str;
+
+error_exit:
+    cJSON_Delete(body);
+    hive_set_error(-1);
+    return NULL;
 }
 
-static int onedrive_drive_mkdir(HiveDrive *obj, const char *path)
+static int onedrive_drive_mkdir(HiveDrive *base, const char *path)
 {
-    OneDriveDrive *drv = (OneDriveDrive *)obj;
-    char url[MAXPATHLEN + 1];
-    cJSON *req_body;
-    int rc;
-    long resp_code;
-    char *req_body_str;
+    OneDriveDrive *drive = (OneDriveDrive *)base;
+    char url[ONEDRIVE_MAX_URL_LENGTH] = {0};
+    http_client_t *httpc;
+    long resp_code = 0;
     char *dir;
-    char *dir_esc;
-    http_client_t *http_cli;
+    char *body;
+    int rc;
+
+    assert(drive);
+    assert(path);
+    assert(path[0] == '/');
+
+    httpc = http_client_new();
+    if (!httpc) {
+        hive_set_error(-1);
+        return -1;
+    }
 
     dir = dirname((char *)path);
-    if (!strcmp(dir, "/"))
-        rc = snprintf(url, sizeof(url), "%s/root/children", drv->drv_url);
-    else {
-        http_cli = http_client_new();
-        if (!http_cli)
-            return -1;
-        dir_esc = http_client_escape(http_cli, dir, strlen(dir));
-        http_client_close(http_cli);
-        if (!dir_esc)
-            return -1;
-        rc = snprintf(url, sizeof(url), "%s/root:%s:/children", drv->drv_url, dir_esc);
-        http_client_memory_free(dir_esc);
-    }
-    if (rc < 0 || rc >= sizeof(url))
-        return -1;
+    if (strcmp(dir, "/") == 0) {
+        // "mkdir" under the root directory.
+        rc = snprintf(url, sizeof(url), "%s/root/children", drive->drv_url);
+    } else {
+        char *escaped_dir;
 
-    req_body = cJSON_CreateObject();
-    if (!req_body)
-        return -1;
+        escaped_dir = http_client_escape(httpc, dir, strlen(dir));
+        http_client_reset(httpc);
 
-    if (!cJSON_AddStringToObject(req_body, "name", basename((char *)path))) {
-        cJSON_Delete(req_body);
-        return -1;
+        if (!escaped_dir) {
+            hive_set_error(-1);
+            goto error_exit;
+        }
+
+        rc = snprintf(url, sizeof(url), "%s/root:%s:/children", drive->drv_url,
+                      escaped_dir);
+        http_client_memory_free(escaped_dir);
     }
 
-    if (!cJSON_AddObjectToObject(req_body, "folder")) {
-        cJSON_Delete(req_body);
+    if (rc < 0 || rc >= (int)sizeof(url)) {
+        hive_set_error(-1);
+        goto error_exit;
+    }
+
+    body = create_request_body((char *)path);
+    if (!body)
+        goto error_exit;
+
+    http_client_set_url_escape(httpc, url);
+    http_client_set_method(httpc, HTTP_METHOD_POST);
+    http_client_set_header(httpc, "Content-Type", "application/json");
+    http_client_set_header(httpc, "Authorization", token_get_access_token(drive->oauth_client));
+    http_client_set_request_body_instant(httpc, body, strlen(body));
+
+    rc = http_client_request(httpc);
+    free(body);
+
+    if (rc < 0) {
+        hive_set_error(-1);
+        goto error_exit;
+    }
+
+    rc = http_client_get_response_code(httpc, &resp_code);
+    http_client_close(httpc);
+
+    if (rc < 0) {
+        hive_set_error(-1);
         return -1;
     }
 
-    if (!cJSON_AddStringToObject(req_body, "@microsoft.graph.conflictBehavior", "rename")) {
-        cJSON_Delete(req_body);
+    if (resp_code != 201) {
+        hive_set_error(-1);
         return -1;
     }
 
-    req_body_str = cJSON_PrintUnformatted(req_body);
-    cJSON_Delete(req_body);
-    if (!req_body_str)
-        return -1;
+    return 0;
 
-    void *args[] = {url, req_body_str};
-    onedrv_tsx_t tsx = {
-        .setup_req = &mkdir_setup_req,
-        .user_data = args
-    };
-
-    rc = hive_client_perform_transaction(drv->base.client, &tsx);
-    free(req_body_str);
-    if (rc)
-        return -1;
-
-    rc = http_client_get_response_code(tsx.resp, &resp_code);
-    http_client_close(tsx.resp);
-    return !rc && resp_code == 201 ? 0 : -1;
+error_exit:
+    http_client_close(httpc);
+    return -1;
 }
 
 static void move_setup_req(http_client_t *req, void *args)
@@ -341,6 +386,8 @@ static int onedrive_drive_move_file(HiveDrive *obj, const char *old, const char 
     bool dir_eq = false, base_eq = false;
     char *req_body_str;
     long resp_code;
+
+
 
     strcpy(src_dir, dirname((char *)old));
     strcpy(src_base, basename((char *)old));
@@ -632,91 +679,111 @@ static int onedrive_drive_copy_file(HiveDrive *obj, const char *src_path, const 
 #undef is_dir
 }
 
-static void delete_setup_req(http_client_t *req, void *args)
+static int onedrive_drive_delete_file(HiveDrive *base, const char *path)
 {
-    const char *url = (const char *)((void **)args)[0];
-
-    http_client_set_url_escape(req, url);
-    http_client_set_method(req, HTTP_METHOD_DELETE);
-}
-
-static int onedrive_drive_delete_file(HiveDrive *obj, const char *path)
-{
-    OneDriveDrive *drv = (OneDriveDrive *)obj;
-    char url[MAXPATHLEN + 1];
+    OneDriveDrive *drive = (OneDriveDrive *)base;
+    char url[ONEDRIVE_MAX_URL_LENGTH] = {0};
+    http_client_t *httpc;
+    char *escaped_path;
+    long resp_code = 0;
     int rc;
-    long resp_code;
-    http_client_t *http_cli;
-    char *path_esc;
 
-    http_cli = http_client_new();
-    if (!http_cli)
+    httpc = http_client_new();
+    if (!httpc) {
+        hive_set_error(-1);
         return -1;
+    }
 
-    path_esc = http_client_escape(http_cli, path, strlen(path));
-    http_client_close(http_cli);
-    if (!path_esc)
+    escaped_path = http_client_escape(httpc, path, strlen(path));
+    http_client_reset(httpc);
+
+    if (!escaped_path) {
+        hive_set_error(-1);
+        goto error_exit;
+    }
+
+    rc = snprintf(url, sizeof(url), "%s/root:%s:", drive->drv_url, escaped_path);
+    http_client_memory_free(escaped_path);
+
+    if (rc < 0 || rc >= (int)sizeof(url)) {
+        hive_set_error(-1);
+        goto error_exit;
+    }
+
+    http_client_set_url_escape(httpc, url);
+    http_client_set_method(httpc, HTTP_METHOD_DELETE);
+    http_client_set_header(httpc, "Authorization", token_get_access_token(drive->oauth_client));
+
+    rc = http_client_request(httpc);
+    if (rc < 0) {
+        hive_set_error(-1);
+        goto error_exit;
+    }
+
+    rc = http_client_get_response_code(httpc, &resp_code);
+    http_client_close(httpc);
+    if (rc < 0) {
+        hive_set_error(-1);
         return -1;
+    }
 
-    rc = snprintf(url, sizeof(url), "%s/root:%s:", drv->drv_url, path_esc);
-    http_client_memory_free(path_esc);
-    if (rc < 0 || rc >= sizeof(url))
+    if (resp_code != 204) {
+        hive_set_error(-1);
         return -1;
+    }
 
-    void *args[] = {url};
-    onedrv_tsx_t tsx = {
-        .setup_req = &delete_setup_req,
-        .user_data = args
-    };
+    return 0;
 
-    rc = hive_client_perform_transaction(drv->base.client, &tsx);
-    if (rc)
-        return -1;
-
-    rc = http_client_get_response_code(tsx.resp, &resp_code);
-    http_client_close(tsx.resp);
-    return !rc && resp_code == 204 ? 0 : -1;
+error_exit:
+    http_client_close(httpc);
+    return -1;
 }
 
-static void onedrive_drive_close(HiveDrive *drv)
+static void onedrive_drive_close(HiveDrive *base)
 {
-    deref(drv);
+    assert(base);
+    deref(base);
 }
 
-static void onedrive_drive_destructor(void *obj)
+HiveDrive *onedrive_drive_open(HiveClient *base, const char *driveid)
 {
-    OneDriveDrive *drv = (OneDriveDrive *)obj;
+    OneDriveDrive *drive;
+    char path[512] = {0};
+    size_t url_len;
 
-    deref(drv->base.client);
-}
+    assert(base);
+    assert(driveid);
 
-HiveDrive *onedrive_drive_open(HiveClient *onedrv_client, const char *drive_id)
-{
-    bool def_drv = !strcmp(drive_id, "default") ? true : false;
-    size_t drv_url_len =
-        strlen(ONEDRV_ME) + strlen("/") +
-        (def_drv ? strlen("drive") : strlen("drives/") + strlen(drive_id));
-    OneDriveDrive *drv = (OneDriveDrive *)rc_zalloc(
-        sizeof(OneDriveDrive) + drv_url_len + 1, &onedrive_drive_destructor);
-    if (!drv)
+    /*
+     * If param @driveid equals "default", then use the default drive.
+     * otherwise, use the drive with specific driveid.
+     */
+
+    if (!strcmp(driveid, "default"))
+        snprintf(path, sizeof(path), "/drive");
+    else
+        snprintf(path, sizeof(path), "/drives/%s", driveid);
+
+    url_len = strlen(ONEDRV_ME) + strlen(path) + 1;
+    drive = (OneDriveDrive *)rc_zalloc(sizeof(OneDriveDrive) + url_len, NULL);
+    if (!drive) {
+        hive_set_error(-1);
         return NULL;
+    }
 
-    sprintf(drv->drv_url, "%s/%s%s",
-        ONEDRV_ME,
-        def_drv ? "drive" : "drives/",
-        def_drv ? "" : drive_id);
+    snprintf(drive->drv_url, url_len, "%s/%s", ONEDRV_ME, path);
 
-    ref(onedrv_client);
-    drv->base.client = onedrv_client;
+    //drv->oauth_client = onedrv_client->oauth_client;
+    drive->base.client = base;
 
-    drv->base.get_info    = &onedrive_drive_get_info;
-    drv->base.file_stat   = &onedrive_drive_file_stat;
-    drv->base.list_files  = &onedrive_drive_list_files;
-    drv->base.makedir     = &onedrive_drive_mkdir;
-    drv->base.move_file   = &onedrive_drive_move_file;
-    drv->base.copy_file   = &onedrive_drive_copy_file;
-    drv->base.delete_file = &onedrive_drive_delete_file;
-    drv->base.close       = &onedrive_drive_close;
+    drive->base.get_info    = &onedrive_drive_get_info;
+    drive->base.file_stat   = &onedrive_drive_file_stat;
+    drive->base.list_files  = &onedrive_drive_list_files;
+    drive->base.makedir     = &onedrive_drive_mkdir;
+    drive->base.move_file   = &onedrive_drive_move_file;
+    drive->base.copy_file   = &onedrive_drive_copy_file;
+    drive->base.delete_file = &onedrive_drive_delete_file;
+    drive->base.close       = &onedrive_drive_close;
 
-    return (HiveDrive *)drv;
+    return &drive->base;
 }
