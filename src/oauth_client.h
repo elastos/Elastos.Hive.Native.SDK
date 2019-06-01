@@ -29,4 +29,7 @@ int oauth_client_logout(oauth_client_t *client);
 int oauth_client_get_access_token(oauth_client_t *client, char **token);
 int oauth_client_refresh_access_token(oauth_client_t *client, char **token);
 
+
+char *token_get_access_token(oauth_client_t *client);
+
 #endif // __OAUTH_CLIENT_H__
