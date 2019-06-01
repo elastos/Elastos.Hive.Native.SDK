@@ -221,9 +221,10 @@ static HiveDrive *onedrive_client_drive_open(
     return onedrive_drive_open(obj, opt->drive_id);
 }
 
-static void onedrive_client_close(HiveClient *obj)
+static int onedrive_client_close(HiveClient *obj)
 {
     deref(obj);
+    return 0;
 }
 
 static int onedrive_client_invalidate_credential(HiveClient *obj)
@@ -337,7 +338,7 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
     onedrv_client->base.get_info              = &onedrive_client_get_info;
     onedrv_client->base.list_drives           = &onedrive_client_list_drives;
     onedrv_client->base.drive_open            = &onedrive_client_drive_open;
-    onedrv_client->base.destructor_func       = &onedrive_client_close;
+    onedrv_client->base.finalize              = &onedrive_client_close;
 
     onedrv_client->base.perform_tsx           = &onedrive_client_perform_tsx;
     onedrv_client->base.invalidate_credential = &onedrive_client_invalidate_credential;

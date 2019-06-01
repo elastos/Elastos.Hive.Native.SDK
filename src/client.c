@@ -9,7 +9,7 @@
 
 typedef struct ClientFactoryMethod {
     int drive_type;
-    HiveClient * (*factory_func)(const HiveOptions *);
+    HiveClient * (*factory_cb)(const HiveOptions *);
 } ClientFactoryMethod;
 
 static ClientFactoryMethod client_factory_methods[] = {
@@ -22,65 +22,90 @@ static ClientFactoryMethod client_factory_methods[] = {
 
 HiveClient *hive_client_new(const HiveOptions *options)
 {
-    ClientFactoryMethod *method;
+    ClientFactoryMethod *method = &client_factory_methods[0];
     HiveClient *client = NULL;
 
-    if (!options || !options->persistent_location || !*options->persistent_location)
+    if (!options || !options->persistent_location ||
+        !*options->persistent_location) {
+        hive_set_error(-1);
         return NULL;
+    }
 
-    for (method = &client_factory_methods[0]; method->factory_func; method++) {
+    for (; method->factory_cb; method++) {
         if (method->drive_type == options->drive_type) {
-            client = method->factory_func(options);
+            client = method->factory_cb(options);
             break;
         }
     }
 
-    if (!method->factory_func)
+    if (!method->factory_cb) {
+        hive_set_error(-1);
         return NULL;
-
-    if (!client)
-        return NULL;
+    }
 
     return client;
 }
 
 int hive_client_close(HiveClient *client)
 {
-    if (!client)
+    if (!client) {
+        hive_set_error(-1);
         return -1;
+    }
 
-    client->destructor_func(client);
+    if (client->finalize)
+        client->finalize(client);
+
     return 0;
 }
 
 int hive_client_login(HiveClient *client)
 {
-    if (!client)
+    if (!client) {
+        hive_set_error(-1);
         return -1;
+    }
+
+    if (!client->login)
+        return 0;
 
     return client->login(client);
 }
 
 int hive_client_logout(HiveClient *client)
 {
-    if (!client)
+    if (!client) {
+        hive_set_error(-1);
         return -1;
+    }
+
+    if (!client->logout)
+        return 0;
 
     return client->logout(client);
 }
 
 int hive_client_get_info(HiveClient *client, char **result)
 {
-    if (!client || !result)
+    if (!client || !result) {
+        hive_set_error(-1);
         return -1;
+    }
+
+    if (!client->get_info) {
+        hive_set_error(-1);
+        return -1;
+    }
 
     return client->get_info(client, result);
 }
 
 int hive_client_list_drives(HiveClient *client, char **result)
 {
-    if (!client || !result)
+    if (!client || !result) {
+        hive_set_error(-1);
         return -1;
+    }
 
     return client->list_drives(client, result);
 }
@@ -108,4 +133,3 @@ int hive_client_perform_transaction(HiveClient *client, client_tsx_t *tsx)
 
     return client->perform_tsx(client, tsx);
 }
-
