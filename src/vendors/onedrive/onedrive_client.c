@@ -7,6 +7,7 @@
 #endif
 
 #include <crystal.h>
+#include <oauth_client.h>
 
 #include "onedrive_client.h"
 #include "onedrive_common.h"
@@ -51,66 +52,33 @@ static int onedrive_client_logout(HiveClient *base)
     return 0;
 }
 
-static int onedrive_client_perform_tsx(HiveClient *obj, client_tsx_t *base)
+static int http_client_request_with_credential(http_client_t *httpc, oauth_client_t *credential)
 {
-    OneDriveClient *client = (OneDriveClient *)obj;
-    onedrv_tsx_t *tsx = (onedrv_tsx_t *)base;
-    int rc;
-    long resp_code;
     char *access_token;
-    http_client_t *http_client;
+    int rc;
+    long resp_code = 0;
 
-    http_client = http_client_new();
-    if (!http_client)
+    rc = oauth_client_get_access_token(credential, &access_token);
+    if (rc)
         return -1;
 
-    rc = oauth_client_get_access_token(client->oauth_client, &access_token);
-    if (rc) {
-        http_client_close(http_client);
+    http_client_set_header(httpc, "Authorization", access_token);
+    free(access_token);
+
+    rc = http_client_request(httpc);
+    if (rc)
+        return -1;
+
+    rc = http_client_get_response_code(httpc, &resp_code);
+    if (rc)
+        return -1;
+
+    if (resp_code == 401) {
+        oauth_client_set_expired(credential);
         return -1;
     }
 
-    while (true) {
-        tsx->setup_req(http_client, tsx->user_data);
-        http_client_set_header(http_client, "Authorization", access_token);
-        free(access_token);
-
-        rc = http_client_request(http_client);
-        if (rc) {
-            http_client_close(http_client);
-            return -1;
-        }
-
-        rc = http_client_get_response_code(http_client, &resp_code);
-        if (rc) {
-            http_client_close(http_client);
-            return -1;
-        }
-
-        if (resp_code == 401) {
-            rc = oauth_client_refresh_access_token(client->oauth_client, &access_token);
-            if (rc) {
-                http_client_close(http_client);
-                return -1;
-            }
-            http_client_reset(http_client);
-            continue;
-        }
-
-        tsx->resp = http_client;
-        return 0;
-    }
-}
-
-
-/*
- *  1. Check access token expired or not;
- *  2. Redeem access token if being expired.
- */
-static int check_and_redeem_token(oauth_client_t *client)
-{
-    //TODO;
-    return -1;
+    return 0;
 }
 
 static int onedrive_client_get_info(HiveClient *base, char **result)
@@ -124,13 +92,6 @@ static int onedrive_client_get_info(HiveClient *base, char **result)
     assert(client);
     assert(result);
 
-    rc = check_and_redeem_token(client->oauth_client);
-    if (rc < 0) {
-        vlogE("Hive: Refresh token error");
-        hive_set_error(-1);
-        return -1;
-    }
-
     httpc = http_client_new();
     if (!httpc) {
         hive_set_error(-1);
@@ -140,10 +101,9 @@ static int onedrive_client_get_info(HiveClient *base, char **result)
     http_client_set_url(httpc, ONEDRV_ME);
     http_client_set_method(httpc, HTTP_METHOD_GET);
     http_client_set_header(httpc, "Content-Type", "application/json");
-    http_client_set_header(httpc, "Authorization", token_get_access_token(client->oauth_client)); // TODO:
     http_client_enable_response_body(httpc);
 
-    rc = http_client_request(httpc);
+    rc = http_client_request_with_credential(httpc, client->oauth_client);
     if (rc < 0) {
         hive_set_error(-1);
         goto error_exit;
@@ -190,13 +150,6 @@ static int onedrive_client_list_drives(HiveClient *base, char **result)
 
     snprintf(url, sizeof(url), "%s/drives", ONEDRV_ME);
 
-    rc = check_and_redeem_token(client->oauth_client);
-    if (rc < 0) {
-        vlogE("Hive: Refresh token error");
-        hive_set_error(-1);
-        return -1;
-    }
-
     httpc = http_client_new();
     if (!httpc) {
         hive_set_error(-1);
@@ -205,10 +158,9 @@ static int onedrive_client_list_drives(HiveClient *base, char **result)
 
     http_client_set_url_escape(httpc, url);
     http_client_set_method(httpc, HTTP_METHOD_GET);
-    http_client_set_header(httpc, "Authorization", token_get_access_token(client->oauth_client));
     http_client_enable_response_body(httpc);
 
-    rc = http_client_request(httpc);
+    rc = http_client_request_with_credential(httpc, client->oauth_client);
     if (rc < 0) {
         hive_set_error(-1);
         goto error_exit;
@@ -255,15 +207,6 @@ static HiveDrive *onedrive_client_drive_open(HiveClient *base, const void *opts)
 
     snprintf(url, sizeof(url), "%s/drives/default", ONEDRV_ME);
 
-    rc = check_and_redeem_token
-
-    (client->oauth_client);
-    if (rc < 0) {
-        vlogE("Hive: Refresh token error");
-        hive_set_error(-1);
-        return NULL;
-    }
-
     httpc = http_client_new();
     if (!httpc) {
         hive_set_error(-1);
@@ -272,10 +215,9 @@ static HiveDrive *onedrive_client_drive_open(HiveClient *base, const void *opts)
 
     http_client_set_url_escape(httpc, url);
     http_client_set_method(httpc, HTTP_METHOD_GET);
-    http_client_set_header(httpc, "Authorization", token_get_access_token(client->oauth_client));
     http_client_enable_response_body(httpc);
 
-    rc = http_client_request(httpc);
+    rc = http_client_request_with_credential(httpc, client->oauth_client);
     if (rc < 0) {
         hive_set_error(-1);
         goto error_exit;
@@ -433,7 +375,6 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
     client->base.drive_open            = &onedrive_client_drive_open;
     client->base.finalize              = &onedrive_client_close;
 
-    client->base.perform_tsx           = &onedrive_client_perform_tsx;
     client->base.invalidate_credential = &onedrive_client_invalidate_credential;
 
     return &client->base;

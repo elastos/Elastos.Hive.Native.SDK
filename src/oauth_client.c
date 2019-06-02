@@ -778,11 +778,11 @@ static bool token_expired(struct timeval *expires_at)
     return now.tv_sec < expires_at->tv_sec ? false : true;
 }
 
-static int get_access_token(oauth_client_t *cli, bool force_refresh, char **token)
+int oauth_client_get_access_token(oauth_client_t *cli, char **token)
 {
     int rc;
 
-    if (force_refresh || token_expired(&cli->svr_resp.expires_at)) {
+    if (token_expired(&cli->svr_resp.expires_at)) {
         rc = refresh_token(cli);
         if (rc)
             return -1;
@@ -797,7 +797,7 @@ static int get_access_token(oauth_client_t *cli, bool force_refresh, char **toke
     }
 
     *token = malloc(strlen(cli->svr_resp.token_type) +
-        strlen(cli->svr_resp.access_token) + 2);
+                    strlen(cli->svr_resp.access_token) + 2);
     if (!*token) {
         pthread_mutex_unlock(&cli->lock);
         return -1;
@@ -808,16 +808,6 @@ static int get_access_token(oauth_client_t *cli, bool force_refresh, char **toke
     return 0;
 }
 
-int oauth_client_get_access_token(oauth_client_t *cli, char **token)
-{
-    return get_access_token(cli, false, token);
-}
-
-int oauth_client_refresh_access_token(oauth_client_t *cli, char **token)
-{
-    return get_access_token(cli, true, token);
-}
-
 int oauth_client_set_expired(oauth_client_t *client)
 {
     client->svr_resp.expires_at.tv_sec = 0;
@@ -825,10 +815,3 @@ int oauth_client_set_expired(oauth_client_t *client)
     return 0;
 }
 
-char *token_get_access_token(oauth_client_t *client)
-{
-    assert(client);
-    assert(client->svr_resp.access_token);
-
-    return client->svr_resp.access_token;
-}
