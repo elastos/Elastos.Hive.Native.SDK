@@ -12,70 +12,143 @@
 #include "hiveipfs_client.h"
 #include "hiveipfs_drive.h"
 
-typedef enum state {
-    NOT_LOGGED_IN,
-    LOGGING_IN,
-    LOGGED_IN,
-    ERRORED
-} state_t;
+enum {
+    RAW          = (int)0,    // The primitive state.
+    LOGINING     = (int)1,    // Being in the middle of logining.
+    LOGINED      = (int)2,    // Already being logined.
+    LOGOUTING    = (int)3,    // Being in the middle of logout.
+};
 
-typedef struct IpfsClient {
+typedef struct IPFSClient {
     HiveClient base;
+
+    int login_state;
+
+    char *uid;
+    char *server_addr;
 
     pthread_mutex_t lock;
     pthread_cond_t cond;
-    state_t state;
-    char *uid;
+    int state;
     char *svr_addr;
-} IpfsClient;
+} IPFSClient;
 
 #define CLUSTER_API_PORT (9094)
 #define NODE_API_PORT (9095)
 
 static int ipfs_client_get_info(HiveClient *obj, char **result);
 
-static int ipfs_client_resolve_peer_id(const char *svr_addr, const char *peer_id, char **result)
+static
+int ipfs_client_resolve(HiveClient *base, const char *peerid, char **result)
 {
+    IPFSClient *client = (IPFSClient *)base;
+    char url[MAXPATHLEN + 1] = {0};
+    http_client_t *httpc;
+    long resp_code = 0;
+    char *p;
     int rc;
-    http_client_t *http_client;
-    char url[MAXPATHLEN + 1];
-    long resp_code;
 
     rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/name/resolve",
-        svr_addr, NODE_API_PORT);
-    if (rc < 0 || rc >= sizeof(url))
-        return -1;
-
-    http_client = http_client_new();
-    if (!http_client)
-        return -1;
-
-    http_client_set_url(http_client, url);
-    http_client_set_query(http_client, "arg", peer_id);
-    http_client_set_method(http_client, HTTP_METHOD_GET);
-    http_client_enable_response_body(http_client);
-
-    rc = http_client_request(http_client);
-    if (rc) {
-        http_client_close(http_client);
+                  client->svr_addr, NODE_API_PORT);
+    if (rc < 0 || rc >= sizeof(url)) {
+        hive_set_error(-1);
         return -1;
     }
 
-    rc = http_client_get_response_code(http_client, &resp_code);
-    if (rc || resp_code != 200) {
-        http_client_close(http_client);
+    httpc = http_client_new();
+    if (!httpc) {
+        hive_set_error(-1);
         return -1;
     }
 
-    *result = http_client_move_response_body(http_client, NULL);
-    http_client_close(http_client);
-    if (!*result)
+    http_client_set_url(httpc, url);
+    http_client_set_query(httpc, "arg", peerid);
+    http_client_set_method(httpc, HTTP_METHOD_GET);
+    http_client_enable_response_body(httpc);
+
+    rc = http_client_request(httpc);
+    if (rc < 0) {
+        hive_set_error(-1);
+        goto error_exit;
+    }
+
+    rc = http_client_get_response_code(httpc, &resp_code);
+    if (rc < 0 || resp_code != 200) {
+        hive_set_error(-1);
+        goto error_exit;
+    }
+
+    p = http_client_move_response_body(httpc, NULL);
+    http_client_close(httpc);
+
+    if (!p) {
+        hive_set_error(-1);
         return -1;
+    }
+
+    *result = p;
     return 0;
+
+error_exit:
+    http_client_close(httpc);
+    return -1;
 }
 
-static int ipfs_client_synchronize_intl(IpfsClient *client)
+static int ipfs_client_login_internal(HiveClient *base, const char *hash)
 {
+    IPFSClient *client = (IPFSClient *)base;
+    char url[MAXPATHLEN + 1] = {0};
+    http_client_t *httpc;
+    long resp_code = 0;
+    int rc;
+
+    rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/uid/login",
+                  client->svr_addr, NODE_API_PORT);
+    if (rc < 0 || rc >= sizeof(url)) {
+        hive_set_error(-1);
+        return -1;
+    }
+
+    httpc = http_client_new();
+    if (!httpc) {
+        hive_set_error(-1);
+        return -1;
+    }
+
+    http_client_set_url(httpc, url);
+    http_client_set_query(httpc, "uid", client->uid);
+    http_client_set_query(httpc, "hash", hash);
+    http_client_set_method(httpc, HTTP_METHOD_POST);
+
+    rc = http_client_request(httpc);
+    if (rc < 0) {
+        hive_set_error(-1);
+        goto error_exit;
+    }
+
+    rc = http_client_get_response_code(httpc, &resp_code);
+    http_client_close(httpc);
+
+    if (rc < 0) {
+        hive_set_error(-1);
+        return -1;
+    }
+
+    if (resp_code != 200) {
+        hive_set_error(-1);
+        return -1;
+    }
+
+    return 0;
+
+error_exit:
+    http_client_close(httpc);
+    return -1;
+}
+
+static int ipfs_client_synchronize_intl(IPFSClient *client)
+{
+
     char url[MAXPATHLEN + 1];
     long resp_code;
     char *resp;
@@ -99,7 +172,7 @@ static int ipfs_client_synchronize_intl(IpfsClient *client)
     if (!cJSON_IsString(peer_id) || !peer_id->valuestring || !*peer_id->valuestring)
         goto end;
 
-    rc = ipfs_client_resolve_peer_id(client->svr_addr, peer_id->valuestring, &resp);
+    rc = ipfs_client_resolve(&client->base, peer_id->valuestring, &resp);
     if (rc)
         goto end;
     cJSON_Delete(json);
@@ -113,26 +186,8 @@ static int ipfs_client_synchronize_intl(IpfsClient *client)
     if (!cJSON_IsString(hash) || !hash->valuestring || !*hash->valuestring)
         goto end;
 
-    rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/uid/login",
-        client->svr_addr, NODE_API_PORT);
-    if (rc < 0 || rc >= sizeof(url))
-        goto end;
-
-    http_client = http_client_new();
-    if (!http_client)
-        goto end;
-
-    http_client_set_url(http_client, url);
-    http_client_set_query(http_client, "uid", client->uid);
-    http_client_set_query(http_client, "hash", hash->valuestring);
-    http_client_set_method(http_client, HTTP_METHOD_POST);
-
-    rc = http_client_request(http_client);
-    if (rc)
-        goto end;
-
-    rc = http_client_get_response_code(http_client, &resp_code);
-    if (rc || resp_code != 200)
+    rc = ipfs_client_login_internal(&client->base, hash->valuestring);
+    if (rc < 0)
         goto end;
 
     ret = 0;
@@ -144,205 +199,245 @@ end:
     return ret;
 }
 
-int ipfs_client_synchronize(HiveClient *obj)
+int ipfs_client_synchronize(HiveClient *base)
 {
-    IpfsClient *client = (IpfsClient *)obj;
+    IPFSClient *client = (IPFSClient *)base;
+    int rc;
 
-    pthread_mutex_lock(&client->lock);
-    if (client->state != LOGGED_IN) {
-        pthread_mutex_unlock(&client->lock);
+    rc = __sync_val_compare_and_swap(&client->login_state, LOGINED, LOGINED);
+    if (rc != LOGINED) {
+        hive_set_error(-1);
         return -1;
     }
-    pthread_mutex_unlock(&client->lock);
-
-    return ipfs_client_synchronize_intl(client);
-}
-
-static int ipfs_client_login(HiveClient *obj)
-{
-    IpfsClient *client = (IpfsClient *)obj;
-    int rc;
-    state_t state_to_set = ERRORED;
-
-    pthread_mutex_lock(&client->lock);
-    while (client->state == LOGGING_IN)
-        pthread_cond_wait(&client->cond, &client->lock);
-    if (client->state >= LOGGED_IN) {
-        rc = client->state == LOGGED_IN ? 0 : -1;
-        pthread_mutex_unlock(&client->lock);
-        return rc;
-    }
-    client->state = LOGGING_IN;
-    pthread_mutex_unlock(&client->lock);
 
     rc = ipfs_client_synchronize_intl(client);
-    if (rc)
-        goto end;
-
-    state_to_set = LOGGED_IN;
-
-end:
-    pthread_mutex_lock(&client->lock);
-    if (client->state == LOGGING_IN) {
-        client->state = state_to_set;
-        pthread_cond_broadcast(&client->cond);
+    if (rc < 0) {
+        hive_set_error(-1);
+        return -1;
     }
-    rc = client->state == LOGGED_IN ? 0 : -1;
-    pthread_mutex_unlock(&client->lock);
-    return rc;
+
+    return 0;
 }
 
-static int ipfs_client_logout(HiveClient *obj)
+static int ipfs_client_login(HiveClient *base)
 {
-    IpfsClient *client = (IpfsClient *)obj;
-    int rc = -1;
-
-    pthread_mutex_lock(&client->lock);
-    if (client->state != ERRORED) {
-        client->state = NOT_LOGGED_IN;
-        rc = 0;
-    }
-    pthread_mutex_unlock(&client->lock);
-
-    return rc;
-}
-
-static int ipfs_client_get_info(HiveClient *obj, char **result)
-{
-    IpfsClient *client = (IpfsClient *)obj;
+    IPFSClient *client = (IPFSClient *)base;
     int rc;
-    http_client_t *http_client;
+
+    assert(client);
+
+    /*
+     * Check login state.
+     * 1. If already logined, return OK immediately, else
+     * 2. if being in progress of logining, then return error. else
+     * 3. It's in raw state, conduct the login process.
+     */
+    rc = __sync_val_compare_and_swap(&client->login_state, RAW, LOGINING);
+    switch(rc) {
+    case RAW:
+        break; // need to proceed the login routine.
+
+    case LOGINING:
+    case LOGOUTING:
+    default:
+        hive_set_error(-1);
+        return -1;
+
+    case LOGINED:
+        vlogD("Hive: This client already logined onto Hive IPFS");
+        return 0;
+    }
+
+    rc = ipfs_client_synchronize_intl(client);
+    if (rc < 0) {
+        // recover back to 'RAW' state.
+        __sync_val_compare_and_swap(&client->login_state, LOGINING, RAW);
+        hive_set_error(-1);
+        return -1;
+    }
+
+    // When conducting all login stuffs successfully, then change to be
+    // 'LOGINED'.
+    __sync_val_compare_and_swap(&client->login_state,  LOGINING, LOGINED);
+    vlogI("Hive: This client logined onto Hive IPFS in success");
+    return 0;
+}
+
+static int ipfs_client_logout(HiveClient *base)
+{
+    IPFSClient *client = (IPFSClient *)base;
+    int rc;
+
+    rc = __sync_val_compare_and_swap(&client->login_state, LOGINED, LOGOUTING);
+    switch(rc) {
+    case RAW:
+        return 0;
+
+    case LOGINING:
+    case LOGOUTING:
+    default:
+        hive_set_error(-1);
+        return -1;
+
+    case LOGINED:
+        break;
+    }
+
+    // do we need do some logout stuff here.
+
+    __sync_val_compare_and_swap(&client->login_state, LOGOUTING, RAW);
+    return 0;
+}
+
+static int ipfs_client_get_info(HiveClient *base, char **result)
+{
+    IPFSClient *client = (IPFSClient *)base;
     char url[MAXPATHLEN + 1];
-    long resp_code;
+    http_client_t *httpc;
+    long resp_code = 0;
+    char *p;
+    int rc;
+
+    assert(client);
+    assert(result);
 
     rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/uid/info",
-        client->svr_addr, NODE_API_PORT);
-    if (rc < 0 || rc >= sizeof(url))
+                  client->svr_addr, NODE_API_PORT);
+    if (rc < 0 || rc >= sizeof(url)) {
+        hive_set_error(-1);
         return -1;
+    }
 
-    http_client = http_client_new();
-    if (!http_client)
+    httpc = http_client_new();
+    if (!httpc) {
+        hive_set_error(-1);
         return -1;
+    }
 
-    http_client_set_url(http_client, url);
-    http_client_set_query(http_client, "uid", client->uid);
-    http_client_set_method(http_client, HTTP_METHOD_POST);
-    http_client_enable_response_body(http_client);
+    http_client_set_url(httpc, url);
+    http_client_set_query(httpc, "uid", client->uid);
+    http_client_set_method(httpc, HTTP_METHOD_POST);
+    http_client_enable_response_body(httpc);
 
-    rc = http_client_request(http_client);
+    rc = http_client_request(httpc);
     if (rc) {
-        http_client_close(http_client);
-        return -1;
+        hive_set_error(-1);
+        goto error_exit;
     }
 
-    rc = http_client_get_response_code(http_client, &resp_code);
+    rc = http_client_get_response_code(httpc, &resp_code);
     if (rc || resp_code != 200) {
-        http_client_close(http_client);
+        hive_set_error(-1);
+        goto error_exit;
+    }
+
+    p = http_client_move_response_body(httpc, NULL);
+    http_client_close(httpc);
+    if (!p) {
+        hive_set_error(-1);
         return -1;
     }
 
-    *result = http_client_move_response_body(http_client, NULL);
-    http_client_close(http_client);
-    if (!*result)
-        return -1;
+    *result = p;
     return 0;
+
+error_exit:
+    http_client_close(httpc);
+    return -1;
 }
 
-static int ipfs_client_list_drives(HiveClient *obj, char **result)
+static int ipfs_client_list_drives(HiveClient *base, char **result)
 {
-    IpfsClient *client = (IpfsClient *)obj;
+    IPFSClient *client = (IPFSClient *)base;
+    char url[MAXPATHLEN + 1] = {0};
+    http_client_t *httpc;
+    long resp_code = 0;
+    char *p;
     int rc;
-    http_client_t *http_client;
-    char url[MAXPATHLEN + 1];
-    long resp_code;
-
-    pthread_mutex_lock(&client->lock);
-    while (client->state == LOGGING_IN)
-        pthread_cond_wait(&client->cond, &client->lock);
-    if (client->state != LOGGED_IN) {
-        pthread_mutex_unlock(&client->lock);
-        return -1;
-    }
-    pthread_mutex_unlock(&client->lock);
-
-    rc = ipfs_client_synchronize_intl(client);
-    if (rc)
-        return -1;
 
     rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/files/stat",
-        client->svr_addr, NODE_API_PORT);
-    if (rc < 0 || rc >= sizeof(url))
-        return -1;
-
-    http_client = http_client_new();
-    if (!http_client)
-        return -1;
-
-    http_client_set_url(http_client, url);
-    http_client_set_query(http_client, "uid", client->uid);
-    http_client_set_query(http_client, "path", "/");
-    http_client_set_method(http_client, HTTP_METHOD_POST);
-    http_client_enable_response_body(http_client);
-
-    rc = http_client_request(http_client);
-    if (rc) {
-        http_client_close(http_client);
+                  client->svr_addr, NODE_API_PORT);
+    if (rc < 0 || rc >= sizeof(url)) {
+        hive_set_error(-1);
         return -1;
     }
 
-    rc = http_client_get_response_code(http_client, &resp_code);
-    if (rc || resp_code != 200) {
-        http_client_close(http_client);
+    httpc = http_client_new();
+    if (!httpc) {
+        hive_set_error(-1);
         return -1;
     }
 
-    *result = http_client_move_response_body(http_client, NULL);
-    http_client_close(http_client);
-    if (!*result)
+    http_client_set_url(httpc, url);
+    http_client_set_query(httpc, "uid", client->uid);
+    http_client_set_query(httpc, "path", "/");
+    http_client_set_method(httpc, HTTP_METHOD_POST);
+    http_client_enable_response_body(httpc);
+
+    rc = http_client_request(httpc);
+    if (rc < 0) {
+        hive_set_error(-1);
+        goto error_exit;
+    }
+
+    rc = http_client_get_response_code(httpc, &resp_code);
+    if (rc < 0) {
+        hive_set_error(-1);
+        goto error_exit;
+    }
+
+    if (resp_code != 200) {
+        hive_set_error(-1);
+        goto error_exit;
+    }
+
+    p = http_client_move_response_body(httpc, NULL);
+    http_client_close(httpc);
+
+    if (!p) {
+        hive_set_error(-1);
         return -1;
+    }
+
+    *result = p;
     return 0;
+
+error_exit:
+    http_client_close(httpc);
+    return -1;
 }
 
-static HiveDrive *ipfs_client_drive_open(HiveClient *obj, const HiveDriveOptions *options)
+static HiveDrive *ipfs_client_drive_open(HiveClient *base, const HiveDriveOptions *opts)
 {
-    IpfsClient *client = (IpfsClient *)obj;
+    IPFSClient *client = (IPFSClient *)base;
 
-    (void)options;
+    assert(client);
+    (void)opts;
 
-    pthread_mutex_lock(&client->lock);
-    while (client->state == LOGGING_IN)
-        pthread_cond_wait(&client->cond, &client->lock);
-    if (client->state != LOGGED_IN) {
-        pthread_mutex_unlock(&client->lock);
-        return NULL;
-    }
-    pthread_mutex_unlock(&client->lock);
-
-    return ipfs_drive_open((HiveClient *)client);
+    return ipfs_drive_open(base);
 }
 
-static int ipfs_client_close(HiveClient *obj)
+static int ipfs_client_close(HiveClient *base)
 {
-    deref(obj);
+    assert(base);
+
+    deref(base);
     return 0;
 }
 
 static int ipfs_client_perform_tsx(HiveClient *obj, client_tsx_t *base)
 {
-    IpfsClient *client = (IpfsClient *)obj;
+    IPFSClient *client = (IPFSClient *)obj;
     ipfs_tsx_t *tsx = (ipfs_tsx_t *)base;
     int rc;
     http_client_t *http_client;
     char url[MAXPATHLEN + 1];
 
-    pthread_mutex_lock(&client->lock);
-    while (client->state == LOGGING_IN)
-        pthread_cond_wait(&client->cond, &client->lock);
-    if (client->state != LOGGED_IN) {
-        pthread_mutex_unlock(&client->lock);
+    rc = __sync_val_compare_and_swap(&client->login_state, LOGINED, LOGINED);
+    if (rc != LOGINED) {
+        hive_set_error(-1);
         return -1;
     }
-    pthread_mutex_unlock(&client->lock);
 
     rc = snprintf(url, sizeof(url), "http://%s:%d", client->svr_addr, NODE_API_PORT);
     if (rc < 0 || rc >= sizeof(url))
@@ -372,41 +467,58 @@ static int ipfs_client_invalidate_credential(HiveClient *obj)
     return 0;
 }
 
-static int test_reachable(const char *ip)
+static int test_reachable(const char *ipaddr)
 {
-    http_client_t *http_client;
     char url[MAXPATHLEN + 1];
+    http_client_t *httpc;
     int rc;
     long resp_code;
 
     rc = snprintf(url, sizeof(url), "http://%s:%d/version",
-        ip, CLUSTER_API_PORT);
-    if (rc < 0 || rc >= sizeof(url))
-        return -1;
-
-    http_client = http_client_new();
-    if (!http_client)
-        return -1;
-
-    http_client_set_url(http_client, url);
-    http_client_set_method(http_client, HTTP_METHOD_POST);
-
-    rc = http_client_request(http_client);
-    if (rc) {
-        http_client_close(http_client);
+                  ipaddr, CLUSTER_API_PORT);
+    if (rc < 0 || rc >= sizeof(url)) {
+        hive_set_error(-1);
         return -1;
     }
 
-    rc = http_client_get_response_code(http_client, &resp_code);
-    http_client_close(http_client);
-    if (rc || resp_code != 200)
+    httpc = http_client_new();
+    if (!httpc) {
+        hive_set_error(-1);
         return -1;
+    }
+
+    http_client_set_url(httpc, url);
+    http_client_set_method(httpc, HTTP_METHOD_POST);
+
+    rc = http_client_request(httpc);
+    if (rc < 0) {
+        hive_set_error(-1);
+        goto error_exit;
+    }
+
+    rc = http_client_get_response_code(httpc, &resp_code);
+    http_client_close(httpc);
+
+    if (rc < 0) {
+        hive_set_error(-1);
+        return -1;
+    }
+
+    if (resp_code != 200) {
+        hive_set_error(-1);
+        return -1;
+    }
+
     return 0;
+
+error_exit:
+    http_client_close(httpc);
+    return -1;
 }
 
-static void hiveipfs_destructor(void *obj)
+static void hiveipfs_destructor(void *p)
 {
-    IpfsClient *client = (IpfsClient *)obj;
+    IPFSClient *client = (IPFSClient *)p;
 
     if (client->uid)
         free(client->uid);
@@ -420,34 +532,42 @@ static void hiveipfs_destructor(void *obj)
 
 HiveClient *hiveipfs_client_new(const HiveOptions * options)
 {
-    HiveIpfsOptions *opt = (HiveIpfsOptions *)options;
-    int i;
+    HiveIpfsOptions *opts = (HiveIpfsOptions *)options;
+    IPFSClient *client;
     int rc;
-    IpfsClient *client;
+    int i;
 
-    if (!opt->uid || !*opt->uid || !opt->bootstraps_size)
+    if (!opts->uid || !*opts->uid || !opts->bootstraps_size) {
+        hive_set_error(-1);
         return NULL;
+    }
 
-    for (i = 0; i < opt->bootstraps_size; ++i) {
-        rc = test_reachable(opt->bootstraps_ip[i]);
+    for (i = 0; i < opts->bootstraps_size; ++i) {
+        rc = test_reachable(opts->bootstraps_ip[i]);
         if (!rc)
             break;
     }
-    if (i == opt->bootstraps_size)
+    if (i == opts->bootstraps_size) {
+        hive_set_error(-1);
         return NULL;
+    }
 
-    client = (IpfsClient *)rc_zalloc(sizeof(IpfsClient), &hiveipfs_destructor);
-    if (!client)
+    client = (IPFSClient *)rc_zalloc(sizeof(IPFSClient), &hiveipfs_destructor);
+    if (!client) {
+        hive_set_error(-1);
         return NULL;
+    }
 
-    client->uid = strdup(opt->uid);
+    client->uid = strdup(opts->uid);
     if (!client->uid) {
+        hive_set_error(-1);
         deref(client);
         return NULL;
     }
 
-    client->svr_addr = strdup(opt->bootstraps_ip[i]);
+    client->svr_addr = strdup(opts->bootstraps_ip[i]);
     if (!client->svr_addr) {
+        hive_set_error(-1);
         deref(client);
         return NULL;
     }
@@ -465,11 +585,11 @@ HiveClient *hiveipfs_client_new(const HiveOptions * options)
     client->base.perform_tsx           = &ipfs_client_perform_tsx;
     client->base.invalidate_credential = &ipfs_client_invalidate_credential;
 
-    rc = ipfs_client_get_info((HiveClient *)client, NULL);
+    rc = ipfs_client_get_info(&client->base, NULL);
     if (rc) {
         deref(client);
         return NULL;
     }
 
-    return (HiveClient *)client;
+    return &client->base;
 }
