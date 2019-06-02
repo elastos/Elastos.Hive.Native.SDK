@@ -125,11 +125,3 @@ int hive_client_invalidate_credential(HiveClient *client)
 
     return client->invalidate_credential(client);
 }
-
-int hive_client_perform_transaction(HiveClient *client, client_tsx_t *tsx)
-{
-    assert(client);
-    assert(tsx);
-
-    return client->perform_tsx(client, tsx);
-}
