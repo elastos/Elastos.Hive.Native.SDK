@@ -86,7 +86,7 @@ int hive_drive_copy_file(HiveDrive *drv, const char *src_path, const char *dest_
     int rc;
 
     if (!drv || !src_path || !dest_path || src_path[0] != '/' ||
-        dest_path[0] == '\0' || strlen(src_path) > MAXPATHLEN ||
+        dest_path[0] != '/' || strlen(src_path) > MAXPATHLEN ||
         strlen(dest_path) > MAXPATHLEN || !strcmp(src_path, dest_path))
         return -1;
 
