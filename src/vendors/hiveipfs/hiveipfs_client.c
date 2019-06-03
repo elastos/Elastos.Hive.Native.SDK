@@ -582,7 +582,6 @@ HiveClient *hiveipfs_client_new(const HiveOptions * options)
     client->base.drive_open            = &ipfs_client_drive_open;
     client->base.finalize              = &ipfs_client_close;
 
-    client->base.perform_tsx           = &ipfs_client_perform_tsx;
     client->base.invalidate_credential = &ipfs_client_invalidate_credential;
 
     rc = ipfs_client_get_info(&client->base, NULL);

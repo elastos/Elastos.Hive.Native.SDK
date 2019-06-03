@@ -33,7 +33,7 @@ static int ipfs_drive_publish(ipfs_drv_t *drv, const char *path)
     int rc;
     long resp_code;
 
-    rc = hive_client_perform_transaction(drv->base.client, &tsx);
+    // // rc = hive_client_perform_transaction(drv->base.client, &tsx);
     if (rc)
         return -1;
 
@@ -66,11 +66,11 @@ static int ipfs_drive_get_info(HiveDrive *obj, char **result)
     int rc;
     long resp_code;
 
-    rc = ipfs_client_synchronize(drv->base.client);
+    // rc = ipfs_client_synchronize(drv->base.client);
     if (rc)
         return -1;
 
-    rc = hive_client_perform_transaction(drv->base.client, &tsx);
+    // // rc = hive_client_perform_transaction(drv->base.client, &tsx);
     if (rc)
         return -1;
 
@@ -111,11 +111,11 @@ static int ipfs_drive_file_stat(HiveDrive *obj, const char *file_path, char **re
     int rc;
     long resp_code;
 
-    rc = ipfs_client_synchronize(drv->base.client);
+    // rc = ipfs_client_synchronize(drv->base.client);
     if (rc)
         return -1;
 
-    rc = hive_client_perform_transaction(drv->base.client, &tsx);
+    // // rc = hive_client_perform_transaction(drv->base.client, &tsx);
     if (rc)
         return -1;
 
@@ -156,11 +156,11 @@ static int ipfs_drive_list_files(HiveDrive *obj, const char *dir_path, char **re
     int rc;
     long resp_code;
 
-    rc = ipfs_client_synchronize(drv->base.client);
+    // rc = ipfs_client_synchronize(drv->base.client);
     if (rc)
         return -1;
 
-    rc = hive_client_perform_transaction(drv->base.client, &tsx);
+    // // rc = hive_client_perform_transaction(drv->base.client, &tsx);
     if (rc)
         return -1;
 
@@ -201,11 +201,11 @@ static int ipfs_drive_makedir(HiveDrive *obj, const char *path)
     int rc;
     long resp_code;
 
-    rc = ipfs_client_synchronize(drv->base.client);
+    // rc = ipfs_client_synchronize(drv->base.client);
     if (rc)
         return -1;
 
-    rc = hive_client_perform_transaction(drv->base.client, &tsx);
+    // // rc = hive_client_perform_transaction(drv->base.client, &tsx);
     if (rc)
         return -1;
 
@@ -242,11 +242,11 @@ static int ipfs_drive_move_file(HiveDrive *obj, const char *old, const char *new
     int rc;
     long resp_code;
 
-    rc = ipfs_client_synchronize(drv->base.client);
+    // rc = ipfs_client_synchronize(drv->base.client);
     if (rc)
         return -1;
 
-    rc = hive_client_perform_transaction(drv->base.client, &tsx);
+    // // rc = hive_client_perform_transaction(drv->base.client, &tsx);
     if (rc)
         return -1;
 
@@ -283,11 +283,11 @@ static int ipfs_drive_copy_file(HiveDrive *obj, const char *src_path, const char
     int rc;
     long resp_code;
 
-    rc = ipfs_client_synchronize(drv->base.client);
+    // rc = ipfs_client_synchronize(drv->base.client);
     if (rc)
         return -1;
 
-    rc = hive_client_perform_transaction(drv->base.client, &tsx);
+    // // rc = hive_client_perform_transaction(drv->base.client, &tsx);
     if (rc)
         return -1;
 
@@ -323,11 +323,11 @@ static int ipfs_drive_delete_file(HiveDrive *obj, const char *path)
     int rc;
     long resp_code;
 
-    rc = ipfs_client_synchronize(drv->base.client);
+    // rc = ipfs_client_synchronize(drv->base.client);
     if (rc)
         return -1;
 
-    rc = hive_client_perform_transaction(drv->base.client, &tsx);
+    // rc = hive_client_perform_transaction(drv->base.client, &tsx);
     if (rc)
         return -1;
 
@@ -355,7 +355,7 @@ HiveDrive *ipfs_drive_open(HiveClient *client)
     if (!drv)
         return NULL;
 
-    drv->base.client      = client;
+    // drv->base.client      = client;
     drv->base.get_info    = &ipfs_drive_get_info;
     drv->base.file_stat   = &ipfs_drive_file_stat;
     drv->base.list_files  = &ipfs_drive_list_files;
