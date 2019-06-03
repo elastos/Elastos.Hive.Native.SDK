@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <assert.h>
 
+#include <crystal.h>
+
 #include "client.h"
 #include "local_client.h"
 #include "onedrive_client.h"
@@ -61,33 +63,102 @@ int hive_client_close(HiveClient *client)
 
 int hive_client_login(HiveClient *client)
 {
+    int rc;
+
     if (!client) {
         hive_set_error(-1);
         return -1;
     }
 
-    if (!client->login)
+    if (!client->login) {
+        hive_set_error(-1);
         return 0;
+    }
 
-    return client->login(client);
+    /*
+     * Check login state.
+     * 1. If already logined, return OK immediately, else
+     * 2. if being in progress of logining, then return error. else
+     * 3. It's in raw state, conduct the login process.
+     */
+    rc = __sync_val_compare_and_swap(&client->state, RAW, LOGINING);
+    switch(rc) {
+    case RAW:
+        break; // need to proceed the login routine.
+
+    case LOGINING:
+    case LOGOUTING:
+    default:
+        hive_set_error(-1);
+        return -1;
+
+    case LOGINED:
+        vlogD("Hive: This client logined already.");
+        return 0;
+    }
+
+    rc = client->login(client);
+    if (rc < 0) {
+        // recover back to 'RAW' state.
+        __sync_val_compare_and_swap(&client->state, LOGINING, RAW);
+        hive_set_error(-1);
+        return -1;
+    }
+
+    // When conducting all login stuffs successfully, then change to be
+    // 'LOGINED'.
+    __sync_val_compare_and_swap(&client->state,  LOGINING, LOGINED);
+    return 0;
 }
 
 int hive_client_logout(HiveClient *client)
 {
+    int rc;
+
     if (!client) {
         hive_set_error(-1);
         return -1;
     }
 
-    if (!client->logout)
+    if (!client->logout) {
+        hive_set_error(-1);
+        return 0;
+    }
+
+    rc = __sync_val_compare_and_swap(&client->state, LOGINED, LOGOUTING);
+    switch(rc) {
+    case RAW:
         return 0;
 
-    return client->logout(client);
+    case LOGINING:
+    case LOGOUTING:
+    default:
+        hive_set_error(-1);
+        return -1;
+
+    case LOGINED:
+        break;
+    }
+
+    rc = client->logout(client);
+    __sync_val_compare_and_swap(&client->state, LOGOUTING, RAW);
+
+    if (rc < 0) {
+        hive_set_error(-1);
+        return -1;
+    }
+
+    return 0;
 }
 
 int hive_client_get_info(HiveClient *client, char **result)
 {
     if (!client || !result) {
+        hive_set_error(-1);
+        return -1;
+    }
+
+    if (!is_client_ready(client))  {
         hive_set_error(-1);
         return -1;
     }
@@ -107,6 +178,11 @@ int hive_client_list_drives(HiveClient *client, char **result)
         return -1;
     }
 
+    if (!is_client_ready(client))  {
+        hive_set_error(-1);
+        return -1;
+    }
+
     if (!client->list_drives) {
         hive_set_error(-1);
         return -1;
@@ -122,6 +198,11 @@ HiveDrive *hive_drive_open(HiveClient *client)
         return NULL;
     }
 
+    if (!is_client_ready(client))  {
+        hive_set_error(-1);
+        return NULL;
+    }
+
     if  (!client->get_default_drive) {
         hive_set_error(-1);
         return NULL;
@@ -133,6 +214,11 @@ HiveDrive *hive_drive_open(HiveClient *client)
 int hive_client_invalidate_credential(HiveClient *client)
 {
     if (!client) {
+        hive_set_error(-1);
+        return -1;
+    }
+
+    if (!is_client_ready(client))  {
         hive_set_error(-1);
         return -1;
     }
