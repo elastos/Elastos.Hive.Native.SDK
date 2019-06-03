@@ -1,5 +1,5 @@
-#ifndef __ELASTOS_HIVE_H__
-#define __ELASTOS_HIVE_H__
+#ifndef __ELA_HIVE_H__
+#define __ELA_HIVE_H__
 
 #if defined(__APPLE__)
 #pragma GCC diagnostic push
@@ -82,17 +82,41 @@ typedef struct OneDriveDriveOptions {
     char drive_id[256];
 } OneDriveDriveOptions;
 
+
+/**
+* \~English
+ * Create a new hive client instance to the specific drive.
+ * All other hive APIs should be called after having client instance.
+ *
+ * @param
+ *      options     [in] A pointer to a valid HiveOptions structure.
+ *
+ * @return
+ *      If no error occurs, return the pointer of Hive client instance.
+ *      Otherwise, return NULL, and a specific error code can be
+ *      retrieved by calling hive_get_error().
+ */
 HIVE_API
 HiveClient *hive_client_new(const HiveOptions *options);
 
+/**
+ * \~English
+ * Destroy all associated resources with the Hive client instance.
+ *
+ * After calling the function, the client pointer becomes invalid.
+ * No other functions should be called.
+ *
+ * @param
+ *      client      [in] A handle identifying the Hive client instance.
+ */
 HIVE_API
-int hive_client_close(HiveClient *);
+int hive_client_close(HiveClient *client);
 
 HIVE_API
-int hive_client_login(HiveClient *);
+int hive_client_login(HiveClient *client);
 
 HIVE_API
-int hive_client_logout(HiveClient *);
+int hive_client_logout(HiveClient *client);
 
 HIVE_API
 int hive_client_get_info(HiveClient *, char **result);

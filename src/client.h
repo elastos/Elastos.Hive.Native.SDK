@@ -1,9 +1,7 @@
 #ifndef __HIVE_CLIENT_H__
 #define __HIVE_CLIENT_H__
 
-#include "elastos_hive.h"
-
-typedef void client_tsx_t;
+#include "ela_hive.h"
 
 struct HiveClient {
     int (*login)    (HiveClient *);
