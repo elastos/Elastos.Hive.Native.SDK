@@ -4,15 +4,13 @@
 #include "ela_hive.h"
 
 struct HiveClient {
-    int (*login)    (HiveClient *);
-    int (*logout)   (HiveClient *);
-    int (*get_info) (HiveClient *, char **result);
-    int (*finalize) (HiveClient *);
+    int (*login)        (HiveClient *);
+    int (*logout)       (HiveClient *);
+    int (*get_info)     (HiveClient *, char **result);
+    int (*finalize)     (HiveClient *);
+    int (*list_drives)  (HiveClient *, char **result);
 
     HiveDrive *(*get_default_drive)(HiveClient *);
-
-    int (*list_drives)(HiveClient *, char **result);
-    HiveDrive *(*drive_open)(HiveClient *, const HiveDriveOptions *);
 
     int (*invalidate_credential)(HiveClient *);
 };

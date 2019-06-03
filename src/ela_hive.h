@@ -32,10 +32,10 @@ extern "C" {
 #define HIVE_API
 #endif
 
-typedef struct HiveClient HiveClient;
-typedef struct HiveClientInfo HiveClientInfo;
-typedef struct HiveDrive HiveDrive;
-typedef struct HiveDriveInfo HiveDriveInfo;
+typedef struct HiveClient       HiveClient;
+typedef struct HiveClientInfo   HiveClientInfo;
+typedef struct HiveDrive        HiveDrive;
+typedef struct HiveDriveInfo    HiveDriveInfo;
 
 struct HiveOAuthInfo {
     const char *client_id;
@@ -58,8 +58,6 @@ typedef struct HiveOptions {
     int  drive_type;
 } HiveOptions;
 
-typedef void HiveDriveOptions;
-
 typedef struct OneDriveOptions {
     HiveOptions base;
 
@@ -77,10 +75,6 @@ typedef struct HiveIpfsOptions {
     size_t bootstraps_size;
     const char *bootstraps_ip[0];
 } HiveIpfsOptions ;
-
-typedef struct OneDriveDriveOptions {
-    char drive_id[256];
-} OneDriveDriveOptions;
 
 
 /**
@@ -119,16 +113,13 @@ HIVE_API
 int hive_client_logout(HiveClient *client);
 
 HIVE_API
-int hive_client_get_info(HiveClient *, char **result);
+int hive_client_get_info(HiveClient *client, char **result);
 
 HIVE_API
-int hive_client_list_drives(HiveClient *, char **result);
+HiveDrive *hive_drive_open(HiveClient *client);
 
 HIVE_API
-HiveDrive *hive_drive_open(HiveClient *, const HiveDriveOptions *options);
-
-HIVE_API
-int hive_drive_close(HiveDrive *);
+int hive_drive_close(HiveDrive *client);
 
 HIVE_API
 int hive_drive_get_info(HiveDrive *, char **result);

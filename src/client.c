@@ -107,21 +107,35 @@ int hive_client_list_drives(HiveClient *client, char **result)
         return -1;
     }
 
+    if (!client->list_drives) {
+        hive_set_error(-1);
+        return -1;
+    }
+
     return client->list_drives(client, result);
 }
 
-HiveDrive *hive_drive_open(HiveClient *client, const HiveDriveOptions *options)
+HiveDrive *hive_drive_open(HiveClient *client)
 {
-    if (!client || !options)
+    if (!client) {
+        hive_set_error(-1);
         return NULL;
+    }
 
-    return client->drive_open(client, options);
+    if  (!client->get_default_drive) {
+        hive_set_error(-1);
+        return NULL;
+    }
+
+    return client->get_default_drive(client);
 }
 
 int hive_client_invalidate_credential(HiveClient *client)
 {
-    if (!client)
+    if (!client) {
+        hive_set_error(-1);
         return -1;
+    }
 
     return client->invalidate_credential(client);
 }

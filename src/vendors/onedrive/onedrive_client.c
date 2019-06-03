@@ -188,13 +188,12 @@ error_exit:
     return -1;
 }
 
-static HiveDrive *onedrive_client_drive_open(HiveClient *base, const void *opts)
+static HiveDrive *onedrive_client_drive_open(HiveClient *base)
 {
     OneDriveClient *client = (OneDriveClient *)base;
 
     assert(client);
     assert(client->oauth_client);
-    (void)opts;
 
     return onedrive_drive_open(client->oauth_client, "default");
 }
@@ -322,12 +321,12 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
         goto error_exit;
     }
 
-    client->base.login                 = &onedrive_client_login;
-    client->base.logout                = &onedrive_client_logout;
-    client->base.get_info              = &onedrive_client_get_info;
-    client->base.list_drives           = &onedrive_client_list_drives;
-    client->base.drive_open            = &onedrive_client_drive_open;
-    client->base.finalize              = &onedrive_client_close;
+    client->base.login              = &onedrive_client_login;
+    client->base.logout             = &onedrive_client_logout;
+    client->base.get_info           = &onedrive_client_get_info;
+    client->base.list_drives        = &onedrive_client_list_drives;
+    client->base.get_default_drive  = &onedrive_client_drive_open;
+    client->base.finalize           = &onedrive_client_close;
 
     client->base.invalidate_credential = &onedrive_client_invalidate_credential;
 
