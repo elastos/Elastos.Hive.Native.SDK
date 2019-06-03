@@ -12,17 +12,9 @@
 #include "hiveipfs_client.h"
 #include "hiveipfs_drive.h"
 
-enum {
-    RAW          = (int)0,    // The primitive state.
-    LOGINING     = (int)1,    // Being in the middle of logining.
-    LOGINED      = (int)2,    // Already being logined.
-    LOGOUTING    = (int)3,    // Being in the middle of logout.
-};
-
 typedef struct IPFSClient {
     HiveClient base;
 
-    int login_state;
     char *uid;
     char *server_addr;
 } IPFSClient;
@@ -198,12 +190,6 @@ int ipfs_client_synchronize(HiveClient *base)
     IPFSClient *client = (IPFSClient *)base;
     int rc;
 
-    rc = __sync_val_compare_and_swap(&client->login_state, LOGINED, LOGINED);
-    if (rc != LOGINED) {
-        hive_set_error(-1);
-        return -1;
-    }
-
     rc = ipfs_client_synchronize_intl(client);
     if (rc < 0) {
         hive_set_error(-1);
@@ -220,66 +206,20 @@ static int ipfs_client_login(HiveClient *base)
 
     assert(client);
 
-    /*
-     * Check login state.
-     * 1. If already logined, return OK immediately, else
-     * 2. if being in progress of logining, then return error. else
-     * 3. It's in raw state, conduct the login process.
-     */
-    rc = __sync_val_compare_and_swap(&client->login_state, RAW, LOGINING);
-    switch(rc) {
-    case RAW:
-        break; // need to proceed the login routine.
-
-    case LOGINING:
-    case LOGOUTING:
-    default:
-        hive_set_error(-1);
-        return -1;
-
-    case LOGINED:
-        vlogD("Hive: This client already logined onto Hive IPFS");
-        return 0;
-    }
-
     rc = ipfs_client_synchronize_intl(client);
     if (rc < 0) {
         // recover back to 'RAW' state.
-        __sync_val_compare_and_swap(&client->login_state, LOGINING, RAW);
         hive_set_error(-1);
         return -1;
     }
 
-    // When conducting all login stuffs successfully, then change to be
-    // 'LOGINED'.
-    __sync_val_compare_and_swap(&client->login_state,  LOGINING, LOGINED);
     vlogI("Hive: This client logined onto Hive IPFS in success");
     return 0;
 }
 
 static int ipfs_client_logout(HiveClient *base)
 {
-    IPFSClient *client = (IPFSClient *)base;
-    int rc;
-
-    rc = __sync_val_compare_and_swap(&client->login_state, LOGINED, LOGOUTING);
-    switch(rc) {
-    case RAW:
-        return 0;
-
-    case LOGINING:
-    case LOGOUTING:
-    default:
-        hive_set_error(-1);
-        return -1;
-
-    case LOGINED:
-        break;
-    }
-
     // do we need do some logout stuff here.
-
-    __sync_val_compare_and_swap(&client->login_state, LOGOUTING, RAW);
     return 0;
 }
 
