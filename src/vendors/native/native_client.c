@@ -1,9 +1,9 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#include "owncloud.h"
+#include "native_client.h"
 
-int owncloud_client_new(const HiveOptions *options, HiveClient **client)
+int native_client_new(const HiveOptions *options, HiveClient **client)
 {
     assert(options);
     assert(client);

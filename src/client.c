@@ -4,21 +4,21 @@
 #include <crystal.h>
 
 #include "client.h"
-#include "local_client.h"
+#include "native_client.h"
+#include "ipfs_client.h"
 #include "onedrive_client.h"
 #include "owncloud.h"
-#include "hiveipfs_client.h"
 
 typedef struct FactoryMethod {
     int drive_type;
-    HiveClient * (*factory_cb)(const HiveOptions *);
+    int (*factory_cb)(const HiveOptions *, HiveClient **);
 } FactoryMethod;
 
 static FactoryMethod factory_methods[] = {
-    { HiveDriveType_Local,     localfs_client_new  },
+    { HiveDriveType_Native,    native_client_new   },
+    { HiveDriveType_IPFS,      ipfs_client_new     },
     { HiveDriveType_OneDrive,  onedrive_client_new },
     { HiveDriveType_ownCloud,  owncloud_client_new },
-    { HiveDriveType_HiveIPFS,  hiveipfs_client_new },
     { HiveDriveType_Butt,      NULL }
 };
 
@@ -26,6 +26,7 @@ HiveClient *hive_client_new(const HiveOptions *options)
 {
     FactoryMethod *method = &factory_methods[0];
     HiveClient *client = NULL;
+    int rc;
 
     if (!options || !options->persistent_location ||
         !*options->persistent_location) {
@@ -35,13 +36,18 @@ HiveClient *hive_client_new(const HiveOptions *options)
 
     for (; method->factory_cb; method++) {
         if (method->drive_type == options->drive_type) {
-            client = method->factory_cb(options);
+            rc = method->factory_cb(options, &client);
             break;
         }
     }
 
     if (!method->factory_cb) {
         hive_set_error(-1);
+        return NULL;
+    }
+
+    if (rc < 0) {
+        hive_set_error(rc);
         return NULL;
     }
 
@@ -100,7 +106,7 @@ int hive_client_login(HiveClient *client)
     if (rc < 0) {
         // recover back to 'RAW' state.
         __sync_val_compare_and_swap(&client->state, LOGINING, RAW);
-        hive_set_error(-1);
+        hive_set_error(rc);
         return -1;
     }
 
@@ -142,7 +148,7 @@ int hive_client_logout(HiveClient *client)
     __sync_val_compare_and_swap(&client->state, LOGOUTING, RAW);
 
     if (rc < 0) {
-        hive_set_error(-1);
+        hive_set_error(rc);
         return -1;
     }
 
@@ -171,6 +177,8 @@ int hive_client_get_info(HiveClient *client, char **result)
 
 int hive_client_list_drives(HiveClient *client, char **result)
 {
+    int rc;
+
     if (!client || !result) {
         hive_set_error(-1);
         return -1;
@@ -186,11 +194,20 @@ int hive_client_list_drives(HiveClient *client, char **result)
         return -1;
     }
 
-    return client->list_drives(client, result);
+    rc = client->list_drives(client, result);
+    if (rc < 0)  {
+        hive_set_error(rc);
+        return -1;
+    }
+
+    return 0;
 }
 
 HiveDrive *hive_drive_open(HiveClient *client)
 {
+    HiveDrive *drive;
+    int rc;
+
     if (!client) {
         hive_set_error(-1);
         return NULL;
@@ -201,16 +218,24 @@ HiveDrive *hive_drive_open(HiveClient *client)
         return NULL;
     }
 
-    if  (!client->get_default_drive) {
+    if  (!client->get_drive) {
         hive_set_error(-1);
         return NULL;
     }
 
-    return client->get_default_drive(client);
+    rc = client->get_drive(client, &drive);
+    if (rc < 0) {
+        hive_set_error(rc);
+        return NULL;
+    }
+
+    return drive;
 }
 
 int hive_client_invalidate_credential(HiveClient *client)
 {
+    int rc;
+
     if (!client) {
         hive_set_error(-1);
         return -1;
@@ -221,5 +246,11 @@ int hive_client_invalidate_credential(HiveClient *client)
         return -1;
     }
 
-    return client->invalidate_credential(client);
+    rc = client->invalidate_credential(client);
+    if (rc < 0) {
+        hive_set_error(rc);
+        return -1;
+    }
+
+    return 0;
 }

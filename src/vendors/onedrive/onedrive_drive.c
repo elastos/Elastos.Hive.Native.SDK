@@ -23,6 +23,7 @@
 #include "onedrive_client.h"
 #include "http_client.h"
 #include "oauth_client.h"
+#include "client.h"
 
 typedef struct OneDriveDrive {
     HiveDrive base;

@@ -13,6 +13,7 @@
 #include "onedrive_common.h"
 #include "onedrive_drive.h"
 #include "http_client.h"
+#include "client.h"
 
 typedef struct OneDriveClient {
     HiveClient base;
@@ -30,8 +31,7 @@ static int onedrive_client_login(HiveClient *base)
     rc = oauth_client_login(client->oauth_client);
     if (rc < 0) {
         vlogE("Hive: Client Logining onto oneDrive error");
-        hive_set_error(rc);
-        return -1;
+        return rc;
     }
 
     vlogD("Hive: Client logined onto oneDrive service");
@@ -188,14 +188,23 @@ error_exit:
     return -1;
 }
 
-static HiveDrive *onedrive_client_drive_open(HiveClient *base)
+static int onedrive_client_drive_open(HiveClient *base, HiveDrive **drive)
 {
     OneDriveClient *client = (OneDriveClient *)base;
+    HiveDrive *tmp;
+    int rc;
 
     assert(client);
     assert(client->oauth_client);
 
-    return onedrive_drive_open(client->oauth_client, "default");
+    tmp = onedrive_drive_open(client->oauth_client, "default");
+    if (!tmp) {
+        // TODO;
+        return -1;
+    }
+
+    *drive = tmp;
+    return 0;
 }
 
 static int onedrive_client_close(HiveClient *base)
@@ -227,10 +236,10 @@ static void client_destroy(void *p)
     }
 }
 
-HiveClient *onedrive_client_new(const HiveOptions *options)
+int onedrive_client_new(const HiveOptions *options, HiveClient **client)
 {
     OneDriveOptions *opts = (OneDriveOptions *)options;
-    OneDriveClient *client = NULL;
+    OneDriveClient *tmp = NULL;
     http_client_t *httpc = NULL;
     oauth_opt_t oauth_opt;
     char *redirect_url = NULL;
@@ -238,8 +247,9 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
     char *host = NULL;
     char *port = NULL;
     char *path = NULL;
-    int rc;
+    int rc = -1;
 
+    assert(client);
     assert(opts);
     assert(opts->base.drive_type == HiveDriveType_OneDrive);
 
@@ -247,62 +257,62 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
         !opts->redirect_url || !*opts->redirect_url ||
         !opts->scope        || !*opts->scope        ||
         !opts->grant_authorize) {
-        hive_set_error(-1);
-        return NULL;
+        // TOOD;
+        return rc;
     }
 
     path = realpath(options->persistent_location, oauth_opt.profile_path);
     if (!path && errno != ENOENT) {
-        hive_set_error(-1);
-        return NULL;
+        // TODO;
+        return rc;
     }
 
     httpc = http_client_new();
     if (!httpc) {
-        hive_set_error(-1);
-        return NULL;
+        // TODO;
+        return rc;
     }
 
     rc = http_client_set_url(httpc, opts->redirect_url);
     if (rc < 0) {
-        hive_set_error(-1);
+        // TODO;
         goto error_exit;
     }
 
     rc = http_client_get_scheme(httpc, &scheme);
     if (rc < 0) {
-        hive_set_error(-1);
+        // TODO:
         goto error_exit;
     }
 
     rc = http_client_get_host(httpc, &host);
     if (rc < 0) {
-        hive_set_error(-1);
+        // TODO;
         goto error_exit;
     }
 
     redirect_url = (char *)calloc(1, strlen(scheme) + strlen(host) + 4);
     if (!redirect_url) {
-        hive_set_error(-1);
+        // TODO;
         goto error_exit;
     }
 
     sprintf(redirect_url, "%s://%s", scheme, host);
     rc = http_client_get_port(httpc, &port);
     if (rc) {
-        hive_set_error(-1);
+        // TODO;
         goto error_exit;
     }
 
     rc = http_client_get_path(httpc, &path);
     if (rc <  0) {
-        hive_set_error(-1);
+        // TODO;
         goto error_exit;
     }
 
-    client = (OneDriveClient *)rc_zalloc(sizeof(OneDriveClient), client_destroy);
+    tmp = (OneDriveClient *)rc_zalloc(sizeof(OneDriveClient), client_destroy);
     if (!client) {
-        hive_set_error(-1);
+        // TODO;
         goto error_exit;
     }
 
@@ -315,22 +325,23 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
     oauth_opt.redirect_path   = path;
     oauth_opt.grant_authorize = opts->grant_authorize;
 
-    client->oauth_client = oauth_client_new(&oauth_opt);
-    if (!client->oauth_client) {
-        hive_set_error(-1);
+    tmp->oauth_client = oauth_client_new(&oauth_opt);
+    if (!tmp->oauth_client) {
+        // TODO;
         goto error_exit;
     }
 
-    client->base.login              = &onedrive_client_login;
-    client->base.logout             = &onedrive_client_logout;
-    client->base.get_info           = &onedrive_client_get_info;
-    client->base.list_drives        = &onedrive_client_list_drives;
-    client->base.get_default_drive  = &onedrive_client_drive_open;
-    client->base.finalize           = &onedrive_client_close;
+    tmp->base.login        = &onedrive_client_login;
+    tmp->base.logout       = &onedrive_client_logout;
+    tmp->base.get_info     = &onedrive_client_get_info;
+    tmp->base.list_drives  = &onedrive_client_list_drives;
+    tmp->base.get_drive    = &onedrive_client_drive_open;
+    tmp->base.finalize     = &onedrive_client_close;
 
-    client->base.invalidate_credential = &onedrive_client_invalidate_credential;
+    tmp->base.invalidate_credential = &onedrive_client_invalidate_credential;
 
-    return &client->base;
+    *client = (HiveClient *)tmp;
+    return 0;
 
 error_exit:
     if (host)
@@ -348,5 +359,5 @@ error_exit:
     if (client)
         deref(client);
 
-    return NULL;
+    return -1;
 }

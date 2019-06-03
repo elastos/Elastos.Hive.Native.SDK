@@ -3,8 +3,8 @@
 #include <crystal.h>
 #include <stdlib.h>
 
-#include "hiveipfs_drive.h"
-#include "hiveipfs_client.h"
+#include "ipfs_drive.h"
+#include "ipfs_client.h"
 
 typedef struct ipfs_drive {
     HiveDrive base;
