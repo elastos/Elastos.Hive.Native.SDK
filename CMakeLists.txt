@@ -33,7 +33,6 @@ set(ENABLE_DOCS FALSE CACHE BOOL "Build APIs documentation")
 
 add_subdirectory(deps)
 add_subdirectory(src)
-add_subdirectory(tests)
 
 # Alias target for package. But it fix issue about making package
 # inrelevant to udpatation of cmake scripts.
