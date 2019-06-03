@@ -149,6 +149,9 @@ static int onedrive_client_list_drives(HiveClient *base, char **result)
     http_client_set_url_escape(httpc, url);
     http_client_set_method(httpc, HTTP_METHOD_GET);
     http_client_enable_response_body(httpc);
+    http_client_set_header(httpc, "Authorization", access_token);
+    http_client_enable_response_body(httpc);
+    free(access_token);
 
     rc = http_client_request(httpc);
     if (rc < 0) {

@@ -917,7 +917,7 @@ HiveDrive *onedrive_drive_open(oauth_client_t *credential, const char *drive_id)
         return NULL;
     }
 
-    snprintf(drive->drv_url, url_len, "%s/%s", ONEDRV_ME, path);
+    snprintf(drive->drv_url, url_len, "%s%s", ONEDRV_ME, path);
 
     ref(credential);
     drive->credential = credential;
