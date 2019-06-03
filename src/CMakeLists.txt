@@ -53,7 +53,7 @@ set(SRC
     vendors/hiveipfs/hiveipfs_drive.c)
 
 set(HEADERS
-    elastos_hive.h)
+    ela_hive.h)
 
 if(WIN32)
     set(SYSTEM_LIBS Ws2_32 Iphlpapi)

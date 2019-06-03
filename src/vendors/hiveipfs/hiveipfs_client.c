@@ -425,6 +425,7 @@ static int ipfs_client_close(HiveClient *base)
     return 0;
 }
 
+/*
 static int ipfs_client_perform_tsx(HiveClient *obj, client_tsx_t *base)
 {
     IPFSClient *client = (IPFSClient *)obj;
@@ -460,6 +461,7 @@ static int ipfs_client_perform_tsx(HiveClient *obj, client_tsx_t *base)
     tsx->resp = http_client;
     return 0;
 }
+*/
 
 static int ipfs_client_invalidate_credential(HiveClient *obj)
 {
