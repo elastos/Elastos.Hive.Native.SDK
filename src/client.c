@@ -9,12 +9,12 @@
 #include "owncloud.h"
 #include "hiveipfs_client.h"
 
-typedef struct ClientFactoryMethod {
+typedef struct FactoryMethod {
     int drive_type;
     HiveClient * (*factory_cb)(const HiveOptions *);
-} ClientFactoryMethod;
+} FactoryMethod;
 
-static ClientFactoryMethod client_factory_methods[] = {
+static FactoryMethod factory_methods[] = {
     { HiveDriveType_Local,     localfs_client_new  },
     { HiveDriveType_OneDrive,  onedrive_client_new },
     { HiveDriveType_ownCloud,  owncloud_client_new },
@@ -24,7 +24,7 @@ static ClientFactoryMethod client_factory_methods[] = {
 
 HiveClient *hive_client_new(const HiveOptions *options)
 {
-    ClientFactoryMethod *method = &client_factory_methods[0];
+    FactoryMethod *method = &factory_methods[0];
     HiveClient *client = NULL;
 
     if (!options || !options->persistent_location ||
@@ -81,20 +81,19 @@ int hive_client_login(HiveClient *client)
      * 2. if being in progress of logining, then return error. else
      * 3. It's in raw state, conduct the login process.
      */
-    rc = __sync_val_compare_and_swap(&client->state, RAW, LOGINING);
+    rc = client_try_login(client);
     switch(rc) {
-    case RAW:
-        break; // need to proceed the login routine.
+    case 0:
+        break;
 
-    case LOGINING:
-    case LOGOUTING:
+    case 1:
+        vlogD("Hive: This client logined already");
+        return 0;
+
+    case -1:
     default:
         hive_set_error(-1);
         return -1;
-
-    case LOGINED:
-        vlogD("Hive: This client logined already.");
-        return 0;
     }
 
     rc = client->login(client);
@@ -125,19 +124,18 @@ int hive_client_logout(HiveClient *client)
         return 0;
     }
 
-    rc = __sync_val_compare_and_swap(&client->state, LOGINED, LOGOUTING);
+    rc = client_try_logout(client);
     switch(rc) {
-    case RAW:
+    case 0:
+        break;
+
+    case 1:
         return 0;
 
-    case LOGINING:
-    case LOGOUTING:
+    case -1:
     default:
         hive_set_error(-1);
         return -1;
-
-    case LOGINED:
-        break;
     }
 
     rc = client->logout(client);
