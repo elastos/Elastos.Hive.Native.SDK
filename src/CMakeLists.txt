@@ -45,12 +45,12 @@ set(SRC
     oauth_client.c
     sandbird/sandbird.c
     http/http_client.c
-    vendors/local/local_client.c
+    vendors/native/native_client.c
+    vendors/ipfs/ipfs_client.c
+    vendors/ipfs/ipfs_drive.c
     vendors/onedrive/onedrive_client.c
     vendors/onedrive/onedrive_drive.c
-    vendors/owncloud/owncloud.c
-    vendors/hiveipfs/hiveipfs_client.c
-    vendors/hiveipfs/hiveipfs_drive.c)
+    vendors/owncloud/owncloud.c)
 
 set(HEADERS
     ela_hive.h)
@@ -66,10 +66,10 @@ include_directories(
     .
     http
     sandbird
-    vendors/local
+    vendors/native
+    vendors/ipfs
     vendors/onedrive
     vendors/owncloud
-    vendors/hiveipfs
     ${CMAKE_CURRENT_BINARY_DIR}
     ${HIVE_INT_DIST_DIR}/include)
 

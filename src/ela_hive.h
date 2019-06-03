@@ -44,12 +44,11 @@ struct HiveOAuthInfo {
 };
 
 enum HiveDriveType {
-    HiveDriveType_Local     = 0x0,
-    HiveDriveType_OneDrive  = 0x01,
+    HiveDriveType_Native    = 0x0,
+    HiveDriveType_IPFS      = 0x01,
 
+    HiveDriveType_OneDrive  = 0x10,
     HiveDriveType_ownCloud  = 0x51,
-
-    HiveDriveType_HiveIPFS  = 0x98,
     HiveDriveType_Butt      = 0x99
 };
 
@@ -68,14 +67,13 @@ typedef struct OneDriveOptions {
     int (*grant_authorize)(const char *request_url);
 } OneDriveOptions;
 
-typedef struct HiveIpfsOptions {
+typedef struct IPFSOptions {
     HiveOptions base;
 
     char *uid;
     size_t bootstraps_size;
     const char *bootstraps_ip[0];
-} HiveIpfsOptions ;
-
+} IPFSOptions;
 
 /**
 * \~English

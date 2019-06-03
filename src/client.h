@@ -19,8 +19,7 @@ struct HiveClient {
     int (*get_info)     (HiveClient *, char **result);
     int (*finalize)     (HiveClient *);
     int (*list_drives)  (HiveClient *, char **result);
-
-    HiveDrive *(*get_default_drive)(HiveClient *);
+    int (*get_drive)    (HiveClient *, HiveDrive **);
 
     int (*invalidate_credential)(HiveClient *);
 };

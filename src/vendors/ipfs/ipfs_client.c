@@ -1,16 +1,18 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <stddef.h>
 #include <pthread.h>
 #include <crystal.h>
 #ifdef HAVE_SYS_PARAM_H
 #include <sys/param.h>
 #endif
-#include <http_client.h>
-#include <stdlib.h>
-#include <cjson/cJSON.h>
 
-#include "hiveipfs_client.h"
-#include "hiveipfs_drive.h"
+#include <cjson/cJSON.h>
+#include <http_client.h>
+
+#include "ela_hive.h"
+#include "ipfs_client.h"
+#include "ipfs_drive.h"
 
 typedef struct IPFSClient {
     HiveClient base;
@@ -91,6 +93,7 @@ static int ipfs_client_login_internal(HiveClient *base, const char *hash)
     rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/uid/login",
                   client->server_addr, NODE_API_PORT);
     if (rc < 0 || rc >= sizeof(url)) {
+        return rc;
         hive_set_error(-1);
         return -1;
     }
@@ -341,11 +344,19 @@ error_exit:
     return -1;
 }
 
-static HiveDrive *ipfs_client_drive_open(HiveClient *base)
+static int ipfs_client_drive_open(HiveClient *base, HiveDrive **drive)
 {
+    HiveDrive *tmp;
     assert(base);
 
-    return ipfs_drive_open(base);
+    tmp = ipfs_drive_open(base);
+    if (!tmp) {
+        // TODO
+        return -1;
+    }
+
+    *drive = tmp;
+    return 0;
 }
 
 static int ipfs_client_close(HiveClient *base)
@@ -355,44 +366,6 @@ static int ipfs_client_close(HiveClient *base)
     deref(base);
     return 0;
 }
-
-/*
-static int ipfs_client_perform_tsx(HiveClient *obj, client_tsx_t *base)
-{
-    IPFSClient *client = (IPFSClient *)obj;
-    ipfs_tsx_t *tsx = (ipfs_tsx_t *)base;
-    int rc;
-    http_client_t *http_client;
-    char url[MAXPATHLEN + 1];
-
-    rc = __sync_val_compare_and_swap(&client->login_state, LOGINED, LOGINED);
-    if (rc != LOGINED) {
-        hive_set_error(-1);
-        return -1;
-    }
-
-    rc = snprintf(url, sizeof(url), "http://%s:%d", client->svr_addr, NODE_API_PORT);
-    if (rc < 0 || rc >= sizeof(url))
-        return -1;
-
-    http_client = http_client_new();
-    if (!http_client)
-        return -1;
-
-    http_client_set_url(http_client, url);
-    http_client_set_query(http_client, "uid", client->uid);
-    tsx->setup_req(http_client, tsx->user_data);
-
-    rc = http_client_request(http_client);
-    if (rc) {
-        http_client_close(http_client);
-        return -1;
-    }
-
-    tsx->resp = http_client;
-    return 0;
-}
-*/
 
 static int ipfs_client_invalidate_credential(HiveClient *obj)
 {
@@ -449,7 +422,7 @@ error_exit:
     return -1;
 }
 
-static void hiveipfs_destructor(void *p)
+static void ipfs_client_destructor(void *p)
 {
     IPFSClient *client = (IPFSClient *)p;
 
@@ -460,16 +433,18 @@ static void hiveipfs_destructor(void *p)
         free(client->server_addr);
 }
 
-HiveClient *hiveipfs_client_new(const HiveOptions * options)
+int ipfs_client_new(const HiveOptions * options, HiveClient **client)
 {
-    HiveIpfsOptions *opts = (HiveIpfsOptions *)options;
-    IPFSClient *client;
-    int rc;
+    IPFSOptions *opts = (IPFSOptions *)options;
+    IPFSClient *tmp;
+    int rc = -1;
     int i;
 
+    assert(client);
+
     if (!opts->uid || !*opts->uid || !opts->bootstraps_size) {
-        hive_set_error(-1);
-        return NULL;
+        // TODO:
+        return rc;
     }
 
     for (i = 0; i < opts->bootstraps_size; ++i) {
@@ -477,45 +452,46 @@ HiveClient *hiveipfs_client_new(const HiveOptions * options)
         if (!rc)
             break;
     }
-    if (i == opts->bootstraps_size) {
-        hive_set_error(-1);
-        return NULL;
+    if (i >= opts->bootstraps_size) {
+        // TODO;
+        return rc;
     }
 
-    client = (IPFSClient *)rc_zalloc(sizeof(IPFSClient), &hiveipfs_destructor);
-    if (!client) {
-        hive_set_error(-1);
-        return NULL;
+    tmp = (IPFSClient *)rc_zalloc(sizeof(IPFSClient), ipfs_client_destructor);
+    if (!tmp) {
+        // TODO;
+        return rc;
     }
 
-    client->uid = strdup(opts->uid);
-    if (!client->uid) {
-        hive_set_error(-1);
-        deref(client);
-        return NULL;
+    tmp->uid = strdup(opts->uid);
+    if (!tmp->uid) {
+        deref(tmp);
+        // TODO;
+        return rc;
     }
 
-    client->server_addr = strdup(opts->bootstraps_ip[i]);
-    if (!client->server_addr) {
-        hive_set_error(-1);
-        deref(client);
-        return NULL;
+    tmp->server_addr = strdup(opts->bootstraps_ip[i]);
+    if (!tmp->server_addr) {
+        deref(tmp);
+        // TODO;
+        return rc;
     }
 
-    client->base.login              = &ipfs_client_login;
-    client->base.logout             = &ipfs_client_logout;
-    client->base.get_info           = &ipfs_client_get_info;
-    client->base.list_drives        = &ipfs_client_list_drives;
-    client->base.get_default_drive  = &ipfs_client_drive_open;
-    client->base.finalize           = &ipfs_client_close;
+    tmp->base.login      = &ipfs_client_login;
+    tmp->base.logout     = &ipfs_client_logout;
+    tmp->base.get_info   = &ipfs_client_get_info;
+    tmp->base.list_drives= &ipfs_client_list_drives;
+    tmp->base.get_drive  = &ipfs_client_drive_open;
+    tmp->base.finalize   = &ipfs_client_close;
 
-    client->base.invalidate_credential = &ipfs_client_invalidate_credential;
+    tmp->base.invalidate_credential = &ipfs_client_invalidate_credential;
 
-    rc = ipfs_client_get_info(&client->base, NULL);
+    rc = ipfs_client_get_info(&tmp->base, NULL);
     if (rc) {
-        deref(client);
-        return NULL;
+        deref(tmp);
+        return rc;
     }
 
-    return &client->base;
+    *client = (HiveClient *)tmp;
+    return 0;
 }
