@@ -43,6 +43,7 @@ set(SRC
     client.c
     drive.c
     oauth_client.c
+    ela_error.c
     sandbird/sandbird.c
     http/http_client.c
     vendors/native/native_client.c

@@ -6,7 +6,6 @@
 #include <malloc.h>
 #endif
 #include <stdbool.h>
-
 #include <curl/curl.h>
 #include <crystal.h>
 
@@ -33,6 +32,11 @@ struct http_client {
 };
 
 static bool initialized = false;
+
+const char *http_client_strerror(int errcode)
+{
+    return curl_easy_strerror(errcode);
+}
 
 #if defined(_WIN32) || defined(_WIN64)
 BOOL APIENTRY DllMain(
@@ -85,18 +89,6 @@ static void finalizer()
 }
 #endif
 
-static inline int __curlcode_to_error(CURLcode code)
-{
-    // TODO;
-    return -1;
-}
-
-static inline int __curlucode_to_error(CURLUcode code)
-{
-    // TODO;
-    return -1;
-}
-
 #ifndef NDEBUG
 static
 void dump(const char *text, FILE *stream, unsigned char *ptr, size_t size)
@@ -138,29 +130,29 @@ int trace_func(CURL *handle, curl_infotype type, char *data, size_t size,
     (void)userp;
 
     switch (type) {
-        case CURLINFO_TEXT:
-            fprintf(stderr, "== Info: %s", data);
-        default: /* in case a new one is introduced to shock us */
-            return 0;
+    case CURLINFO_TEXT:
+        fprintf(stderr, "== Info: %s", data);
+    default: /* in case a new one is introduced to shock us */
+        return 0;
 
-        case CURLINFO_HEADER_OUT:
-            text = "=> Send header";
-            break;
-        case CURLINFO_DATA_OUT:
-            text = "=> Send data";
-            break;
-        case CURLINFO_SSL_DATA_OUT:
-            text = "=> Send SSL data";
-            break;
-        case CURLINFO_HEADER_IN:
-            text = "<= Recv header";
-            break;
-        case CURLINFO_DATA_IN:
-            text = "<= Recv data";
-            break;
-        case CURLINFO_SSL_DATA_IN:
-            text = "<= Recv SSL data";
-            break;
+    case CURLINFO_HEADER_OUT:
+        text = "=> Send header";
+        break;
+    case CURLINFO_DATA_OUT:
+        text = "=> Send data";
+        break;
+    case CURLINFO_SSL_DATA_OUT:
+        text = "=> Send SSL data";
+        break;
+    case CURLINFO_HEADER_IN:
+        text = "<= Recv header";
+        break;
+    case CURLINFO_DATA_IN:
+        text = "<= Recv data";
+        break;
+    case CURLINFO_SSL_DATA_IN:
+        text = "<= Recv SSL data";
+        break;
     }
 
     dump(text, stderr, (unsigned char *)data, size);
@@ -204,21 +196,17 @@ http_client_t *http_client_new(void)
         return NULL;
 
     client = (http_client_t *)rc_zalloc(sizeof(http_client_t), http_client_destroy);
-    if (!client) {
-        // hive_set_error();
+    if (!client)
         return NULL;
-    }
 
     client->url = curl_url();
     if (!client->url) {
-        // hive_set_error(); out of memory.
         deref(client);
         return NULL;
     }
 
     client->curl = curl_easy_init();
     if (!client->curl) {
-        // hive_set_error(); out of memory.
         deref(client);
         return NULL;
     }
@@ -294,7 +282,7 @@ int http_client_set_method(http_client_t *client, http_method_t method)
         break;
     }
 
-    return __curlcode_to_error(code);
+    return code;
 }
 
 int http_client_set_url(http_client_t *client, const char *url)
@@ -308,7 +296,7 @@ int http_client_set_url(http_client_t *client, const char *url)
     code = curl_url_set(client->url, CURLUPART_URL, url, CURLU_URLENCODE);
     if (code != CURLUE_OK) {
         vlogE("HttpClient: Set url %s error (%d)", url, code);
-        return __curlucode_to_error(code);
+        return code;
     }
 
     return 0;
@@ -325,7 +313,7 @@ int http_client_set_url_escape(http_client_t *client, const char *url)
     code = curl_url_set(client->url, CURLUPART_URL, url, 0);
     if (code != CURLUE_OK) {
         vlogE("HttpClient: Escape url %s error (%d)", url, code);
-        return __curlucode_to_error(code);
+        return code;
     }
 
     return 0;
@@ -341,7 +329,7 @@ int http_client_get_url_escape(http_client_t *client, char **url)
     code = curl_url_get(client->url, CURLUPART_URL, url, 0);
     if (code != CURLUE_OK)  {
         vlogE("HttpClient: Get url from curl error (%d)", code);
-        return  __curlucode_to_error(code);
+        return code;
     }
 
     return 0;
@@ -357,7 +345,7 @@ int http_client_get_scheme(http_client_t *client, char **scheme)
     code = curl_url_get(client->url, CURLUPART_SCHEME, scheme, CURLU_URLDECODE);
     if (code != CURLUE_OK)  {
         vlogE("HttpClient: Get url from curl error (%d)", code);
-        return  __curlucode_to_error(code);
+        return code;
     }
 
     return 0;
@@ -373,7 +361,7 @@ int http_client_get_host(http_client_t *client, char **host)
     code = curl_url_get(client->url, CURLUPART_HOST, host, CURLU_URLDECODE);
     if (code != CURLUE_OK)  {
         vlogE("HttpClient: Get url from curl error (%d)", code);
-        return  __curlucode_to_error(code);
+        return  code;
     }
 
     return 0;
@@ -389,7 +377,7 @@ int http_client_get_port(http_client_t *client, char **port)
     code = curl_url_get(client->url, CURLUPART_PORT, port, CURLU_URLDECODE);
     if (code != CURLUE_OK)  {
         vlogE("HttpClient: Get url from curl error (%d)", code);
-        return  __curlucode_to_error(code);
+        return code;
     }
 
     return 0;
@@ -405,7 +393,7 @@ int http_client_get_path(http_client_t *client, char **path)
     code = curl_url_get(client->url, CURLUPART_PATH, path, CURLU_URLDECODE);
     if (code != CURLUE_OK)  {
         vlogE("HttpClient: Get url from curl error (%d)", code);
-        return  __curlucode_to_error(code);
+        return code;
     }
 
     return 0;
@@ -420,10 +408,8 @@ int http_client_set_path(http_client_t *client, const char *path)
     assert(*path);
 
     code = curl_url_set(client->url, CURLUPART_PATH, path, CURLU_URLENCODE);
-    if (code != CURLUE_OK)  {
-        // TODO;
-        return  __curlucode_to_error(code);
-    }
+    if (code != CURLUE_OK)
+        return code;
 
     return 0;
 }
@@ -444,11 +430,9 @@ int http_client_set_query(http_client_t *client,
     sprintf(query, "%s=%s", name, value);
 
     code = curl_url_set(client->url, CURLUPART_QUERY, query,
-                CURLU_URLENCODE | CURLU_APPENDQUERY);
-    if (code != CURLUE_OK)  {
-        // TODO;
-        return  __curlucode_to_error(code);
-    }
+                        CURLU_URLENCODE | CURLU_APPENDQUERY);
+    if (code != CURLUE_OK)
+        return code;
 
     return 0;
 }
@@ -469,10 +453,8 @@ int http_client_set_header(http_client_t *client,
     sprintf(header, "%s: %s", name, value);
 
     hdr = curl_slist_append(client->hdr, header);
-    if (!hdr) {
-        // TODO;
-        return __curlcode_to_error(CURLE_OUT_OF_MEMORY);
-    }
+    if (!hdr)
+        return CURLE_OUT_OF_MEMORY;
 
     client->hdr = hdr;
     return 0;
@@ -497,10 +479,8 @@ int http_client_set_version(http_client_t *client, http_version_t version)
 
     code = curl_easy_setopt(client->curl, CURLOPT_HTTP_VERSION,
                             curl_http_versions[version]);
-    if (code != CURLE_OK) {
-        // TODO;
-        return __curlcode_to_error(CURLE_OUT_OF_MEMORY);
-    }
+    if (code != CURLE_OK)
+        return CURLE_OUT_OF_MEMORY;
 
     return 0;
 }
@@ -607,9 +587,8 @@ char *http_client_move_response_body(http_client_t *client, size_t *len)
         return NULL;
     }
 
-    if (len) {
+    if (len)
         *len = client->response_body.used;
-    }
     resp = client->response_body.data;
 
     client->response_body.data = NULL;
@@ -649,7 +628,7 @@ int http_client_request(http_client_t *client)
     code = curl_easy_perform(client->curl);
     if (code != CURLE_OK) {
         vlogE("HttpClient: Perform http request error (%d)", code);
-        return __curlcode_to_error(code);
+        return code;
     }
 
     return 0;
@@ -664,10 +643,8 @@ int http_client_get_response_code(http_client_t *client, long *response_code)
 
     code = curl_easy_getinfo(client->curl, CURLINFO_RESPONSE_CODE,
                              response_code);
-    if (code != CURLE_OK) {
-        // TODO;
-        return __curlcode_to_error(code);
-    }
+    if (code != CURLE_OK)
+        return code;
 
     return 0;
 }
@@ -681,11 +658,8 @@ char *http_client_escape(http_client_t *client, const char *data, size_t len)
     assert(len);
 
     escaped_data = curl_easy_escape(client->curl, data, len);
-    if (!escaped_data) {
-        // TODO;
-        //__curlcode_to_error(CURLE_OUT_OF_MEMORY);
+    if (!escaped_data)
         return NULL;
-    }
 
     return escaped_data;
 }
@@ -702,11 +676,8 @@ char *http_client_unescape(http_client_t *client, const char *data, size_t len,
     assert(outlen);
 
     unescaped_data = curl_easy_unescape(client->curl, data, len, &_outlen);
-    if (!unescaped_data) {
-        // TODO;
-        // __curlcode_to_error(CURLE_OUT_OF_MEMORY);
+    if (!unescaped_data)
         return NULL;
-    }
 
     *outlen = (size_t)_outlen;
     return unescaped_data;
