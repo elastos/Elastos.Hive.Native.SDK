@@ -289,15 +289,18 @@ static int onedrive_drive_list_files(HiveDrive *obj, const char *dir_path, char 
         }
 
         next_link = cJSON_GetObjectItemCaseSensitive(resp_part, "@odata.nextLink");
-        cJSON_Delete(resp_part);
-        resp_part = NULL;
         if (next_link && (!cJSON_IsString(next_link) || !*next_link->valuestring)) {
+            cJSON_Delete(resp_part);
+            resp_part = NULL;
             hive_set_error(-1);
             goto error_exit;
         }
 
         if (next_link) {
             rc = snprintf(url, sizeof(url), "%s", next_link->valuestring);
+            cJSON_Delete(resp_part);
+            resp_part = NULL;
+
             if (rc < 0 || rc >= sizeof(url)) {
                 hive_set_error(-1);
                 goto error_exit;
