@@ -22,6 +22,8 @@ typedef enum {
     HTTP_VERSION_2_0
 } http_version_t;
 
+const char *http_client_strerror(int errcode);
+
 /*
  * Http client instance.
  */

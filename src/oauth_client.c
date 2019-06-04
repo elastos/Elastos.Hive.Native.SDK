@@ -182,33 +182,33 @@ static void save_profile(oauth_client_t *cli)
 
 static int perform_token_tsx(oauth_client_t *cli, char *req_body, char **resp_body)
 {
-    http_client_t *http_cli;
+    http_client_t *httpc;
     long resp_code;
     int rc;
 
-    http_cli = http_client_new();
-    if (!http_cli)
+    httpc = http_client_new();
+    if (!httpc)
         return -1;
 
-    http_client_set_url(http_cli, cli->opt.token_url);
-    http_client_set_method(http_cli, HTTP_METHOD_POST);
-    http_client_set_request_body_instant(http_cli, req_body, strlen(req_body));
-    http_client_enable_response_body(http_cli);
+    http_client_set_url(httpc, cli->opt.token_url);
+    http_client_set_method(httpc, HTTP_METHOD_POST);
+    http_client_set_request_body_instant(httpc, req_body, strlen(req_body));
+    http_client_enable_response_body(httpc);
 
-    rc = http_client_request(http_cli);
+    rc = http_client_request(httpc);
     if (rc) {
-        http_client_close(http_cli);
+        http_client_close(httpc);
         return -1;
     }
 
-    rc = http_client_get_response_code(http_cli, &resp_code);
+    rc = http_client_get_response_code(httpc, &resp_code);
     if (rc < 0 && resp_code != 200) {
-        http_client_close(http_cli);
+        http_client_close(httpc);
         return -1;
     }
 
-    *resp_body = http_client_move_response_body(http_cli, NULL);
-    http_client_close(http_cli);
+    *resp_body = http_client_move_response_body(httpc, NULL);
+    http_client_close(httpc);
     if (!*resp_body)
         return -1;
 
@@ -307,7 +307,7 @@ static int refresh_token(oauth_client_t *cli)
     char *resp_body;
     int rc;
     char redirect_url_raw[128];
-    http_client_t *http_cli;
+    http_client_t *httpc;
     char *cli_id;
     char *refresh_token;
     char *redirect_url;
@@ -317,20 +317,20 @@ static int refresh_token(oauth_client_t *cli)
     if (rc < 0 || rc >= sizeof(redirect_url_raw))
         return -1;
 
-    http_cli = http_client_new();
-    if (!http_cli)
+    httpc = http_client_new();
+    if (!httpc)
         return -1;
 
-    cli_id = http_client_escape(http_cli, cli->opt.client_id, strlen(cli->opt.client_id));
+    cli_id = http_client_escape(httpc, cli->opt.client_id, strlen(cli->opt.client_id));
     if (!cli_id) {
-        http_client_close(http_cli);
+        http_client_close(httpc);
         return -1;
     }
 
-    redirect_url = http_client_escape(http_cli, redirect_url_raw, strlen(redirect_url_raw));
+    redirect_url = http_client_escape(httpc, redirect_url_raw, strlen(redirect_url_raw));
     if (!redirect_url) {
         http_client_memory_free(cli_id);
-        http_client_close(http_cli);
+        http_client_close(httpc);
         return -1;
     }
 
@@ -339,9 +339,9 @@ static int refresh_token(oauth_client_t *cli)
         pthread_mutex_unlock(&cli->lock);
         return -1;
     }
-    refresh_token = http_client_escape(http_cli, cli->svr_resp.refresh_token, strlen(cli->svr_resp.refresh_token));
+    refresh_token = http_client_escape(httpc, cli->svr_resp.refresh_token, strlen(cli->svr_resp.refresh_token));
     pthread_mutex_unlock(&cli->lock);
-    http_client_close(http_cli);
+    http_client_close(httpc);
     if (!refresh_token) {
         http_client_memory_free(cli_id);
         http_client_memory_free(redirect_url);
@@ -474,25 +474,25 @@ static int get_auth_code(oauth_client_t *cli)
     sb_Server *server;
     pthread_t tid;
     int rc;
-    http_client_t *http_cli;
+    http_client_t *httpc;
     char buf[512];
     bool svr_finish = false;
     char *url;
 
-    http_cli = http_client_new();
-    if (!http_cli)
+    httpc = http_client_new();
+    if (!httpc)
         return -1;
 
-    http_client_set_url(http_cli, cli->opt.auth_url);
+    http_client_set_url(httpc, cli->opt.auth_url);
 
     rc = snprintf(buf, sizeof(buf), "%s:%s%s",
         cli->opt.redirect_url, cli->opt.redirect_port, cli->opt.redirect_path);
     assert(rc > 0 && rc < sizeof(buf));
 
-    http_client_set_query(http_cli, "client_id", cli->opt.client_id);
-    http_client_set_query(http_cli, "scope", cli->opt.scope);
-    http_client_set_query(http_cli, "redirect_uri", buf);
-    http_client_set_query(http_cli, "response_type", "code");
+    http_client_set_query(httpc, "client_id", cli->opt.client_id);
+    http_client_set_query(httpc, "scope", cli->opt.scope);
+    http_client_set_query(httpc, "redirect_uri", buf);
+    http_client_set_query(httpc, "response_type", "code");
 
     void *args1[] = {cli, &svr_finish};
     memset(&opt, 0, sizeof(opt));
@@ -502,12 +502,12 @@ static int get_auth_code(oauth_client_t *cli)
 
     server = sb_new_server(&opt);
     if (!server) {
-        http_client_close(http_cli);
+        http_client_close(httpc);
         return -1;
     }
 
-    rc = http_client_get_url_escape(http_cli, &url);
-    http_client_close(http_cli);
+    rc = http_client_get_url_escape(httpc, &url);
+    http_client_close(httpc);
     if (rc) {
         sb_close_server(server);
         return -1;
@@ -536,7 +536,7 @@ static int redeem_access_token(oauth_client_t *cli)
     char *resp_body;
     int rc;
     char redirect_url_raw[128];
-    http_client_t *http_cli;
+    http_client_t *httpc;
     char *cli_id;
     char *code;
     char *redirect_url;
@@ -546,27 +546,27 @@ static int redeem_access_token(oauth_client_t *cli)
     if (rc < 0 || rc >= sizeof(redirect_url_raw))
         return -1;
 
-    http_cli = http_client_new();
-    if (!http_cli)
+    httpc = http_client_new();
+    if (!httpc)
         return -1;
 
-    cli_id = http_client_escape(http_cli, cli->opt.client_id, strlen(cli->opt.client_id));
+    cli_id = http_client_escape(httpc, cli->opt.client_id, strlen(cli->opt.client_id));
     if (!cli_id) {
-        http_client_close(http_cli);
+        http_client_close(httpc);
         return -1;
     }
 
-    redirect_url = http_client_escape(http_cli, redirect_url_raw, strlen(redirect_url_raw));
+    redirect_url = http_client_escape(httpc, redirect_url_raw, strlen(redirect_url_raw));
     if (!redirect_url) {
         http_client_memory_free(cli_id);
-        http_client_close(http_cli);
+        http_client_close(httpc);
         return -1;
     }
 
     pthread_mutex_lock(&cli->lock);
-    code = http_client_escape(http_cli, cli->svr_resp.auth_code, strlen(cli->svr_resp.auth_code));
+    code = http_client_escape(httpc, cli->svr_resp.auth_code, strlen(cli->svr_resp.auth_code));
     pthread_mutex_unlock(&cli->lock);
-    http_client_close(http_cli);
+    http_client_close(httpc);
     if (!code) {
         http_client_memory_free(cli_id);
         http_client_memory_free(redirect_url);
