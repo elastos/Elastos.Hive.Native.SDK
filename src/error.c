@@ -41,7 +41,7 @@ int hive_get_error(void)
 void hive_clear_error(void)
 {
 #if defined(_WIN32) || defined(_WIN64) || defined(__linux__)
-    hive_error = ELASUCCESS;
+    hive_error = HIVESUCCESS;
 #elif defined(__APPLE__)
     (void)pthread_setspecific(hive_error, 0);
 #else

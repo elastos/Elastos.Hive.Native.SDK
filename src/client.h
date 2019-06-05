@@ -1,13 +1,19 @@
 #ifndef __HIVE_CLIENT_H__
 #define __HIVE_CLIENT_H__
 
+#include <stdbool.h>
+#include <stdint.h>
+#if defined(_WIN32) || defined(_WIN64)
+#include <winnt.h>
+#endif
+
 #include "ela_hive.h"
 
 enum {
-    RAW          = (int)0,    // The primitive state.
-    LOGINING     = (int)1,    // Being in the middle of logining.
-    LOGINED      = (int)2,    // Already being logined.
-    LOGOUTING    = (int)3,    // Being in the middle of logout.
+    RAW          = (uint32_t)0,    // The primitive state.
+    LOGINING     = (uint32_t)1,    // Being in the middle of logining.
+    LOGINED      = (uint32_t)2,    // Already being logined.
+    LOGOUTING    = (uint32_t)3,    // Being in the middle of logout.
 };
 
 struct HiveClient {
@@ -25,7 +31,13 @@ struct HiveClient {
 
 inline static void hive_set_error(int error) { }
 
-#define _test_and_swap __sync_val_compare_and_swap
+#if defined(_WIN32) || defined(_WIN64)
+#define _test_and_swap(ptr, oldval, newval) \
+    InterlockedCompareExchange(ptr, newval, oldval)
+#else
+#define _test_and_swap(ptr, oldval, newval) \
+    __sync_val_compare_and_swap(ptr, oldval, newval)
+#endif
 
 inline static
 int client_try_login(HiveClient *client)
