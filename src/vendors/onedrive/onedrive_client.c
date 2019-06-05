@@ -7,10 +7,10 @@
 #endif
 
 #include <crystal.h>
-#include <oauth_client.h>
 
+#include "oauth_client.h"
 #include "onedrive_client.h"
-#include "onedrive_common.h"
+#include "onedrive_constants.h"
 #include "onedrive_drive.h"
 #include "http_client.h"
 #include "client.h"
@@ -56,8 +56,8 @@ static int onedrive_client_get_info(HiveClient *base, char **result)
     OneDriveClient *client = (OneDriveClient *)base;
     http_client_t *httpc;
     long resp_code = 0;
-    char *p = NULL;
     char *access_token;
+    char *p = NULL;
     int rc;
 
     assert(client);
@@ -65,18 +65,18 @@ static int onedrive_client_get_info(HiveClient *base, char **result)
 
     rc = oauth_client_get_access_token(client->oauth_client, &access_token);
     if (rc) {
-        hive_set_error(-1);
-        return -1;
+        vlogD("Hive: Get access token to login for onedrive error");
+        return HIVE_GENERAL_ERROR(-1);
     }
 
     httpc = http_client_new();
     if (!httpc) {
         free(access_token);
-        hive_set_error(-1);
-        return -1;
+        // TODO: rc
+        return rc;
     }
 
-    http_client_set_url(httpc, ONEDRV_ME);
+    http_client_set_url(httpc, URL_API);
     http_client_set_method(httpc, HTTP_METHOD_GET);
     http_client_set_header(httpc, "Content-Type", "application/json");
     http_client_set_header(httpc, "Authorization", access_token);
@@ -85,20 +85,24 @@ static int onedrive_client_get_info(HiveClient *base, char **result)
 
     rc = http_client_request(httpc);
     if (rc < 0) {
-        hive_set_error(-1);
+        // TODO: rc
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc < 0) {
-        hive_set_error(-1);
+        // TODO: rc
+        goto error_exit;
+    }
+
+    if (resp_code == 401) {
+        oauth_client_set_expired(client->oauth_client);
+        // TODO: rc;
         goto error_exit;
     }
 
     if (resp_code != 200) {
-        if (resp_code == 401)
-            oauth_client_set_expired(client->oauth_client);
-        hive_set_error(-1);
+        // TODO: rc;
         goto error_exit;
     }
 
@@ -106,8 +110,8 @@ static int onedrive_client_get_info(HiveClient *base, char **result)
     http_client_close(httpc);
 
     if (!p) {
-        hive_set_error(-1);
-        return -1;
+        // TODO: rc;
+        return rc;
     }
 
     *result = p;
@@ -115,7 +119,7 @@ static int onedrive_client_get_info(HiveClient *base, char **result)
 
 error_exit:
     http_client_close(httpc);
-    return -1;
+    return rc;
 }
 
 static int onedrive_client_list_drives(HiveClient *base, char **result)
@@ -123,29 +127,28 @@ static int onedrive_client_list_drives(HiveClient *base, char **result)
     OneDriveClient *client = (OneDriveClient *)base;
     char url[ONEDRIVE_MAX_URL_LENGTH] = {0};
     http_client_t *httpc;
+    char *access_token;
     long resp_code = 0;
     char *p;
     int rc;
-    char *access_token;
 
     assert(client);
     assert(result);
 
-    snprintf(url, sizeof(url), "%s/drives", ONEDRV_ME);
-
     rc = oauth_client_get_access_token(client->oauth_client, &access_token);
     if (rc) {
-        hive_set_error(-1);
-        return -1;
+        // TODO: rc
+        return rc;
     }
 
     httpc = http_client_new();
     if (!httpc) {
         free(access_token);
-        hive_set_error(-1);
-        return -1;
+        // TODO: rc;
+        return rc;
     }
 
+    snprintf(url, sizeof(url), "%s/drives", URL_API);
     http_client_set_url_escape(httpc, url);
     http_client_set_method(httpc, HTTP_METHOD_GET);
     http_client_enable_response_body(httpc);
@@ -155,20 +158,19 @@ static int onedrive_client_list_drives(HiveClient *base, char **result)
 
     rc = http_client_request(httpc);
     if (rc < 0) {
-        hive_set_error(-1);
+        // TODO: rc;
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc < 0) {
-        hive_set_error(-1);
+        // TODO: rc;
         goto error_exit;
     }
 
-    if (resp_code != 200) {
-        if (resp_code == 401)
-            oauth_client_set_expired(client->oauth_client);
-        hive_set_error(-1);
+    if (resp_code == 401) {
+        oauth_client_set_expired(client->oauth_client);
+        // TODO: rc;
         goto error_exit;
     }
 
@@ -176,8 +178,8 @@ static int onedrive_client_list_drives(HiveClient *base, char **result)
     http_client_close(httpc);
 
     if (!p) {
-        hive_set_error(-1);
-        return -1;
+        // TODO: rc;
+        return rc;
     }
 
     *result = p;
@@ -185,22 +187,22 @@ static int onedrive_client_list_drives(HiveClient *base, char **result)
 
 error_exit:
     http_client_close(httpc);
-    return -1;
+    return rc;
 }
 
 static int onedrive_client_drive_open(HiveClient *base, HiveDrive **drive)
 {
     OneDriveClient *client = (OneDriveClient *)base;
     HiveDrive *tmp;
-    int rc;
+    int rc = -1;
 
     assert(client);
     assert(client->oauth_client);
 
-    tmp = onedrive_drive_open(client->oauth_client, "default");
-    if (!tmp) {
-        // TODO;
-        return -1;
+    rc = onedrive_drive_open(client->oauth_client, "default", &tmp);
+    if (rc < 0) {
+        // TODO: rc;
+        return rc;
     }
 
     *drive = tmp;
@@ -316,8 +318,8 @@ int onedrive_client_new(const HiveOptions *options, HiveClient **client)
         goto error_exit;
     }
 
-    oauth_opt.auth_url        = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
-    oauth_opt.token_url       = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
+    oauth_opt.auth_url        = URL_OAUTH METHOD_AUTHORIZE;
+    oauth_opt.token_url       = URL_OAUTH METHOD_TOKEN;
     oauth_opt.scope           = opts->scope;
     oauth_opt.client_id       = opts->client_id;
     oauth_opt.redirect_url    = redirect_url;

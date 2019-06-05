@@ -1,7 +1,6 @@
 #ifndef __HIVE_CLIENT_H__
 #define __HIVE_CLIENT_H__
 
-#include <stdbool.h>
 #include "ela_hive.h"
 
 enum {
@@ -24,16 +23,16 @@ struct HiveClient {
     int (*invalidate_credential)(HiveClient *);
 };
 
-HIVE_API
-int hive_client_invalidate_credential(HiveClient *);
-
 inline static void hive_set_error(int error) { }
 
-inline static int client_try_login(HiveClient *client)
+#define _test_and_swap __sync_val_compare_and_swap
+
+inline static
+int client_try_login(HiveClient *client)
 {
     int rc;
 
-    rc = __sync_val_compare_and_swap(&client->state, RAW, LOGINING);
+    rc = _test_and_swap(&client->state, RAW, LOGINING);
     switch(rc) {
     case RAW:
         rc = 0; // need to proceed the login routine.
@@ -53,11 +52,12 @@ inline static int client_try_login(HiveClient *client)
     return rc;
 }
 
-inline static int client_try_logout(HiveClient *client)
+inline static
+int client_try_logout(HiveClient *client)
 {
     int rc;
 
-    rc = __sync_val_compare_and_swap(&client->state, LOGINED, LOGOUTING);
+    rc = _test_and_swap(&client->state, LOGINED, LOGOUTING);
     switch(rc) {
     case RAW:
         rc = 1;
@@ -77,11 +77,12 @@ inline static int client_try_logout(HiveClient *client)
     return rc;
 }
 
-inline static bool is_client_ready(HiveClient *client)
+inline static
+bool is_client_ready(HiveClient *client)
 {
     int rc;
 
-    rc = __sync_val_compare_and_swap(&client->state, LOGINED, LOGINED);
+    rc = _test_and_swap(&client->state, LOGINED, LOGINED);
     return (rc == LOGINED);
 }
 

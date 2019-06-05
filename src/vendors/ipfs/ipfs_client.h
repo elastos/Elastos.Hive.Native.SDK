@@ -1,5 +1,5 @@
-#ifndef __HIVE_IPFS_CLIENT_H__
-#define __HIVE_IPFS_CLIENT_H__
+#ifndef __IPFS_CLIENT_H__
+#define __IPFS_CLIENT_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,4 +22,4 @@ int ipfs_client_synchronize(HiveClient *);
 }
 #endif
 
-#endif // __HIVE_IPFS_CLIENT_H__
+#endif // __IPFS_CLIENT_H__

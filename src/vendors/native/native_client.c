@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#include "native_client.h"
+#include "ela_hive.h"
 
 int native_client_new(const HiveOptions *options, HiveClient **client)
 {
