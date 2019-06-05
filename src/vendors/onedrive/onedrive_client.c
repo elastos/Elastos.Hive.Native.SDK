@@ -66,7 +66,7 @@ static int onedrive_client_get_info(HiveClient *base, char **result)
     rc = oauth_client_get_access_token(client->oauth_client, &access_token);
     if (rc) {
         vlogD("Hive: Get access token to login for onedrive error");
-        //return ELA_GENERAL_ERROR(-1);
+        //return HIVE_GENERAL_ERROR(-1);
         return rc;
     }
 
