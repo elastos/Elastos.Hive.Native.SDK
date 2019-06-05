@@ -24,7 +24,7 @@ typedef struct IPFSClient {
 #define CLUSTER_API_PORT (9094)
 #define NODE_API_PORT (9095)
 
-static int ipfs_client_get_info(HiveClient *obj, char **result);
+static int ipfs_client_get_info(HiveClient *base, char **result);
 
 static
 int ipfs_client_resolve(HiveClient *base, const char *peerid, char **result)
@@ -137,16 +137,11 @@ error_exit:
 
 static int ipfs_client_synchronize_intl(IPFSClient *client)
 {
-
-    char url[MAXPATHLEN + 1];
-    long resp_code;
     char *resp;
     cJSON *json = NULL;
     cJSON *peer_id;
     cJSON *hash;
-    http_client_t *http_client = NULL;
     int rc;
-    int ret = -1;
 
     rc = ipfs_client_get_info((HiveClient *)client, &resp);
     if (rc)
@@ -179,13 +174,11 @@ static int ipfs_client_synchronize_intl(IPFSClient *client)
     if (rc < 0)
         goto end;
 
-    ret = 0;
+    rc = 0;
 end:
     if (json)
         cJSON_Delete(json);
-    if (http_client)
-        http_client_close(http_client);
-    return ret;
+    return rc;
 }
 
 int ipfs_client_synchronize(HiveClient *base)

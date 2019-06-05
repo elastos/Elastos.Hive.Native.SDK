@@ -195,7 +195,7 @@ static int onedrive_client_drive_open(HiveClient *base, HiveDrive **drive)
 {
     OneDriveClient *client = (OneDriveClient *)base;
     HiveDrive *tmp;
-    int rc = -1;
+    int rc;
 
     assert(client);
     assert(client->oauth_client);
