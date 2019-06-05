@@ -140,6 +140,7 @@ int hive_drive_copy_file(HiveDrive *, const char *src_path, const char *dest_pat
 HIVE_API
 int hive_drive_delete_file(HiveDrive *, const char *path);
 
+<<<<<<< Updated upstream
 /******************************************************************************
  * Error handling
  *****************************************************************************/
@@ -398,4 +399,4 @@ char *ela_get_strerror(int errnum, char *buf, size_t len);
 #pragma GCC diagnostic pop
 #endif
 
-#endif // __ELASTOS_HIVE_H__
+#endif // __ELA_HIVE_H__

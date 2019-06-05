@@ -1,11 +1,11 @@
-#ifndef __HIVE_NATIVE_CLIENT_H__
-#define __HIVE_NATIVE_CLIENT_H__
+#ifndef __NATIVE_CLIENT_H__
+#define __NATIVE_CLIENT_H__
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "ela_hive.h"
+//#include "ela_hive.h"
 
 int native_client_new(const HiveOptions *, HiveClient **);
 
@@ -13,4 +13,4 @@ int native_client_new(const HiveOptions *, HiveClient **);
 }
 #endif
 
-#endif // __HIVE_NATIVE_CLIENT_H__
+#endif // __NATIVE_CLIENT_H__

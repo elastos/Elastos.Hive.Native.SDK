@@ -1,6 +1,5 @@
 #include <stdlib.h>
 #include <assert.h>
-
 #include <crystal.h>
 
 #include "client.h"

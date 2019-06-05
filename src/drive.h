@@ -16,4 +16,4 @@ struct HiveDrive {
     void (*close)       (HiveDrive *);
 };
 
-#endif // __DRIVE_H__
+#endif // __HIVE_DRIVE_H__
