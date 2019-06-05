@@ -140,7 +140,6 @@ int hive_drive_copy_file(HiveDrive *, const char *src_path, const char *dest_pat
 HIVE_API
 int hive_drive_delete_file(HiveDrive *, const char *path);
 
-<<<<<<< Updated upstream
 /******************************************************************************
  * Error handling
  *****************************************************************************/
