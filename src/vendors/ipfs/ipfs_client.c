@@ -431,7 +431,7 @@ int ipfs_client_new(const HiveOptions * options, HiveClient **client)
     IPFSOptions *opts = (IPFSOptions *)options;
     IPFSClient *tmp;
     int rc = -1;
-    int i;
+    size_t i;
 
     assert(client);
 

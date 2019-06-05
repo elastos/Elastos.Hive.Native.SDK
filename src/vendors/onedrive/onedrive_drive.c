@@ -379,11 +379,10 @@ error_exit:
     return -1;
 }
 
-static char *create_mkir_request_body(const char *path)
+static char *create_mkdir_request_body(const char *path)
 {
     cJSON *body;
     char  *body_str;
-    char name[256] = {0};
     char *p;
 
     assert(path);
@@ -392,7 +391,7 @@ static char *create_mkir_request_body(const char *path)
     if (!body)
         return NULL;
 
-    p = basename_r(path, name);
+    p = basename((char *)path);
     if (!cJSON_AddStringToObject(body, "name", p))
         goto error_exit;
 
@@ -472,7 +471,7 @@ static int onedrive_drive_mkdir(HiveDrive *base, const char *path)
         goto error_exit;
     }
 
-    body_str = create_mkir_request_body(path);
+    body_str = create_mkdir_request_body(path);
     if (!body_str) {
         free(access_token);
         // TODO: rc;

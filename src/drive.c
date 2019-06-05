@@ -1,7 +1,9 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <crystal.h>
+#ifdef HAVE_SYS_PARAM_H
 #include <sys/param.h>
+#endif
 
 #include "drive.h"
 #include "client.h"
