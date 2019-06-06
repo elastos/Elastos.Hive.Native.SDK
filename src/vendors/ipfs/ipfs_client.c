@@ -24,7 +24,7 @@ typedef struct IPFSClient {
 #define CLUSTER_API_PORT (9094)
 #define NODE_API_PORT (9095)
 
-static int ipfs_client_get_info(HiveClient *base, char **result);
+static int ipfs_client_get_info_internal(HiveClient *base, char **result);
 
 static
 int ipfs_client_resolve(HiveClient *base, const char *peerid, char **result)
@@ -143,7 +143,7 @@ static int ipfs_client_synchronize_intl(IPFSClient *client)
     cJSON *hash;
     int rc;
 
-    rc = ipfs_client_get_info((HiveClient *)client, &resp);
+    rc = ipfs_client_get_info_internal((HiveClient *)client, &resp);
     if (rc)
         goto end;
 
@@ -219,7 +219,7 @@ static int ipfs_client_logout(HiveClient *base)
     return 0;
 }
 
-static int ipfs_client_get_info(HiveClient *base, char **result)
+static int ipfs_client_get_info_internal(HiveClient *base, char **result)
 {
     IPFSClient *client = (IPFSClient *)base;
     char url[MAXPATHLEN + 1];
@@ -274,6 +274,35 @@ static int ipfs_client_get_info(HiveClient *base, char **result)
 error_exit:
     http_client_close(httpc);
     return -1;
+}
+
+static int ipfs_client_get_info(HiveClient *base, HiveClientInfo **result)
+{
+    IPFSClient *client = (IPFSClient *)base;
+    HiveClientInfo *info;
+
+    assert(client);
+    assert(result);
+
+    info = calloc(1, sizeof(HiveClientInfo));
+    if (!info)
+        return -1;
+
+    info->user_id = strdup(client->uid);
+    info->display_name = strdup("");
+    info->email = strdup("");
+    info->phone_number = strdup("");
+    info->region = strdup("");
+
+    if (!info->user_id || !info->display_name ||
+        !info->email   || !info->phone_number ||
+        !info->region) {
+        hive_client_info_free(info);
+        return -1;
+    }
+
+    *result = info;
+    return 0;
 }
 
 static int ipfs_client_list_drives(HiveClient *base, char **result)
@@ -479,7 +508,7 @@ int ipfs_client_new(const HiveOptions * options, HiveClient **client)
 
     tmp->base.invalidate_credential = &ipfs_client_invalidate_credential;
 
-    rc = ipfs_client_get_info(&tmp->base, NULL);
+    rc = ipfs_client_get_info_internal(&tmp->base, NULL);
     if (rc) {
         deref(tmp);
         return rc;

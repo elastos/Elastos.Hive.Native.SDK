@@ -43,6 +43,43 @@ struct HiveOAuthInfo {
     const char *redirect_url;
 };
 
+/**
+ * \~English
+ * A structure representing the hive client associated user's information.
+ */
+struct HiveClientInfo {
+    /**
+     * \~English
+     * User Id.
+     */
+    char *user_id;
+
+    /**
+     * \~English
+     * User's display name.
+     */
+    char *display_name;
+
+    /**
+     * \~English
+     * User's email address.
+     */
+    char *email;
+
+    /**
+     * \~English
+     * User's phone number.
+     */
+    char *phone_number;
+
+
+    /**
+     * \~English
+     * User's region.
+     */
+    char *region;
+};
+
 enum HiveDriveType {
     HiveDriveType_Native    = 0x0,
     HiveDriveType_IPFS      = 0x01,
@@ -200,8 +237,7 @@ int hive_client_logout(HiveClient *client);
 
 /**
  * \~English
- * Get @client associated user's information. The result is a json string
- * (not necessarily null-terminated) passed to @result.
+ * Get @client associated user's information. The result is passed to @result.
  *
  * This function is effective only when a user is associated with the
  * @client.
@@ -209,16 +245,26 @@ int hive_client_logout(HiveClient *client);
  * @param
  *      client      [in] A handle identifying the Hive client instance.
  * @param
- *      result      [out] After the call, *result points to the buffer
- *                        holding the result. Call free() to release
- *                        the buffer after use.
+ *      result      [out] After the call, *result points to a  HiveClientInfo
+ *                        instance. Call hive_client_info_free() to release
+ *                        the instance after use.
  *
  * @return
  *      If no error occurs, return 0. Otherwise, return -1, and a specific
  *      error code can be retrieved by calling hive_get_error().
  */
 HIVE_API
-int hive_client_get_info(HiveClient *client, char **result);
+int hive_client_get_info(HiveClient *client, HiveClientInfo **result);
+
+/**
+ * \~English
+ * Release HiveClientInfo instance.
+ *
+ * @param
+ *      info        [in] A handle identifying the Hive client info instance.
+ */
+HIVE_API
+void hive_client_info_free(HiveClientInfo *info);
 
 /******************************************************************************
  * Drive APIs
