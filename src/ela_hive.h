@@ -32,15 +32,20 @@ extern "C" {
     #define HIVE_API
 #endif
 
+/******************************************************************************
+ * Client APIs
+ *****************************************************************************/
+
 typedef struct HiveClient       HiveClient;
 typedef struct HiveClientInfo   HiveClientInfo;
-typedef struct HiveDrive        HiveDrive;
-typedef struct HiveDriveInfo    HiveDriveInfo;
 
-struct HiveOAuthInfo {
-    const char *client_id;
-    const char *scope;
-    const char *redirect_url;
+enum HiveDriveType {
+    HiveDriveType_Native    = 0x0,
+    HiveDriveType_IPFS      = 0x01,
+
+    HiveDriveType_OneDrive  = 0x10,
+    HiveDriveType_ownCloud  = 0x51,
+    HiveDriveType_Butt      = 0x99
 };
 
 /**
@@ -72,26 +77,12 @@ struct HiveClientInfo {
      */
     char *phone_number;
 
-
     /**
      * \~English
      * User's region.
      */
     char *region;
 };
-
-enum HiveDriveType {
-    HiveDriveType_Native    = 0x0,
-    HiveDriveType_IPFS      = 0x01,
-
-    HiveDriveType_OneDrive  = 0x10,
-    HiveDriveType_ownCloud  = 0x51,
-    HiveDriveType_Butt      = 0x99
-};
-
-/******************************************************************************
- * Client APIs
- *****************************************************************************/
 
 /**
  * \~English
@@ -270,6 +261,21 @@ void hive_client_info_free(HiveClientInfo *info);
  * Drive APIs
  *****************************************************************************/
 
+typedef struct HiveDrive        HiveDrive;
+typedef struct HiveDriveInfo    HiveDriveInfo;
+
+/**
+ * \~English
+ * A structure representing the hive drive information.
+ */
+struct HiveDriveInfo {
+    /**
+     * \~English
+     * Drive Id.
+     */
+    char *drive_id;
+};
+
 /**
  * \~English
  *
@@ -309,8 +315,7 @@ int hive_drive_close(HiveDrive *drive);
 
 /**
  * \~English
- * Get @drive's information. The result is a json string(not necessarily
- * null-terminated) passed to @result.
+ * Get @drive's information. The result is passed to @result.
  *
  * This function is effective only when a user is associated with the
  * client generating the @drive.
@@ -318,16 +323,26 @@ int hive_drive_close(HiveDrive *drive);
  * @param
  *      drive       [in] A handle identifying the Hive drive instance.
  * @param
- *      result      [out] After the call, *result points to the buffer
- *                        holding the result. Call free() to release
- *                        the buffer after use.
+ *      result      [out] After the call, *result points to an instance
+ *                        of HiveDriveInfo. Call free() to release the
+ *                        instance after use.
  *
  * @return
  *      If no error occurs, return 0. Otherwise, return -1, and a specific
  *      error code can be retrieved by calling hive_get_error().
  */
 HIVE_API
-int hive_drive_get_info(HiveDrive *drive, char **result);
+int hive_drive_get_info(HiveDrive *drive, HiveDriveInfo **result);
+
+/**
+ * \~English
+ * Release HiveDriveInfo instance.
+ *
+ * @param
+ *      info        [in] A handle identifying the Hive drive info instance.
+ */
+HIVE_API
+void hive_drive_info_free(HiveDriveInfo *info);
 
 /**
  * \~English

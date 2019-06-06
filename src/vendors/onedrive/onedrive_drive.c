@@ -31,8 +31,49 @@ typedef struct OneDriveDrive {
     char drv_url[0];
 } OneDriveDrive ;
 
+static int onedrive_drive_decode_drive_info(const char *info_str,
+                                            HiveDriveInfo **result)
+{
+#define move(dst, src) \
+    do {               \
+        (dst) = (src); \
+        (src) = NULL;  \
+    } while (0)
+
+    cJSON *json;
+    cJSON *id;
+    HiveDriveInfo *info;
+
+    assert(info_str);
+    assert(result);
+
+    json = cJSON_Parse(info_str);
+    if (!json)
+        return -1;
+
+    id = cJSON_GetObjectItemCaseSensitive(json, "id");
+    if (!cJSON_IsString(id) || !id->valuestring || !*id->valuestring) {
+        cJSON_Delete(json);
+        return -1;
+    }
+
+    info = malloc(sizeof(HiveDriveInfo));
+    if (!info) {
+        cJSON_Delete(json);
+        return -1;
+    }
+
+    move(info->drive_id, id->valuestring);
+
+    cJSON_Delete(json);
+    *result = info;
+    return 0;
+
+#undef move
+}
+
 static
-int onedrive_drive_get_info(HiveDrive *base, char **result)
+int onedrive_drive_get_info(HiveDrive *base, HiveDriveInfo **result)
 {
     OneDriveDrive *drive = (OneDriveDrive *)base;
     http_client_t *httpc;
@@ -95,6 +136,11 @@ int onedrive_drive_get_info(HiveDrive *base, char **result)
         // TODO: rc;
         return rc;
     }
+
+    rc = onedrive_drive_decode_drive_info(p, result);
+    free(p);
+    if (rc)
+        return -1;
 
     return 0;
 

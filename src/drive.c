@@ -8,7 +8,7 @@
 #include "drive.h"
 #include "client.h"
 
-int hive_drive_get_info(HiveDrive *drive, char **result)
+int hive_drive_get_info(HiveDrive *drive, HiveDriveInfo **result)
 {
     int rc;
 
@@ -27,6 +27,22 @@ int hive_drive_get_info(HiveDrive *drive, char **result)
     deref(drive);
 
     return rc;
+}
+
+void hive_drive_info_free(HiveDriveInfo *info)
+{
+#define FREE(ptr)           \
+    do {                    \
+        if (ptr) free(ptr); \
+    } while (0)
+
+    if (!info)
+        return;
+
+    FREE(info->drive_id);
+
+    free(info);
+#undef FREE
 }
 
 int hive_drive_file_stat(HiveDrive *drive, const char *path, char **result)
