@@ -13,23 +13,23 @@ extern "C" {
 #include <sys/types.h>
 
 #if defined(HIVE_STATIC)
-#define HIVE_API
+    #define HIVE_API
 #elif defined(HIVE_DYNAMIC)
-#ifdef HIVE_BUILD
-#if defined(_WIN32) || defined(_WIN64)
-#define HIVE_API __declspec(dllexport)
-#else
-#define HIVE_API __attribute__((visibility("default")))
-#endif
-#else
-#if defined(_WIN32) || defined(_WIN64)
-      #define HIVE_API __declspec(dllimport)
+    #ifdef HIVE_BUILD
+        #if defined(_WIN32) || defined(_WIN64)
+            #define HIVE_API __declspec(dllexport)
+        #else
+            #define HIVE_API __attribute__((visibility("default")))
+        #endif
     #else
-      #define HIVE_API
+        #if defined(_WIN32) || defined(_WIN64)
+            #define HIVE_API __declspec(dllimport)
+        #else
+            #define HIVE_API
+        #endif
     #endif
-#endif
 #else
-#define HIVE_API
+    #define HIVE_API
 #endif
 
 typedef struct HiveClient       HiveClient;
@@ -52,18 +52,67 @@ enum HiveDriveType {
     HiveDriveType_Butt      = 0x99
 };
 
+/******************************************************************************
+ * Client APIs
+ *****************************************************************************/
+
+/**
+ * \~English
+ * The common options which clients of all types share.
+ */
 typedef struct HiveOptions {
+    /**
+     * \~English
+     * The path to a directory where all client associating data stores.
+     */
     char *persistent_location;
-    int  drive_type;
+    /**
+     * \~English
+     * Specifies the backend type of the client.
+     */
+    int drive_type;
 } HiveOptions;
 
+/**
+ * \~English
+ * The OneDrive client options.
+ */
 typedef struct OneDriveOptions {
+    /**
+     * \~English
+     * Common options.
+     */
     HiveOptions base;
 
+    /**
+     * \~English
+     * The Client Id OneDrive assigns to the client.
+     */
     const char *client_id;
+    /**
+     * \~English
+     * The scope the client acquires from the delegated user. Drive and
+     * file reading apis require corresponding read permissions; Drive and
+     * file writing apis require corresponding write permissions;
+     * hive_client_get_info() requires User.Read scope.
+     */
     const char *scope;
+    /**
+     * \~English
+     * The redirect URL through which the client gets the authorization code.
+     */
     const char *redirect_url;
 
+    /**
+     * \~English
+     * The Callback to open the authorization page.
+     * @param
+     *      request_url     [in] The URL of the authorization page.
+     *
+     * @return
+     *      On successfully opening the page, return 0. Otherwise, return
+     *      non-zero.
+     */
     int (*grant_authorize)(const char *request_url);
 } OneDriveOptions;
 
@@ -76,12 +125,17 @@ typedef struct IPFSOptions {
 } IPFSOptions;
 
 /**
-* \~English
- * Create a new hive client instance to the specific drive.
+ * \~English
+ * Create a new hive client instance to the specific backend. If the data
+ * of a former existing client instance exists in @options::persistent_location,
+ * the client instance is restored. Otherwise, a fresh new client instance
+ * is returned, no user is associated with the client.
+ *
  * All other hive APIs should be called after having client instance.
  *
  * @param
- *      options     [in] A pointer to a valid HiveOptions structure.
+ *      options     [in] A pointer to a valid Options structure of
+ *                       specific backend.
  *
  * @return
  *      If no error occurs, return the pointer of Hive client instance.
@@ -100,45 +154,263 @@ HiveClient *hive_client_new(const HiveOptions *options);
  *
  * @param
  *      client      [in] A handle identifying the Hive client instance.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
  */
 HIVE_API
 int hive_client_close(HiveClient *client);
 
+/**
+ * \~English
+ * Associate a user with the @client. During the process, the user
+ * delegates to the @client.
+ *
+ * This function is effective only when no user is associated with the
+ * @client.
+ *
+ * @param
+ *      client      [in] A handle identifying the Hive client instance.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 int hive_client_login(HiveClient *client);
 
+/**
+ * \~English
+ * Dissociate the user from the @client. All client's data in persistent
+ * location is deleted.
+ *
+ * This function is effective only when a user is associated with the
+ * @client.
+ *
+ * @param
+ *      client      [in] A handle identifying the Hive client instance.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 int hive_client_logout(HiveClient *client);
 
+/**
+ * \~English
+ * Get @client associated user's information. The result is a json string
+ * (not necessarily null-terminated) passed to @result.
+ *
+ * This function is effective only when a user is associated with the
+ * @client.
+ *
+ * @param
+ *      client      [in] A handle identifying the Hive client instance.
+ * @param
+ *      result      [out] After the call, *result points to the buffer
+ *                        holding the result. Call free() to release
+ *                        the buffer after use.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 int hive_client_get_info(HiveClient *client, char **result);
 
+/******************************************************************************
+ * Drive APIs
+ *****************************************************************************/
+
+/**
+ * \~English
+ *
+ * Create a new Hive drive instance representing the default drive of @client's
+ * associating user.
+ *
+ * This function is effective only when a user is associated with the
+ * @client.
+ *
+ * @param
+ *      client      [in] A handle identifying the Hive client instance.
+ *
+ * @return
+ *      If no error occurs, return the pointer of Hive drive instance.
+ *      Otherwise, return NULL, and a specific error code can be
+ *      retrieved by calling hive_get_error().
+ */
 HIVE_API
 HiveDrive *hive_drive_open(HiveClient *client);
 
+/**
+ * \~English
+ * Destroy all associated resources with the Hive drive instance.
+ *
+ * After calling the function, the client pointer becomes invalid.
+ * No other functions should be called.
+ *
+ * @param
+ *      drive      [in] A handle identifying the Hive drive instance.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
-int hive_drive_close(HiveDrive *client);
+int hive_drive_close(HiveDrive *drive);
 
+/**
+ * \~English
+ * Get @drive's information. The result is a json string(not necessarily
+ * null-terminated) passed to @result.
+ *
+ * This function is effective only when a user is associated with the
+ * client generating the @drive.
+ *
+ * @param
+ *      drive       [in] A handle identifying the Hive drive instance.
+ * @param
+ *      result      [out] After the call, *result points to the buffer
+ *                        holding the result. Call free() to release
+ *                        the buffer after use.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
-int hive_drive_get_info(HiveDrive *, char **result);
+int hive_drive_get_info(HiveDrive *drive, char **result);
 
+/**
+ * \~English
+ * Get status of the file specified by @file_path in @drive. The result is
+ * a json string(not necessarily null-terminated) passed to @result.
+ *
+ * This function is effective only when a user is associated with the
+ * client generating the @drive.
+ *
+ * @param
+ *      drive      [in] A handle identifying the Hive client instance.
+ * @param
+ *      file_path  [in] The absolute path to a file in @drive.
+ * @param
+ *      result     [out] After the call, *result points to the buffer
+ *                       holding the result. Call free() to release
+ *                       the buffer after use.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
-int hive_drive_file_stat(HiveDrive *, const char *file_path, char **result);
+int hive_drive_file_stat(HiveDrive *drive, const char *file_path, char **result);
 
+/**
+ * \~English
+ * List files under the directory specified by @dir_path in @drive. The
+ * result is a json string(not necessarily null-terminated) passed to @result.
+ *
+ * This function is effective only when a user is associated with the
+ * client generating the @drive.
+ *
+ * @param
+ *      drive      [in] A handle identifying the Hive client instance.
+ * @param
+ *      dir_path   [in] The absolute path to a directory in @drive.
+ * @param
+ *      result     [out] After the call, *result points to the buffer
+ *                       holding the result. Call free() to release
+ *                       the buffer after use.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
-int hive_drive_list_files(HiveDrive *, const char *dir_path, char **result);
+int hive_drive_list_files(HiveDrive *drive, const char *dir_path, char **result);
 
+/**
+ * \~English
+ * Create a directory specified by @path in @drive. The result is
+ * a json string(not necessarily null-terminated) passed to @result.
+ *
+ * This function is effective only when a user is associated with the
+ * client generating the @drive.
+ *
+ * @param
+ *      drive      [in] A handle identifying the Hive client instance.
+ * @param
+ *      path       [in] The absolute path to a directory in @drive.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
-int hive_drive_mkdir(HiveDrive *, const char *path);
+int hive_drive_mkdir(HiveDrive *drive, const char *path);
 
+/**
+ * \~English
+ * Move the file specified by @old to the new path @new in @drive.
+ *
+ * This function is effective only when a user is associated with the
+ * client generating the @drive.
+ *
+ * @param
+ *      drive      [in] A handle identifying the Hive client instance.
+ * @param
+ *      old        [in] The absolute path to a file in @drive.
+ * @param
+ *      new        [in] The absolute path to a file in @drive.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
-int hive_drive_move_file(HiveDrive *, const char *old, const char *new);
+int hive_drive_move_file(HiveDrive *drive, const char *old, const char *new);
 
+/**
+ * \~English
+ * Copy the file specified by @src_path to path specified by @dest_path in @drive.
+ *
+ * This function is effective only when a user is associated with the
+ * client generating the @drive.
+ *
+ * @param
+ *      drive      [in] A handle identifying the Hive client instance.
+ * @param
+ *      src_path   [in] The absolute path to a file in @drive.
+ * @param
+ *      dest_path  [in] The absolute path to a file in @drive.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
-int hive_drive_copy_file(HiveDrive *, const char *src_path, const char *dest_path);
+int hive_drive_copy_file(HiveDrive *drive, const char *src_path, const char *dest_path);
 
+/**
+ * \~English
+ * Delete the file specified by @path in @drive.
+ *
+ * This function is effective only when a user is associated with the
+ * client generating the @drive.
+ *
+ * @param
+ *      drive      [in] A handle identifying the Hive client instance.
+ * @param
+ *      path       [in] The absolute path to a file in @drive.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
-int hive_drive_delete_file(HiveDrive *, const char *path);
+int hive_drive_delete_file(HiveDrive *drive, const char *path);
 
 /******************************************************************************
  * Error handling
