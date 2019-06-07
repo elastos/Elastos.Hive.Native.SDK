@@ -276,32 +276,34 @@ error_exit:
     return -1;
 }
 
-static int ipfs_client_get_info(HiveClient *base, HiveClientInfo **result)
+static int ipfs_client_get_info(HiveClient *base, HiveClientInfo *result)
 {
     IPFSClient *client = (IPFSClient *)base;
-    HiveClientInfo *info;
+    int rc;
 
     assert(client);
     assert(result);
 
-    info = calloc(1, sizeof(HiveClientInfo));
-    if (!info)
+    rc = snprintf(result->user_id, sizeof(result->user_id), "%s", client->uid);
+    if (rc < 0 || rc >= sizeof(result->user_id))
         return -1;
 
-    info->user_id = strdup(client->uid);
-    info->display_name = strdup("");
-    info->email = strdup("");
-    info->phone_number = strdup("");
-    info->region = strdup("");
-
-    if (!info->user_id || !info->display_name ||
-        !info->email   || !info->phone_number ||
-        !info->region) {
-        hive_client_info_free(info);
+    rc = snprintf(result->display_name, sizeof(result->display_name), "");
+    if (rc < 0 || rc >= sizeof(result->display_name))
         return -1;
-    }
 
-    *result = info;
+    rc = snprintf(result->email, sizeof(result->email), "");
+    if (rc < 0 || rc >= sizeof(result->email))
+        return -1;
+
+    rc = snprintf(result->phone_number, sizeof(result->phone_number), "");
+    if (rc < 0 || rc >= sizeof(result->phone_number))
+        return -1;
+
+    rc = snprintf(result->region, sizeof(result->region), "");
+    if (rc < 0 || rc >= sizeof(result->region))
+        return -1;
+
     return 0;
 }
 

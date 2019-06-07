@@ -39,14 +39,71 @@ extern "C" {
 typedef struct HiveClient       HiveClient;
 typedef struct HiveClientInfo   HiveClientInfo;
 
+/**
+ * \~English
+ * Various Hive supporting backends.
+ */
 enum HiveDriveType {
+    /**
+     * \~English
+     * Native file system.
+     */
     HiveDriveType_Native    = 0x0,
+
+    /**
+     * \~English
+     * IPFS.
+     */
     HiveDriveType_IPFS      = 0x01,
 
+    /**
+     * \~English
+     * OneDrive.
+     */
     HiveDriveType_OneDrive  = 0x10,
+
+    /**
+     * \~English
+     * OwnCloud(not implemented).
+     */
     HiveDriveType_ownCloud  = 0x51,
+
+    /**
+     * \~English
+     * Drive type buttom(not a valid type).
+     */
     HiveDriveType_Butt      = 0x99
 };
+
+/**
+ * \~English
+ * User ID max length.
+ */
+#define HIVE_MAX_USER_ID_LEN            255
+
+/**
+ * \~English
+ * User name max length.
+ */
+#define HIVE_MAX_USER_NAME_LEN          63
+
+/**
+ * \~English
+ * User phone number max length.
+ */
+#define HIVE_MAX_PHONE_LEN              31
+
+/**
+ * \~English
+ * User email address max length.
+ */
+#define HIVE_MAX_EMAIL_LEN              127
+
+/**
+ * \~English
+ * User region max length.
+ */
+#define HIVE_MAX_REGION_LEN             127
 
 /**
  * \~English
@@ -57,31 +114,31 @@ struct HiveClientInfo {
      * \~English
      * User Id.
      */
-    char *user_id;
+    char user_id[HIVE_MAX_USER_ID_LEN+1];
 
     /**
      * \~English
      * User's display name.
      */
-    char *display_name;
+    char display_name[HIVE_MAX_USER_NAME_LEN+1];
 
     /**
      * \~English
      * User's email address.
      */
-    char *email;
+    char email[HIVE_MAX_EMAIL_LEN+1];
 
     /**
      * \~English
      * User's phone number.
      */
-    char *phone_number;
+    char phone_number[HIVE_MAX_PHONE_LEN+1];
 
     /**
      * \~English
      * User's region.
      */
-    char *region;
+    char region[HIVE_MAX_REGION_LEN+1];
 };
 
 /**
@@ -228,7 +285,8 @@ int hive_client_logout(HiveClient *client);
 
 /**
  * \~English
- * Get @client associated user's information. The result is passed to @result.
+ * Get @client associated user's information. The result is filled into
+ * @result.
  *
  * This function is effective only when a user is associated with the
  * @client.
@@ -236,26 +294,15 @@ int hive_client_logout(HiveClient *client);
  * @param
  *      client      [in] A handle identifying the Hive client instance.
  * @param
- *      result      [out] After the call, *result points to a  HiveClientInfo
- *                        instance. Call hive_client_info_free() to release
- *                        the instance after use.
+ *      result      [out] On success, the HiveClientInfo instance pointed
+ *                        to by @result is filled up with client's information.
  *
  * @return
  *      If no error occurs, return 0. Otherwise, return -1, and a specific
  *      error code can be retrieved by calling hive_get_error().
  */
 HIVE_API
-int hive_client_get_info(HiveClient *client, HiveClientInfo **result);
-
-/**
- * \~English
- * Release HiveClientInfo instance.
- *
- * @param
- *      info        [in] A handle identifying the Hive client info instance.
- */
-HIVE_API
-void hive_client_info_free(HiveClientInfo *info);
+int hive_client_get_info(HiveClient *client, HiveClientInfo *result);
 
 /******************************************************************************
  * Drive APIs

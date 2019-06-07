@@ -154,7 +154,7 @@ int hive_client_logout(HiveClient *client)
     return 0;
 }
 
-int hive_client_get_info(HiveClient *client, HiveClientInfo **result)
+int hive_client_get_info(HiveClient *client, HiveClientInfo *result)
 {
     if (!client || !result) {
         hive_set_error(-1);
