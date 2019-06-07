@@ -8,7 +8,7 @@
 #include "drive.h"
 #include "client.h"
 
-int hive_drive_get_info(HiveDrive *drive, HiveDriveInfo **result)
+int hive_drive_get_info(HiveDrive *drive, HiveDriveInfo *result)
 {
     int rc;
 

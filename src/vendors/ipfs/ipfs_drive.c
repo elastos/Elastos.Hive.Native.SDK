@@ -45,22 +45,14 @@ static int ipfs_drive_publish(ipfs_drv_t *drv, const char *path)
     return 0;
 }
 
-static int ipfs_drive_get_info(HiveDrive *obj, HiveDriveInfo **result)
+static int ipfs_drive_get_info(HiveDrive *obj, HiveDriveInfo *result)
 {
     ipfs_drv_t *drv = (ipfs_drv_t *)obj;
-    HiveDriveInfo *info;
+    int rc;
 
-    info = calloc(1, sizeof(HiveDriveInfo));
-    if (!info)
+    rc = snprintf(result->drive_id, sizeof(result->drive_id), "");
+    if (rc < 0 || rc >= sizeof(result->drive_id))
         return -1;
-
-    info->drive_id = strdup("");
-    if (!info->drive_id) {
-        hive_drive_info_free(info);
-        return -1;
-    }
-
-    *result = info;
 
     return 0;
 }

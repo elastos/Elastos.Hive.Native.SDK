@@ -32,17 +32,11 @@ typedef struct OneDriveDrive {
 } OneDriveDrive ;
 
 static int onedrive_drive_decode_drive_info(const char *info_str,
-                                            HiveDriveInfo **result)
+                                            HiveDriveInfo *result)
 {
-#define move(dst, src) \
-    do {               \
-        (dst) = (src); \
-        (src) = NULL;  \
-    } while (0)
-
     cJSON *json;
     cJSON *id;
-    HiveDriveInfo *info;
+    int rc;
 
     assert(info_str);
     assert(result);
@@ -57,23 +51,17 @@ static int onedrive_drive_decode_drive_info(const char *info_str,
         return -1;
     }
 
-    info = malloc(sizeof(HiveDriveInfo));
-    if (!info) {
-        cJSON_Delete(json);
-        return -1;
-    }
-
-    move(info->drive_id, id->valuestring);
-
+    rc = snprintf(result->drive_id, sizeof(result->drive_id),
+                  "%s", id->valuestring);
     cJSON_Delete(json);
-    *result = info;
-    return 0;
+    if (rc < 0 || rc >= sizeof(result->drive_id))
+        return -1;
 
-#undef move
+    return 0;
 }
 
 static
-int onedrive_drive_get_info(HiveDrive *base, HiveDriveInfo **result)
+int onedrive_drive_get_info(HiveDrive *base, HiveDriveInfo *result)
 {
     OneDriveDrive *drive = (OneDriveDrive *)base;
     http_client_t *httpc;

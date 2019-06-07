@@ -313,6 +313,12 @@ typedef struct HiveDriveInfo    HiveDriveInfo;
 
 /**
  * \~English
+ * Drive ID max length.
+ */
+#define HIVE_MAX_DRIVE_ID_LEN            255
+
+/**
+ * \~English
  * A structure representing the hive drive information.
  */
 struct HiveDriveInfo {
@@ -320,7 +326,7 @@ struct HiveDriveInfo {
      * \~English
      * Drive Id.
      */
-    char *drive_id;
+    char drive_id[HIVE_MAX_DRIVE_ID_LEN+1];
 };
 
 /**
@@ -362,7 +368,7 @@ int hive_drive_close(HiveDrive *drive);
 
 /**
  * \~English
- * Get @drive's information. The result is passed to @result.
+ * Get @drive's information. The result is filled into @result.
  *
  * This function is effective only when a user is associated with the
  * client generating the @drive.
@@ -370,26 +376,15 @@ int hive_drive_close(HiveDrive *drive);
  * @param
  *      drive       [in] A handle identifying the Hive drive instance.
  * @param
- *      result      [out] After the call, *result points to an instance
- *                        of HiveDriveInfo. Call free() to release the
- *                        instance after use.
+ *      result      [out] On success, the HiveDriveInfo instance pointed
+ *                        to by @result is filled up with drive's information.
  *
  * @return
  *      If no error occurs, return 0. Otherwise, return -1, and a specific
  *      error code can be retrieved by calling hive_get_error().
  */
 HIVE_API
-int hive_drive_get_info(HiveDrive *drive, HiveDriveInfo **result);
-
-/**
- * \~English
- * Release HiveDriveInfo instance.
- *
- * @param
- *      info        [in] A handle identifying the Hive drive info instance.
- */
-HIVE_API
-void hive_drive_info_free(HiveDriveInfo *info);
+int hive_drive_get_info(HiveDrive *drive, HiveDriveInfo *result);
 
 /**
  * \~English
