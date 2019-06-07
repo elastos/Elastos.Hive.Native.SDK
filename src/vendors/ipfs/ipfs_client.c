@@ -374,7 +374,7 @@ static int test_reachable(const char *ipaddr)
     long resp_code;
 
     rc = snprintf(url, sizeof(url), "http://%s:%d/version",
-                  ipaddr, CLUSTER_API_PORT);
+                  ipaddr, NODE_API_PORT);
     if (rc < 0 || rc >= sizeof(url)) {
         hive_set_error(-1);
         return -1;
@@ -426,6 +426,82 @@ static void ipfs_client_destructor(void *p)
         free(client->server_addr);
 }
 
+static int ipfs_client_uid_new(IPFSClient *client)
+{
+    char url[MAXPATHLEN + 1] = {0};
+    http_client_t *httpc;
+    long resp_code = 0;
+    cJSON *json;
+    cJSON *uid;
+    char *p;
+    int rc;
+
+    rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/uid/new",
+                  client->server_addr, NODE_API_PORT);
+    if (rc < 0 || rc >= sizeof(url)) {
+        hive_set_error(-1);
+        return -1;
+    }
+
+    httpc = http_client_new();
+    if (!httpc) {
+        hive_set_error(-1);
+        return -1;
+    }
+
+    http_client_set_url(httpc, url);
+    http_client_set_method(httpc, HTTP_METHOD_POST);
+    http_client_enable_response_body(httpc);
+
+    rc = http_client_request(httpc);
+    if (rc < 0) {
+        hive_set_error(-1);
+        goto error_exit;
+    }
+
+    rc = http_client_get_response_code(httpc, &resp_code);
+    if (rc < 0) {
+        hive_set_error(-1);
+        goto error_exit;
+    }
+
+    if (resp_code != 200) {
+        hive_set_error(-1);
+        goto error_exit;
+    }
+
+    p = http_client_move_response_body(httpc, NULL);
+    http_client_close(httpc);
+
+    if (!p) {
+        hive_set_error(-1);
+        return -1;
+    }
+
+    json = cJSON_Parse(p);
+    free(p);
+    if (!json) {
+        hive_set_error(-1);
+        return -1;
+    }
+
+    uid = cJSON_GetObjectItemCaseSensitive(json, "UID");
+    if (!cJSON_IsString(uid) || !uid->valuestring || !*uid->valuestring) {
+        cJSON_Delete(json);
+        return -1;
+    }
+
+    client->uid = uid->valuestring;
+    uid->valuestring = NULL;
+    cJSON_Delete(json);
+
+    return 0;
+
+error_exit:
+    http_client_close(httpc);
+    return -1;
+}
+
 int ipfs_client_new(const HiveOptions * options, HiveClient **client)
 {
     IPFSOptions *opts = (IPFSOptions *)options;
@@ -435,7 +511,7 @@ int ipfs_client_new(const HiveOptions * options, HiveClient **client)
 
     assert(client);
 
-    if (!opts->uid || !*opts->uid || !opts->bootstraps_size) {
+    if ((opts->uid && !*opts->uid) || !opts->bootstraps_size) {
         // TODO:
         return rc;
     }
@@ -456,11 +532,13 @@ int ipfs_client_new(const HiveOptions * options, HiveClient **client)
         return rc;
     }
 
-    tmp->uid = strdup(opts->uid);
-    if (!tmp->uid) {
-        deref(tmp);
-        // TODO;
-        return rc;
+    if (opts->uid) {
+        tmp->uid = strdup(opts->uid);
+        if (!tmp->uid) {
+            deref(tmp);
+            // TODO;
+            return rc;
+        }
     }
 
     tmp->server_addr = strdup(opts->bootstraps_ip[i]);
@@ -479,7 +557,9 @@ int ipfs_client_new(const HiveOptions * options, HiveClient **client)
 
     tmp->base.invalidate_credential = &ipfs_client_invalidate_credential;
 
-    rc = ipfs_client_get_info(&tmp->base, NULL);
+    rc = tmp->uid ?
+         ipfs_client_get_info(&tmp->base, NULL) :
+         ipfs_client_uid_new(tmp);
     if (rc) {
         deref(tmp);
         return rc;
