@@ -42,17 +42,17 @@ endif()
 set(SRC
     client.c
     drive.c
-    oauth_client.c
     error.c
     sandbird/sandbird.c
     http/http_client.c
-    vendors/native/native_client.c
+    oauth/oauth_token.c
     vendors/ipfs/ipfs_client.c
     vendors/ipfs/ipfs_drive.c
     vendors/ipfs/ipfs_token.c
     vendors/ipfs/ipfs_common_ops.c
     vendors/onedrive/onedrive_client.c
     vendors/onedrive/onedrive_drive.c
+    vendors/native/native_client.c
     vendors/owncloud/owncloud.c)
 
 set(HEADERS
@@ -68,6 +68,7 @@ include_directories(
     BEFORE
     .
     http
+    oauth
     sandbird
     vendors/native
     vendors/ipfs

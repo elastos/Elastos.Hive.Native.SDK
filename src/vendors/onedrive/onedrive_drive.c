@@ -1,10 +1,8 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
 #include <errno.h>
-#include <crystal.h>
-#include <stdio.h>
-
 #ifdef HAVE_LIBGEN_H
 #include <libgen.h>
 #endif
@@ -18,17 +16,18 @@
 #include <crystal.h>
 #include <cjson/cJSON.h>
 
+#include "onedrive_client.h"
 #include "onedrive_drive.h"
 #include "onedrive_constants.h"
-#include "onedrive_client.h"
 #include "http_client.h"
-#include "oauth_client.h"
+#include "oauth_token.h"
 #include "client.h"
+
+#define ARGV(args, index) ((void **)args)[index]
 
 typedef struct OneDriveDrive {
     HiveDrive base;
-    oauth_client_t *credential;
-    char drv_url[0];
+    oauth_token_t *token;
 } OneDriveDrive ;
 
 static
@@ -65,34 +64,31 @@ int onedrive_drive_get_info(HiveDrive *base, HiveDriveInfo *info)
 {
     OneDriveDrive *drive = (OneDriveDrive *)base;
     http_client_t *httpc;
-    char *access_token = NULL;
     char *p = NULL;
     long resp_code = 0;
     int rc;
 
     assert(drive);
-    assert(drive->credential);
+    assert(drive->token);
     assert(info);
 
-    rc = oauth_client_get_access_token(drive->credential, &access_token);
-    if (rc) {
-        // TODO: rc;
+    rc = oauth_token_check_expire(drive->token);
+    if (rc < 0) {
+        vlogE("Hive: Checking access token expired error.");
         return rc;
     }
 
     httpc = http_client_new();
     if (!httpc) {
-        free(access_token);
         // TODO: rc;
         return rc;
     }
 
-    http_client_set_url_escape(httpc, drive->drv_url);
+    http_client_set_url_escape(httpc, URL_API);
     http_client_set_method(httpc, HTTP_METHOD_GET);
+    http_client_set_header(httpc, "Content-Type", "application/json");
+    http_client_set_header(httpc, "Authorization", get_bearer_token(drive->token));
     http_client_enable_response_body(httpc);
-    http_client_set_header(httpc, "Authorization", access_token);
-    free(access_token);
-    access_token = NULL;
 
     rc = http_client_request(httpc);
     if (rc) {
@@ -107,7 +103,7 @@ int onedrive_drive_get_info(HiveDrive *base, HiveDriveInfo *info)
     }
 
     if (resp_code == 401) {
-        oauth_client_set_expired(drive->credential);
+        oauth_token_set_expired(drive->token);
         // TODO: rc;
         goto error_exit;
     }
@@ -150,62 +146,55 @@ int onedrive_drive_stat_file(HiveDrive *base, const char *path, HiveFileInfo *in
     char **result; // TODO;
     OneDriveDrive *drive = (OneDriveDrive *)base;
     http_client_t *httpc;
-    char url[MAXPATHLEN + 1] = {0};
-    char *access_token;
-    long resp_code = 0;
+    char url[MAX_URL_LENGTH + 1] = {0};
+    char *escaped_url;
     char *p;
+    long resp_code = 0;
     int rc;
 
     assert(drive);
-    assert(drive->credential);
-    assert(path && *path);
+    assert(drive->token);
+    assert(path);
+    assert(*path);
     assert(result);
 
-    rc = oauth_client_get_access_token(drive->credential, &access_token);
-    if (rc) {
-        // TODO: rc;
+    rc = oauth_token_check_expire(drive->token);
+    if (rc < 0) {
+        vlogE("Hive: Checking access token expired error.");
         return rc;
     }
 
     httpc = http_client_new();
     if (!httpc) {
-        free(access_token);
         // TODO:
         return rc;
     }
 
-    if (!strcmp(path, "/")) {
-        rc = snprintf(url, sizeof(url), "%s/root", drive->drv_url);
-    } else {
-        char *escaped_path;
-
-        escaped_path = http_client_escape(httpc, path, strlen(path));
-        http_client_reset(httpc);
-
-        if (!escaped_path) {
-            free(access_token);
-            // TODO: rc;
-            goto error_exit;
-        }
-
-        rc = snprintf(url, sizeof(url), "%s/root:%s:", drive->drv_url,
-                      escaped_path);
-        http_client_memory_free(escaped_path);
-    }
+    if (!strcmp(path, "/"))
+        rc = snprintf(url, sizeof(url), "%s/root", URL_API);
+    else
+        rc = snprintf(url, sizeof(url), "%s/root:%s", URL_API, path);
 
     if (rc < 0 || rc >= sizeof(url)) {
-        //TODO: rc;
+        vlogE("Hive: Generating url to stat file with path (%s) error", path);
         goto error_exit;
     }
 
-    http_client_set_url_escape(httpc, url);
+    escaped_url = http_client_escape(httpc, url, strlen(path));
+    http_client_reset(httpc);
+
+    if (!escaped_url)
+        goto error_exit;
+
+    http_client_set_url(httpc, escaped_url);
     http_client_set_method(httpc, HTTP_METHOD_GET);
-    http_client_set_header(httpc, "Authorization", access_token);
+    http_client_set_header(httpc, "Content-Type", "application/json");
+    http_client_set_header(httpc, "Authorization", get_bearer_token(drive->token));
     http_client_enable_response_body(httpc);
-    free(access_token);
-    access_token = NULL;
 
     rc = http_client_request(httpc);
+    http_client_memory_free(escaped_url);
+
     if (rc) {
         // TODO: rc;
         goto error_exit;
@@ -218,7 +207,7 @@ int onedrive_drive_stat_file(HiveDrive *base, const char *path, HiveFileInfo *in
     }
 
     if (resp_code == 401) {
-        oauth_client_set_expired(drive->credential);
+        oauth_token_set_expired(drive->token);
         // TODO: rc;
         goto error_exit;
     }
@@ -233,7 +222,7 @@ int onedrive_drive_stat_file(HiveDrive *base, const char *path, HiveFileInfo *in
 
     if (!p) {
         // TODO: rc;
-        return -1;
+        return rc;
     }
 
     rc = onedrive_decode_file_info(p, info);
@@ -245,114 +234,39 @@ int onedrive_drive_stat_file(HiveDrive *base, const char *path, HiveFileInfo *in
 
 error_exit:
     http_client_close(httpc);
-    return -1;
+    return rc;
 }
 
 static
-int onedrive_drive_list_files(HiveDrive *base, const char *path, char **result)
+int add_list_files_to_arry(cJSON *to_array, const char *resp, bool *has_next)
 {
-    OneDriveDrive *drive = (OneDriveDrive *)base;
-    http_client_t *httpc;
-    char url[MAXPATHLEN + 1] = {0};
-    char *access_token;
-    char *p;
-    int rc;
+/*
+    cJSON *json;
+    cJSON *array;
+    cJSON *item;
+    int array_sz;
+    int i;
 
-    int val_sz, i;
-    long resp_code;
-    cJSON *resp_part = NULL, *next_link, *resp = NULL, *val_part, *elem, *val;
-    char *resp_body_str = NULL;
+    assert(to_array);
+    assert(resp);
+    assert(has_next);
 
-    assert(drive);
-    assert(drive->credential);
-    assert(path && !*path);
-    assert(result);
+    json = cJSON_Parse(resp);
+    if (!json)
+        return -1;
 
-    rc = oauth_client_get_access_token(drive->credential, &access_token);
-    if (rc) {
-        // TODO: rc;
-        return rc;
-    }
-
-    httpc = http_client_new();
-    if (!httpc) {
-        free(access_token);
-        // TODO: rc;
-        return rc;
-    }
-
-    if (!strcmp(path, "/"))
-        rc = snprintf(url, sizeof(url), "%s/root/children", drive->drv_url);
-    else {
-        char *escaped_path;
-
-        escaped_path = http_client_escape(httpc, path, strlen(path));
-        if (!escaped_path) {
-            free(access_token);
-            // TODO: rc;
-            goto error_exit;
-        }
-
-        rc = snprintf(url, sizeof(url), "%s/root:%s:/children", drive->drv_url,
-                      escaped_path);
-        http_client_memory_free(escaped_path);
-    }
-
-    if (rc < 0 || rc >= sizeof(url)) {
-        free(access_token);
-        // TODO: rc;
+    array = cJSON_GetObjectItemCaseSensitive(json,  "value");
+    if (!array || !cJSON_IsArray(array))
         goto error_exit;
+
+    array_sz = cJSON_GetArraySize(array);
+    for (i = 0; i < array_sz;  i++) {
+        item = cJSON_DetachItemFromArray(array, i);
+        cJSON_AddItemToArray(to_array, item);
     }
 
-    resp = cJSON_CreateObject();
-    if (!resp) {
-        hive_set_error(-1);
-        goto error_exit;
-    }
-
-    val = cJSON_AddArrayToObject(resp, "value");
-    if (!val) {
-        hive_set_error(-1);
-        goto error_exit;
-    }
-
-    while (true) {
-        char *p;
-
-        http_client_reset(httpc);
-        http_client_set_url_escape(httpc, url);
-        http_client_set_method(httpc, HTTP_METHOD_GET);
-        http_client_set_header(httpc, "Authorization", access_token);
-        http_client_enable_response_body(httpc);
-
-        rc = http_client_request(httpc);
-        if (rc) {
-            // TODO: rc;
-            break;
-        }
-
-        rc = http_client_get_response_code(httpc, &resp_code);
-        if (rc < 0) {
-            // TODO: rc;
-            break;
-        }
-
-        if (resp_code == 401) {
-            oauth_client_set_expired(drive->credential);
-            // TODO: rc;
-            break;
-        }
-
-        if (resp_code != 200) {
-            // TODO;
-            break;
-        }
-
-        p = http_client_move_response_body(httpc, NULL);
-        if (!p) {
-            // TODO: rc;
-            break;
-        }
+    item = cJSON_GetObjectItemCaseSensitive(json, "@odata.nextLink");
+    if (!IS_STRING_NODE(item))
 
         resp_part = cJSON_Parse(resp_body_str);
         free(resp_body_str);
@@ -407,28 +321,155 @@ int onedrive_drive_list_files(HiveDrive *base, const char *path, char **result)
             hive_set_error(-1);
             goto error_exit;
         }
+    */
+    return -1;
+}
 
-        return 0;
+static
+int onedrive_drive_list_files(HiveDrive *base, const char *path, char **result)
+{
+    OneDriveDrive *drive = (OneDriveDrive *)base;
+    http_client_t *httpc;
+    cJSON *json = NULL;
+    cJSON *array;
+    bool has_next = true;
+    char url[MAX_URL_LENGTH + 1] = {0};
+    char *escaped_url = NULL;
+    char *p;
+    int rc;
+
+    int val_sz, i;
+    long resp_code;
+    cJSON *resp_part = NULL, *next_link, *resp = NULL, *val_part, *elem, *val;
+    char *resp_body_str = NULL;
+
+    assert(drive);
+    assert(drive->token);
+    assert(path);
+    assert(*path);
+    assert(result);
+
+    rc = oauth_token_check_expire(drive->token);
+    if (rc < 0) {
+        vlogE("Hive: Checking access token expired error.");
+        return rc;
     }
 
+    httpc = http_client_new();
+    if (!httpc) {
+        // TODO: rc;
+        return rc;
+    }
+
+    if (!strcmp(path, "/"))
+        rc = snprintf(url, sizeof(url), "%s/root/children", URL_API);
+    else
+        rc = snprintf(url, sizeof(url), "%s/root:%s:/children", URL_API, path);
+
+    if (rc < 0 || rc >= sizeof(url)) {
+        vlogE("Hive: Generating url to list files with path (%s) error", path);
+        goto error_exit;
+    }
+
+    escaped_url = http_client_escape(httpc, url, strlen(url));
+    http_client_reset(httpc);
+
+    if (!escaped_url)
+        goto error_exit;
+
+    json = cJSON_CreateObject();
+    if (!json) {
+        http_client_memory_free(escaped_url);
+        goto error_exit;
+    }
+
+    array = cJSON_AddArrayToObject(json, "value");
+    if (!array) {
+        http_client_memory_free(escaped_url);
+        cJSON_Delete(json);
+        goto error_exit;
+    }
+
+    while (has_next) {
+        char *p;
+
+        http_client_reset(httpc);
+        http_client_set_url_escape(httpc, escaped_url);
+        http_client_set_method(httpc, HTTP_METHOD_GET);
+        http_client_set_header(httpc, "Content-Type", "application/json");
+        http_client_set_header(httpc, "Authorization", get_bearer_token(drive->token));
+        http_client_enable_response_body(httpc);
+
+        rc = http_client_request(httpc);
+        http_client_memory_free(escaped_url);
+
+        if (rc) {
+            // TODO: rc;
+            break;
+        }
+
+        rc = http_client_get_response_code(httpc, &resp_code);
+        if (rc < 0) {
+            // TODO: rc;
+            break;
+        }
+
+        if (resp_code == 401) {
+            oauth_token_set_expired(drive->token);
+            // TODO: rc;
+            break;
+        }
+
+        if (resp_code != 200) {
+            // TODO;
+            break;
+        }
+
+        p = http_client_move_response_body(httpc, NULL);
+        if (!p) {
+            // TODO: rc;
+            break;
+        }
+
+        rc = add_list_files_to_arry(array, p, &has_next);
+        if (rc < 0) {
+            // TODO;
+            break;
+        }
+
+        if (!has_next)
+            break;
+
+        // TODO;
+    }
+
+    http_client_memory_free(escaped_url);
+    http_client_close(httpc);
+
+    if (has_next) {
+        vlogE("Hive: Try to next list files, but happen error");
+        cJSON_Delete(json);
+        return rc;
+    }
+
+    p = cJSON_PrintUnformatted(json);
+    cJSON_Delete(json);
+
+    if (!p)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
+
+    *result = p;
+    return 0;
+
 error_exit:
-    if (resp_part)
-        cJSON_Delete(resp);
-    if (resp)
-        cJSON_Delete(resp);
-    if (httpc)
-        http_client_close(httpc);
-    if (access_token)
-        free(access_token) ;
-    if (resp_body_str)
-        free(resp_body_str);
-    return -1;
+    http_client_close(httpc);
+    return rc;
 }
 
 static char *create_mkdir_request_body(const char *path)
 {
     cJSON *body;
-    char  *body_str;
+    char *body_str;
     char *p;
 
     assert(path);
@@ -438,103 +479,82 @@ static char *create_mkdir_request_body(const char *path)
         return NULL;
 
     p = basename((char *)path);
-    if (!cJSON_AddStringToObject(body, "name", p))
-        goto error_exit;
+    if (!cJSON_AddStringToObject(body, "name", p) ||
+        !cJSON_AddStringToObject(body, "folder", NULL) || // TODO
+        !cJSON_AddStringToObject(body, "@microsoft.graph.conflictBehavior", "rename")){
 
-    if (!cJSON_AddObjectToObject(body, "folder"))
-        goto error_exit;
-
-    if (!cJSON_AddStringToObject(body, "@microsoft.graph.conflictBehavior",
-                                 "rename"))
-        goto error_exit;
+        cJSON_Delete(body);
+        return NULL;
+    }
 
     body_str = cJSON_PrintUnformatted(body);
     cJSON_Delete(body);
 
     return body_str;
-
-error_exit:
-    cJSON_Delete(body);
-    return NULL;
 }
 
 static int onedrive_drive_mkdir(HiveDrive *base, const char *path)
 {
     OneDriveDrive *drive = (OneDriveDrive *)base;
-    char url[ONEDRIVE_MAX_URL_LENGTH] = {0};
     http_client_t *httpc;
-    char *access_token = NULL;
-    long resp_code = 0;
-    char *body_str;
+    char url[MAX_URL_LENGTH] = {0};
+    char *escaped_url;
+    char *body;
     char *dir;
     char *p;
+    long resp_code = 0;
     int rc;
 
-    cJSON *req_body = NULL;
-    char *req_body_str = NULL;
-
     assert(drive);
+    assert(drive->token);
     assert(path);
-    assert(path[0] == '/');
+    assert(*path);
 
-    rc = oauth_client_get_access_token(drive->credential, &access_token);
-    if (rc) {
-        // TODO: rc;
+    rc = oauth_token_check_expire(drive->token);
+    if (rc < 0) {
+        vlogE("Hive: Checking access token expired error.");
         return rc;
     }
 
     httpc = http_client_new();
     if (!httpc) {
-        free(access_token);
         // TODO: rc;
         return rc;
     }
 
     dir = dirname((char *)path);
-    if (!strcmp(dir, "/")) {
-        // "mkdir" under the root directory.
-        rc = snprintf(url, sizeof(url), "%s/root/children", drive->drv_url);
-    } else {
-        char *escaped_dir;
-
-        escaped_dir = http_client_escape(httpc, dir, strlen(dir));
-        http_client_reset(httpc);
-
-        if (!escaped_dir) {
-            free(access_token);
-            // TODO: rc;
-            goto error_exit;
-        }
-
-        rc = snprintf(url, sizeof(url), "%s/root:%s:/children", drive->drv_url,
-                      escaped_dir);
-        http_client_memory_free(escaped_dir);
-    }
+    if (!strcmp(dir, "/"))
+        rc = snprintf(url, sizeof(url), "%s/root/children", URL_API);
+    else
+        rc = snprintf(url, sizeof(url), "%s/root:%s:/chidlren", URL_API, dir);
 
     if (rc < 0 || rc >= (int)sizeof(url)) {
-        free(access_token);
+        vlogE("Hive: Generating url to list files with path (%s) error", path);
+        goto error_exit;
+    }
+
+    escaped_url = http_client_escape(httpc, url, strlen(url));
+    http_client_reset(httpc);
+
+    if (!escaped_url)
+        goto error_exit;
+
+    body = create_mkdir_request_body(path);
+    if (!body) {
+        http_client_memory_free(escaped_url);
         // TODO: rc;
         goto error_exit;
     }
 
-    body_str = create_mkdir_request_body(path);
-    if (!body_str) {
-        free(access_token);
-        // TODO: rc;
-        goto error_exit;
-    }
-
-    http_client_set_url_escape(httpc, url);
+    http_client_set_url(httpc, escaped_url);
     http_client_set_method(httpc, HTTP_METHOD_POST);
     http_client_set_header(httpc, "Content-Type", "application/json");
-    http_client_set_header(httpc, "Authorization", access_token);
-    http_client_set_request_body_instant(httpc, body_str, strlen(body_str));
-
-    free(access_token);
-    access_token = NULL;
+    http_client_set_header(httpc, "Authorization", get_bearer_token(drive->token));
+    http_client_set_request_body_instant(httpc, body, strlen(body));
 
     rc = http_client_request(httpc);
-    free(body_str);
+    http_client_memory_free(escaped_url);
+    free(body);
 
     if (rc < 0) {
         // TODO: rc;
@@ -546,11 +566,11 @@ static int onedrive_drive_mkdir(HiveDrive *base, const char *path)
 
     if (rc < 0) {
         // TODO: rc;
-        goto error_exit;
+        return rc;
     }
 
     if (resp_code == 401) {
-        oauth_client_set_expired(drive->credential);
+        oauth_token_set_expired(drive->token);
         // TODO: rc;
         return rc;
     }
@@ -564,160 +584,160 @@ static int onedrive_drive_mkdir(HiveDrive *base, const char *path)
 
 error_exit:
     http_client_close(httpc);
-    return -1;
+    return rc;
 }
 
-static int onedrive_drive_move_file(HiveDrive *obj, const char *old, const char *new)
+static char *create_copy_move_request_body(const char *path)
 {
-    OneDriveDrive *drv = (OneDriveDrive *)obj;
-    char url[MAXPATHLEN + 1];
+    char parent[MAX_URL_LENGTH + 1] = {0};
+    cJSON *body;
+    cJSON *item;
+    char *body_str;
     int rc;
-    http_client_t *httpc = NULL;
-    cJSON *req_body = NULL, *parent_ref;
-    char *req_body_str = NULL;
-    char *access_token = NULL;
-    long resp_code;
-    char parent_dir[MAXPATHLEN + 1];
 
-    rc = oauth_client_get_access_token(drv->credential, &access_token);
-    if (rc) {
-        hive_set_error(-1);
-        return -1;
+    body = cJSON_CreateObject();
+    if (!body)
+        return NULL;
+
+    rc = snprintf(parent, sizeof(parent), "%s/root:%s",
+                  URL_API,
+                  dirname((char *)path));
+    if (rc < 0 || rc >= (int)sizeof(parent))
+        goto error_exit;
+
+    item = cJSON_AddStringToObject(body, "parentReference", parent); //TODO
+    if (!item)
+        goto error_exit;
+
+    if (!cJSON_AddStringToObject(item, "path", parent) ||
+        !cJSON_AddStringToObject(body, "name", basename((char *)path)))
+        goto error_exit;
+
+    body_str = cJSON_PrintUnformatted(body);
+    cJSON_Delete(body);
+
+    return body_str;
+
+error_exit:
+    cJSON_Delete(body);
+    return NULL;
+}
+
+static int onedrive_drive_move_file(HiveDrive *base, const char *old, const char *new)
+{
+    OneDriveDrive *drive = (OneDriveDrive *)base;
+    http_client_t *httpc;
+    char url[MAX_URL_LENGTH + 1] = {0};
+    char *escaped_url;
+    char *body;
+    long resp_code = 0;
+    int rc;
+
+    assert(drive);
+    assert(drive->token);
+    assert(old);
+    assert(*old);
+    assert(new);
+    assert(*new);
+
+    rc = oauth_token_check_expire(drive->token);
+    if (rc < 0) {
+        vlogE("Hive: Checking access token expired error.");
+        return rc;
     }
 
     httpc = http_client_new();
     if (!httpc) {
-        hive_set_error(-1);
-        goto error_exit;
+        // TODO: rc;
+        return rc;
     }
 
     if (!strcmp(old, "/"))
-        rc = snprintf(url, sizeof(url), "%s/root", drv->drv_url);
-    else {
-        char *old_esc;
+        rc = snprintf(url, sizeof(url), "%s/root", URL_API);
+    else
+        rc = snprintf(url, sizeof(url), "%s/root:%s", URL_API, old);
 
-        old_esc = http_client_escape(httpc, old, strlen(old));
-        http_client_reset(httpc);
-        if (!old_esc) {
-            hive_set_error(-1);
-            goto error_exit;
-        }
-
-        rc = snprintf(url, sizeof(url), "%s/root:%s:", drv->drv_url, old_esc);
-        http_client_memory_free(old_esc);
-    }
-
-    if (rc < 0 || rc >= sizeof(url)) {
-        hive_set_error(-1);
+    if (rc < 0 || rc >= (int)sizeof(url)) {
+        vlogE("Hive: Generating url to move file from %s to %s error", old, new);
         goto error_exit;
     }
 
-    req_body = cJSON_CreateObject();
-    if (!req_body) {
-        hive_set_error(-1);
+    escaped_url = http_client_escape(httpc, url, strlen(url));
+    http_client_reset(httpc);
+
+    if (!escaped_url)
+        goto error_exit;
+
+    body = create_copy_move_request_body(new);
+    if (!body) {
+        http_client_memory_free(escaped_url);
         goto error_exit;
     }
 
-    rc = snprintf(parent_dir, sizeof(parent_dir), "%s/root:%s",
-        drv->drv_url + strlen(URL_API), dirname((char *)new));
-    if (rc < 0 || rc >= sizeof(parent_dir)) {
-        hive_set_error(-1);
-        goto error_exit;
-    }
-
-    parent_ref = cJSON_AddObjectToObject(req_body, "parentReference");
-    if (!parent_ref) {
-        hive_set_error(-1);
-        goto error_exit;
-    }
-
-    if (!cJSON_AddStringToObject(parent_ref, "path", parent_dir)) {
-        hive_set_error(-1);
-        goto error_exit;
-    }
-
-    if (!cJSON_AddStringToObject(req_body, "name", basename((char *)new))) {
-        hive_set_error(-1);
-        goto error_exit;
-    }
-
-    req_body_str = cJSON_PrintUnformatted(req_body);
-    cJSON_Delete(req_body);
-    req_body = NULL;
-    if (!req_body_str) {
-        hive_set_error(-1);
-        goto error_exit;
-    }
-
-    http_client_set_url_escape(httpc, url);
+    http_client_set_url(httpc, escaped_url);
     http_client_set_method(httpc, HTTP_METHOD_PATCH);
     http_client_set_header(httpc, "Content-Type", "application/json");
-    http_client_set_request_body_instant(httpc, (void *)req_body_str, strlen(req_body_str));
-    http_client_set_header(httpc, "Authorization", access_token);
-    free(access_token);
-    access_token = NULL;
+    http_client_set_header(httpc, "Authorization", get_bearer_token(drive->token));
+    http_client_set_request_body_instant(httpc, body, strlen(body));
 
     rc = http_client_request(httpc);
-    free(req_body_str);
-    req_body_str = NULL;
-    if (rc) {
-        hive_set_error(-1);
+    http_client_memory_free(escaped_url);
+    free(body);
+
+    if (rc < 0) {
+        // TODO: rc;
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     http_client_close(httpc);
-    httpc = NULL;
+
     if (rc < 0) {
-        hive_set_error(-1);
-        goto error_exit;
+        // TODO: rc;
+        return rc;
+    }
+
+    if (resp_code == 401) {
+        oauth_token_set_expired(drive->token);
+        // TODO: rc;
+        return rc;
     }
 
     if (resp_code != 200) {
-        if (resp_code == 401)
-            oauth_client_set_expired(drv->credential);
-        hive_set_error(-1);
-        goto error_exit;
+        // TODO;
+        return rc;
     }
 
     return 0;
 
 error_exit:
-    if (httpc)
-        http_client_close(httpc);
-    if (req_body)
-        cJSON_Delete(req_body);
-    if (req_body_str)
-        free(req_body_str);
-    if (access_token)
-        free(access_token);
-    return -1;
+    http_client_close(httpc);
+    return rc;
 }
 
-static size_t copy_resp_hdr_cb(
-    char *buffer, size_t size, size_t nitems, void *args)
+static
+size_t handle_response_header(char *buffer, size_t size, size_t nitems,
+                              void *user_data)
 {
-    char *resp_hdr_buf = (char *)(((void **)args)[0]);
-    size_t resp_hdr_buf_sz = *(size_t *)(((void **)args)[1]);
-    size_t total_sz = size * nitems;
-    const char *loc_key = "Location: ";
-    size_t loc_key_sz = strlen(loc_key);
-    size_t loc_val_sz = total_sz - loc_key_sz - 2;
+#define LOC_KEY "Location: "
 
-    if (total_sz <= loc_key_sz)
-        return total_sz;
+    char *buf = (char *)ARGV(user_data, 0);
+    size_t sz = *(size_t *)ARGV(user_data, 1);
+    size_t total_sz = sz * nitems;
+    size_t loc_len = strlen(LOC_KEY);
 
-    if (loc_val_sz >= resp_hdr_buf_sz)
-        return -1;
+    assert(total_sz > strlen(LOC_KEY));
+    assert(strlen(LOC_KEY) > sz);
 
-    if (memcmp(buffer, loc_key, loc_key_sz))
-        return total_sz;
+    if (strncmp(buffer, LOC_KEY, loc_len))
+        return  total_sz;
 
-    memcpy(resp_hdr_buf, buffer + loc_key_sz, loc_val_sz);
-    resp_hdr_buf[loc_val_sz] = '\0';
+    memcpy(buf, buffer + strlen(LOC_KEY), loc_len);
+    buf[loc_len + 1] = '\0';
     return total_sz;
 }
 
+/*
 static int wait_til_complete(const char *prog_qry_url)
 {
     http_client_t *http_cli;
@@ -772,185 +792,150 @@ static int wait_til_complete(const char *prog_qry_url)
         return 0;
     }
 }
+*/
 
-static int onedrive_drive_copy_file(HiveDrive *obj, const char *src_path, const char *dest_path)
+static
+int onedrive_drive_copy_file(HiveDrive *base, const char *src, const char *dest)
 {
-    OneDriveDrive *drv = (OneDriveDrive *)obj;
-    char url[MAXPATHLEN + 1];
+    OneDriveDrive *drive = (OneDriveDrive *)base;
+    http_client_t *httpc;
+    char url[MAX_URL_LENGTH + 1];
+    char *escaped_url;
+    char *body;
+    size_t url_len = sizeof(url);
+    void *args[] = {url, &url_len};
     int rc;
+
     cJSON *req_body = NULL, *parent_ref;
     char *req_body_str = NULL;
     long resp_code;
     char parent_dir[MAXPATHLEN + 1];
-    http_client_t *httpc = NULL;
-    char *access_token = NULL;
     char prog_qry_url[MAXPATHLEN + 1];
     size_t prog_qry_url_sz = sizeof(prog_qry_url);
 
-    rc = oauth_client_get_access_token(drv->credential, &access_token);
-    if (rc) {
-        hive_set_error(-1);
-        return -1;
+    rc = oauth_token_check_expire(drive->token);
+    if (rc < 0) {
+        vlogE("Hive: Checking access token expired error.");
+        return rc;
     }
 
     httpc = http_client_new();
     if (!httpc) {
-        hive_set_error(-1);
+        // TODO;
+        return rc;
+    }
+
+    if (!strcmp(src, "/"))
+        rc = snprintf(url, sizeof(url), "%s/root/copy", URL_API);
+    else
+        rc = snprintf(url, sizeof(url), "%s/root:%s:/copy", URL_API, src);
+
+    if (rc < 0 || rc >= (int)sizeof(url)) {
+        vlogE("Hive: Generating url to copy file from %s to %s error", src, dest);
         goto error_exit;
     }
 
-    if (!strcmp(src_path, "/"))
-        rc = snprintf(url, sizeof(url), "%s/root/copy", drv->drv_url);
-    else {
-        char *src_path_esc;
+    escaped_url = http_client_escape(httpc, url, strlen(url));
+    http_client_reset(httpc);
+    memset(url, 0, sizeof(url));
 
-        src_path_esc = http_client_escape(httpc, src_path, strlen(src_path));
-        http_client_reset(httpc);
-        if (!src_path_esc) {
-            hive_set_error(-1);
-            goto error_exit;
-        }
-        rc = snprintf(url, sizeof(url), "%s/root:%s:/copy", drv->drv_url, src_path_esc);
-        http_client_memory_free(src_path_esc);
-    }
+    if (!escaped_url)
+        goto error_exit;
 
-    if (rc < 0 || rc >= sizeof(url)) {
-        hive_set_error(-1);
+    body = create_copy_move_request_body(src);
+    if (!body) {
+        http_client_memory_free(escaped_url);
         goto error_exit;
     }
 
-    req_body = cJSON_CreateObject();
-    if (!req_body) {
-        hive_set_error(-1);
-        goto error_exit;
-    }
-
-    rc = snprintf(parent_dir, sizeof(parent_dir), "%s/root:%s",
-        drv->drv_url + strlen(URL_API), dirname((char *)dest_path));
-    if (rc < 0 || rc >= sizeof(parent_dir)) {
-        hive_set_error(-1);
-        goto error_exit;
-    }
-
-    parent_ref = cJSON_AddObjectToObject(req_body, "parentReference");
-    if (!parent_ref) {
-        hive_set_error(-1);
-        goto error_exit;
-    }
-
-    if (!cJSON_AddStringToObject(parent_ref, "path", parent_dir)) {
-        hive_set_error(-1);
-        goto error_exit;
-    }
-
-    if (!cJSON_AddStringToObject(req_body, "name", basename((char *)dest_path))) {
-        hive_set_error(-1);
-        goto error_exit;
-    }
-
-    req_body_str = cJSON_PrintUnformatted(req_body);
-    cJSON_Delete(req_body);
-    req_body = NULL;
-    if (!req_body_str) {
-        hive_set_error(-1);
-        goto error_exit;
-    }
-
-    void *args[] = {prog_qry_url, &prog_qry_url_sz};
-    http_client_set_url_escape(httpc, url);
+    http_client_set_url(httpc, escaped_url);
     http_client_set_method(httpc, HTTP_METHOD_POST);
     http_client_set_header(httpc, "Content-Type", "application/json");
-    http_client_set_request_body_instant(httpc, (void *)req_body_str, strlen(req_body_str));
-    http_client_set_response_header(httpc, &copy_resp_hdr_cb, args);
-    http_client_set_header(httpc, "Authorization", access_token);
-    free(access_token);
-    access_token = NULL;
+    http_client_set_header(httpc, "Authorization", get_bearer_token(drive->token));
+    http_client_set_response_header(httpc, &handle_response_header, args);
+    http_client_set_request_body_instant(httpc, body, strlen(body));
 
     rc = http_client_request(httpc);
-    free(req_body_str);
-    req_body_str = NULL;
-    if (rc) {
-        hive_set_error(-1);
+    http_client_memory_free(escaped_url);
+    free(body);
+
+    if (rc < 0) {
+        // TODO: rc;
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     http_client_close(httpc);
-    httpc = NULL;
+
     if (rc < 0) {
-        hive_set_error(-1);
-        goto error_exit;
+        // TODO: rc;
+        return rc;
+    }
+
+    if (resp_code == 400) {
+        oauth_token_set_expired(drive->token);
+        // TODO;
+        return rc;
     }
 
     if (resp_code != 202) {
-        if (resp_code == 401)
-            oauth_client_set_expired(drv->credential);
-        hive_set_error(-1);
-        goto error_exit;
+        // TODO;
+        return rc;
     }
 
-    return wait_til_complete(prog_qry_url);
+    // TODO: wait for completation.
+    return 0;
 
 error_exit:
-    if (req_body)
-        cJSON_Delete(req_body);
-    if (req_body_str)
-        free(req_body_str);
-    if (httpc)
-        http_client_close(httpc);
-    if (access_token)
-        free(access_token);
-    return -1;
+    http_client_close(httpc);
+    return rc;
 }
 
 static int onedrive_drive_delete_file(HiveDrive *base, const char *path)
 {
     OneDriveDrive *drive = (OneDriveDrive *)base;
-    char url[ONEDRIVE_MAX_URL_LENGTH] = {0};
-    http_client_t *httpc = NULL;
-    char *escaped_path = NULL;
+    http_client_t *httpc;
+    char url[MAX_URL_LENGTH] = {0};
+    char *escaped_url;
     long resp_code = 0;
-    char *access_token = NULL;
     int rc;
 
-    rc = oauth_client_get_access_token(drive->credential, &access_token);
-    if (rc) {
-        // TODO: rc;
+    assert(drive);
+    assert(drive->token);
+    assert(path);
+
+    rc = oauth_token_check_expire(drive->token);
+    if (rc < 0) {
+        vlogE("Hive: Checking access token expired error.");
         return rc;
     }
 
     httpc = http_client_new();
     if (!httpc) {
-        free(access_token);
         // TODO: rc;
         return rc;
     }
 
-    escaped_path = http_client_escape(httpc, path, strlen(path));
+    rc = snprintf(url, sizeof(url), "%s/root:%s:", URL_API, path);
+    if (rc < 0 || rc >= sizeof(url)) {
+        vlogE("Hive: Generating url to delete file with path (%s) error", path);
+        goto error_exit;
+    }
+
+    escaped_url = http_client_escape(httpc, url, strlen(url));
     http_client_reset(httpc);
 
-    if (!escaped_path) {
-        free(access_token);
-        // TODO: rc;
+    if (!escaped_url)
         goto error_exit;
-    }
 
-    rc = snprintf(url, sizeof(url), "%s/root:%s:", drive->drv_url, escaped_path);
-    http_client_memory_free(escaped_path);
-
-    if (rc < 0 || rc >= (int)sizeof(url)) {
-        free(access_token);
-        // TODO: rc;
-        goto error_exit;
-    }
-
-    http_client_set_url_escape(httpc, url);
+    http_client_set_url(httpc, escaped_url);
     http_client_set_method(httpc, HTTP_METHOD_DELETE);
-    http_client_set_header(httpc, "Authorization", access_token);
-    free(access_token);
-    access_token = NULL;
+    http_client_set_header(httpc, "Content-Type", "application/json");
+    http_client_set_header(httpc, "Authorization", get_bearer_token(drive->token));
 
     rc = http_client_request(httpc);
+    http_client_memory_free(escaped_url);
+
     if (rc < 0) {
         // TODO: rc;
         goto error_exit;
@@ -961,17 +946,17 @@ static int onedrive_drive_delete_file(HiveDrive *base, const char *path)
 
     if (rc < 0) {
         // TODO: rc;
-        goto error_exit;
+        return rc;
     }
 
     if (resp_code == 401) {
-        oauth_client_set_expired(drive->credential);
+        oauth_token_set_expired(drive->token);
         // TODO: rc;
         return rc;
     }
 
-    if (resp_code != 204) {
-        // TODO: rc;
+    if (resp_code != 200) {
+        // TODO;
         return rc;
     }
 
@@ -991,10 +976,10 @@ static void onedrive_drive_close(HiveDrive *base)
 static void onedrive_drive_destroy(void *p)
 {
     OneDriveDrive *drive = (OneDriveDrive *)p;
-    deref(drive->credential);
+    deref(drive->token);
 }
 
-int onedrive_drive_open(oauth_client_t *credential, const char *driveid,
+int onedrive_drive_open(oauth_token_t *token, const char *driveid,
                         HiveDrive **drive)
 {
     OneDriveDrive *tmp;
@@ -1002,7 +987,7 @@ int onedrive_drive_open(oauth_client_t *credential, const char *driveid,
     size_t url_len;
     int rc;
 
-    assert(credential);
+    assert(token);
     assert(driveid);
     assert(drive);
 
@@ -1024,10 +1009,8 @@ int onedrive_drive_open(oauth_client_t *credential, const char *driveid,
         return rc;
     }
 
-    snprintf(tmp->drv_url, url_len, "%s%s", URL_API, path);
-
-    ref(credential);
-    tmp->credential = credential;
+    ref(token);
+    tmp->token = token;
 
     tmp->base.get_info    = &onedrive_drive_get_info;
     tmp->base.stat_file   = &onedrive_drive_stat_file;

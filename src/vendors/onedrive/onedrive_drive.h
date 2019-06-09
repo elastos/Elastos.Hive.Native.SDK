@@ -6,9 +6,9 @@ extern "C" {
 #endif
 
 #include "drive.h"
-#include "oauth_client.h"
+#include "oauth_token.h"
 
-int onedrive_drive_open(oauth_client_t *credential, const char *driveid,
+int onedrive_drive_open(oauth_token_t *token, const char *driveid,
                         HiveDrive **drive);
 
 #ifdef __cplusplus

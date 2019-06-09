@@ -3,14 +3,11 @@
 
 #include "ela_hive.h"
 
-int native_client_new(const HiveOptions *options, HiveClient **client)
+HiveClient *native_client_new(const HiveOptions *options)
 {
     assert(options);
-    assert(client);
-
     (void)options;
-    (void)client;
 
     // TODO;
-    return -1;
+    return NULL;
 }

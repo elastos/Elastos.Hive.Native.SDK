@@ -5,9 +5,9 @@
 extern "C" {
 #endif
 
-//#include "ela_hive.h"
+#include "ela_hive.h"
 
-int native_client_new(const HiveOptions *, HiveClient **);
+HiveClient *native_client_new(const HiveOptions *);
 
 #ifdef __cplusplus
 }
