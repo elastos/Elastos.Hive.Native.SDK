@@ -33,6 +33,12 @@ extern "C" {
 #endif
 
 /******************************************************************************
+ * Generic Constants
+ *****************************************************************************/
+
+#define HIVE_MAX_IP_STRING_LEN 45
+
+/******************************************************************************
  * Client APIs
  *****************************************************************************/
 
@@ -201,12 +207,15 @@ typedef struct OneDriveOptions {
     int (*grant_authorize)(const char *request_url);
 } OneDriveOptions;
 
+typedef struct IPFSTokenOptions {
+    char uid[HIVE_MAX_USER_ID_LEN+1];
+    size_t bootstraps_size;
+    char bootstraps_ip[0][HIVE_MAX_IP_STRING_LEN+1];
+} IPFSTokenOptions;
+
 typedef struct IPFSOptions {
     HiveOptions base;
-
-    char *uid;
-    size_t bootstraps_size;
-    const char *bootstraps_ip[0];
+    IPFSTokenOptions token_options;
 } IPFSOptions;
 
 /**
