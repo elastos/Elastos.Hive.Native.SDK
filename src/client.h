@@ -21,7 +21,7 @@ struct HiveClient {
 
     int (*login)        (HiveClient *);
     int (*logout)       (HiveClient *);
-    int (*get_info)     (HiveClient *, char **result);
+    int (*get_info)     (HiveClient *, HiveClientInfo *result);
     int (*finalize)     (HiveClient *);
     int (*list_drives)  (HiveClient *, char **result);
     int (*get_drive)    (HiveClient *, HiveDrive **);

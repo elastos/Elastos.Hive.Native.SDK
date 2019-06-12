@@ -32,29 +32,114 @@ extern "C" {
     #define HIVE_API
 #endif
 
-typedef struct HiveClient       HiveClient;
-typedef struct HiveClientInfo   HiveClientInfo;
-typedef struct HiveDrive        HiveDrive;
-typedef struct HiveDriveInfo    HiveDriveInfo;
-
-struct HiveOAuthInfo {
-    const char *client_id;
-    const char *scope;
-    const char *redirect_url;
-};
-
-enum HiveDriveType {
-    HiveDriveType_Native    = 0x0,
-    HiveDriveType_IPFS      = 0x01,
-
-    HiveDriveType_OneDrive  = 0x10,
-    HiveDriveType_ownCloud  = 0x51,
-    HiveDriveType_Butt      = 0x99
-};
-
 /******************************************************************************
  * Client APIs
  *****************************************************************************/
+
+typedef struct HiveClient       HiveClient;
+typedef struct HiveClientInfo   HiveClientInfo;
+
+/**
+ * \~English
+ * Various Hive supporting backends.
+ */
+enum HiveDriveType {
+    /**
+     * \~English
+     * Native file system.
+     */
+    HiveDriveType_Native    = 0x0,
+
+    /**
+     * \~English
+     * IPFS.
+     */
+    HiveDriveType_IPFS      = 0x01,
+
+    /**
+     * \~English
+     * OneDrive.
+     */
+    HiveDriveType_OneDrive  = 0x10,
+
+    /**
+     * \~English
+     * OwnCloud(not implemented).
+     */
+    HiveDriveType_ownCloud  = 0x51,
+
+    /**
+     * \~English
+     * Drive type buttom(not a valid type).
+     */
+    HiveDriveType_Butt      = 0x99
+};
+
+/**
+ * \~English
+ * User ID max length.
+ */
+#define HIVE_MAX_USER_ID_LEN            255
+
+/**
+ * \~English
+ * User name max length.
+ */
+#define HIVE_MAX_USER_NAME_LEN          63
+
+/**
+ * \~English
+ * User phone number max length.
+ */
+#define HIVE_MAX_PHONE_LEN              31
+
+/**
+ * \~English
+ * User email address max length.
+ */
+#define HIVE_MAX_EMAIL_LEN              127
+
+/**
+ * \~English
+ * User region max length.
+ */
+#define HIVE_MAX_REGION_LEN             127
+
+/**
+ * \~English
+ * A structure representing the hive client associated user's information.
+ */
+struct HiveClientInfo {
+    /**
+     * \~English
+     * User Id.
+     */
+    char user_id[HIVE_MAX_USER_ID_LEN+1];
+
+    /**
+     * \~English
+     * User's display name.
+     */
+    char display_name[HIVE_MAX_USER_NAME_LEN+1];
+
+    /**
+     * \~English
+     * User's email address.
+     */
+    char email[HIVE_MAX_EMAIL_LEN+1];
+
+    /**
+     * \~English
+     * User's phone number.
+     */
+    char phone_number[HIVE_MAX_PHONE_LEN+1];
+
+    /**
+     * \~English
+     * User's region.
+     */
+    char region[HIVE_MAX_REGION_LEN+1];
+};
 
 /**
  * \~English
@@ -200,8 +285,8 @@ int hive_client_logout(HiveClient *client);
 
 /**
  * \~English
- * Get @client associated user's information. The result is a json string
- * (not necessarily null-terminated) passed to @result.
+ * Get @client associated user's information. The result is filled into
+ * @result.
  *
  * This function is effective only when a user is associated with the
  * @client.
@@ -209,20 +294,40 @@ int hive_client_logout(HiveClient *client);
  * @param
  *      client      [in] A handle identifying the Hive client instance.
  * @param
- *      result      [out] After the call, *result points to the buffer
- *                        holding the result. Call free() to release
- *                        the buffer after use.
+ *      result      [out] On success, the HiveClientInfo instance pointed
+ *                        to by @result is filled up with client's information.
  *
  * @return
  *      If no error occurs, return 0. Otherwise, return -1, and a specific
  *      error code can be retrieved by calling hive_get_error().
  */
 HIVE_API
-int hive_client_get_info(HiveClient *client, char **result);
+int hive_client_get_info(HiveClient *client, HiveClientInfo *result);
 
 /******************************************************************************
  * Drive APIs
  *****************************************************************************/
+
+typedef struct HiveDrive        HiveDrive;
+typedef struct HiveDriveInfo    HiveDriveInfo;
+
+/**
+ * \~English
+ * Drive ID max length.
+ */
+#define HIVE_MAX_DRIVE_ID_LEN            255
+
+/**
+ * \~English
+ * A structure representing the hive drive information.
+ */
+struct HiveDriveInfo {
+    /**
+     * \~English
+     * Drive Id.
+     */
+    char drive_id[HIVE_MAX_DRIVE_ID_LEN+1];
+};
 
 /**
  * \~English
@@ -263,8 +368,7 @@ int hive_drive_close(HiveDrive *drive);
 
 /**
  * \~English
- * Get @drive's information. The result is a json string(not necessarily
- * null-terminated) passed to @result.
+ * Get @drive's information. The result is filled into @result.
  *
  * This function is effective only when a user is associated with the
  * client generating the @drive.
@@ -272,16 +376,15 @@ int hive_drive_close(HiveDrive *drive);
  * @param
  *      drive       [in] A handle identifying the Hive drive instance.
  * @param
- *      result      [out] After the call, *result points to the buffer
- *                        holding the result. Call free() to release
- *                        the buffer after use.
+ *      result      [out] On success, the HiveDriveInfo instance pointed
+ *                        to by @result is filled up with drive's information.
  *
  * @return
  *      If no error occurs, return 0. Otherwise, return -1, and a specific
  *      error code can be retrieved by calling hive_get_error().
  */
 HIVE_API
-int hive_drive_get_info(HiveDrive *drive, char **result);
+int hive_drive_get_info(HiveDrive *drive, HiveDriveInfo *result);
 
 /**
  * \~English

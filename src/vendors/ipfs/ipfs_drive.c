@@ -45,44 +45,13 @@ static int ipfs_drive_publish(ipfs_drv_t *drv, const char *path)
     return 0;
 }
 
-static void get_info_setup_req(http_client_t *req, void *args)
-{
-    const char *req_path = (const char *)args;
-
-    http_client_set_path(req, req_path);
-    http_client_set_query(req, "path", "/");
-    http_client_set_method(req, HTTP_METHOD_POST);
-    http_client_enable_response_body(req);
-}
-
-static int ipfs_drive_get_info(HiveDrive *obj, char **result)
+static int ipfs_drive_get_info(HiveDrive *obj, HiveDriveInfo *result)
 {
     ipfs_drv_t *drv = (ipfs_drv_t *)obj;
-    const char *req_path = FILES_API"/stat";
-    ipfs_tsx_t tsx = {
-        .setup_req = &get_info_setup_req,
-        .user_data = (void *)req_path
-    };
     int rc;
-    long resp_code;
 
-    // rc = ipfs_client_synchronize(drv->base.client);
-    if (rc)
-        return -1;
-
-    // // rc = hive_client_perform_transaction(drv->base.client, &tsx);
-    if (rc)
-        return -1;
-
-    rc = http_client_get_response_code(tsx.resp, &resp_code);
-    if (rc || resp_code != 200) {
-        http_client_close(tsx.resp);
-        return -1;
-    }
-
-    *result = http_client_move_response_body(tsx.resp, NULL);
-    http_client_close(tsx.resp);
-    if (!*result)
+    rc = snprintf(result->drive_id, sizeof(result->drive_id), "");
+    if (rc < 0 || rc >= sizeof(result->drive_id))
         return -1;
 
     return 0;

@@ -154,7 +154,7 @@ int hive_client_logout(HiveClient *client)
     return 0;
 }
 
-int hive_client_get_info(HiveClient *client, char **result)
+int hive_client_get_info(HiveClient *client, HiveClientInfo *result)
 {
     if (!client || !result) {
         hive_set_error(-1);
@@ -172,6 +172,26 @@ int hive_client_get_info(HiveClient *client, char **result)
     }
 
     return client->get_info(client, result);
+}
+
+void hive_client_info_free(HiveClientInfo *info)
+{
+#define FREE(ptr)           \
+    do {                    \
+        if (ptr) free(ptr); \
+    } while (0)
+
+    if (!info)
+        return;
+
+    FREE(info->user_id);
+    FREE(info->display_name);
+    FREE(info->email);
+    FREE(info->phone_number);
+    FREE(info->region);
+
+    free(info);
+#undef FREE
 }
 
 int hive_client_list_drives(HiveClient *client, char **result)
