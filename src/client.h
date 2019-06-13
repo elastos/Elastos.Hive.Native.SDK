@@ -17,7 +17,7 @@ enum {
 };
 
 struct HiveClient {
-    int state;  // login state.
+    uint32_t state;  // login state.
 
     int (*login)        (HiveClient *);
     int (*logout)       (HiveClient *);
@@ -31,20 +31,24 @@ struct HiveClient {
 
 inline static void hive_set_error(int error) { }
 
+static inline uint32_t _test_and_swap32(uint32_t *ptr, uint32_t oldval, uint32_t newval)
+{
 #if defined(_WIN32) || defined(_WIN64)
-#define _test_and_swap(ptr, oldval, newval) \
-    InterlockedCompareExchange(ptr, newval, oldval)
+    return InterlockedCompareExchange(ptr, newval, oldval);
 #else
-#define _test_and_swap(ptr, oldval, newval) \
-    __sync_val_compare_and_swap(ptr, oldval, newval)
+    uint32_t tmp = oldval;
+    __atomic_compare_exchange(ptr, &tmp, &newval, false,
+                              __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+    return tmp;
 #endif
+}
 
 inline static
 int client_try_login(HiveClient *client)
 {
     int rc;
 
-    rc = _test_and_swap(&client->state, RAW, LOGINING);
+    rc = _test_and_swap32(&client->state, RAW, LOGINING);
     switch(rc) {
     case RAW:
         rc = 0; // need to proceed the login routine.
@@ -69,7 +73,7 @@ int client_try_logout(HiveClient *client)
 {
     int rc;
 
-    rc = _test_and_swap(&client->state, LOGINED, LOGOUTING);
+    rc = _test_and_swap32(&client->state, LOGINED, LOGOUTING);
     switch(rc) {
     case RAW:
         rc = 1;
@@ -94,7 +98,7 @@ bool is_client_ready(HiveClient *client)
 {
     int rc;
 
-    rc = _test_and_swap(&client->state, LOGINED, LOGINED);
+    rc = _test_and_swap32(&client->state, LOGINED, LOGINED);
     return (rc == LOGINED);
 }
 

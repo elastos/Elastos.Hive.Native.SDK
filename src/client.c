@@ -104,14 +104,14 @@ int hive_client_login(HiveClient *client)
     rc = client->login(client);
     if (rc < 0) {
         // recover back to 'RAW' state.
-        _test_and_swap(&client->state, LOGINING, RAW);
+        _test_and_swap32(&client->state, LOGINING, RAW);
         hive_set_error(rc);
         return -1;
     }
 
     // When conducting all login stuffs successfully, then change to be
     // 'LOGINED'.
-    _test_and_swap(&client->state,  LOGINING, LOGINED);
+    _test_and_swap32(&client->state, LOGINING, LOGINED);
     return 0;
 }
 
@@ -144,7 +144,7 @@ int hive_client_logout(HiveClient *client)
     }
 
     rc = client->logout(client);
-    _test_and_swap(&client->state, LOGOUTING, RAW);
+    _test_and_swap32(&client->state, LOGOUTING, RAW);
 
     if (rc < 0) {
         hive_set_error(rc);
