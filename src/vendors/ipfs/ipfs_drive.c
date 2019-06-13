@@ -418,7 +418,7 @@ error_exit:
 
 static void ipfs_drive_close(HiveDrive *obj)
 {
-    deref(obj);
+    (void)obj;
 }
 
 static void ipfs_drive_destructor(void *obj)

@@ -14,6 +14,9 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <errno.h>
+#if defined(_WIN32) || defined(_WIN64)
+#include <winnt.h>
+#endif
 
 #include "ela_hive.h"
 #include "client.h"
@@ -27,10 +30,34 @@
 
 typedef struct IPFSClient {
     HiveClient base;
+    HiveDrive *drive;
     char uid_cookie[MAXPATHLEN];
     ipfs_token_t *token;
 } IPFSClient;
 
+static inline void *_test_and_swap_ptr(void **ptr, void *oldval, void *newval)
+{
+#if defined(_WIN32) || defined(_WIN64)
+    return InterlockedCompareExchangePointer(ptr, newval, oldval);
+#else
+    void *tmp = oldval;
+    __atomic_compare_exchange(ptr, &tmp, &newval, false,
+                              __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+    return tmp;
+#endif
+}
+
+static inline void *_exchange_ptr(void **ptr, void *val)
+{
+#if defined(_WIN32) || defined(_WIN64)
+    return _InterlockedExchangePointer(ptr, val);
+#else
+    void *old;
+    __atomic_exchange(ptr, &val, &old, __ATOMIC_SEQ_CST);
+    return old;
+#endif
+
+}
 static int ipfs_client_login(HiveClient *base)
 {
     IPFSClient *client = (IPFSClient *)base;
@@ -52,7 +79,12 @@ static int ipfs_client_login(HiveClient *base)
 static int ipfs_client_logout(HiveClient *base)
 {
     IPFSClient *client = (IPFSClient *)base;
+    HiveDrive *drive;
     int rc;
+
+    drive = _exchange_ptr((void **)&client->drive, NULL);
+    if (drive)
+        deref(drive);
 
     rc = remove(client->uid_cookie);
     if (rc < 0)
@@ -172,13 +204,22 @@ static int ipfs_client_drive_open(HiveClient *base, HiveDrive **drive)
 
     assert(base);
 
+    if (client->drive)
+        return -1;
+
     tmp = ipfs_drive_open(client->token);
     if (!tmp) {
         // TODO
         return -1;
     }
 
+    if (_test_and_swap_ptr((void **)&client->drive, NULL, tmp)) {
+        deref(tmp);
+        return -1;
+    }
+
     *drive = tmp;
+
     return 0;
 }
 
@@ -199,6 +240,9 @@ static int ipfs_client_invalidate_credential(HiveClient *obj)
 static void ipfs_client_destructor(void *p)
 {
     IPFSClient *client = (IPFSClient *)p;
+
+    if (client->drive)
+        deref(client->drive);
 
     if (client->token)
         ipfs_token_close(client->token);
