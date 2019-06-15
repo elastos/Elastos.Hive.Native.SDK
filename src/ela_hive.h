@@ -32,16 +32,6 @@ extern "C" {
     #define HIVE_API
 #endif
 
-/******************************************************************************
- * Generic Constants
- *****************************************************************************/
-
-#define HIVE_MAX_IP_STRING_LEN 45
-
-/******************************************************************************
- * Client APIs
- *****************************************************************************/
-
 typedef struct HiveClient   HiveClient;
 typedef struct HiveDrive    HiveDrive;
 typedef struct HiveFile     HiveFile;
@@ -114,6 +104,16 @@ enum HiveDriveType {
 
 /**
  * \~English
+ * Drive ID max length.
+ */
+#define HIVE_MAX_DRIVE_ID_LEN            255
+
+/******************************************************************************
+ * Type definitions of all options.
+ *****************************************************************************/
+
+/**
+ * \~English
  * The common part of options that all kinds of client would need.
  */
 typedef struct HiveOptions {
@@ -160,6 +160,10 @@ typedef struct OneDriveOptions {
     const char *redirect_url;
 } OneDriveOptions;
 
+/**
+ * \~English
+ * The Hive hive node.
+ */
 typedef struct HiveRpcNode {
     /**
      * \~English
@@ -242,12 +246,6 @@ typedef struct HiveClientInfo {
 
 /**
  * \~English
- * Drive ID max length.
- */
-#define HIVE_MAX_DRIVE_ID_LEN            255
-
-/**
- * \~English
  * A structure representing the hive drive information.
  */
 typedef struct HiveDriveInfo {
@@ -258,9 +256,17 @@ typedef struct HiveDriveInfo {
     char driveid[HIVE_MAX_DRIVE_ID_LEN+1];
 } HiveDriveInfo;
 
+/**
+ * \~English
+ * A structure representing the hive file information.
+ */
 typedef struct HiveFileInfo {
     char fileid[128];
 } HiveFileInfo;
+
+/******************************************************************************
+ * Client APIs
+ *****************************************************************************/
 
 /**
  * \~English
@@ -285,6 +291,11 @@ HIVE_API
 HiveClient *hive_client_new(const HiveOptions *options);
 
 /**
+ * TODO
+ */
+typedef int HiveRequestAuthenticationCallback(const char *url, void *context);
+
+/**
  * \~English
  * Close the hive client instance.
  *
@@ -302,9 +313,6 @@ HiveClient *hive_client_new(const HiveOptions *options);
  *      If no error occurs, return 0. Otherwise, return -1, and a specific
  *      error code can be retrieved by calling hive_get_error().
  */
-
-typedef int HiveRequestAuthenticationCallback(const char *url, void *context);
-
 HIVE_API
 int hive_client_close(HiveClient *client);
 
