@@ -61,6 +61,11 @@ int hive_drive_mkdir(HiveDrive *drive, const char *path)
         return -1;
     }
 
+    if (strcmp(path, "/") == 0) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
+        return -1;
+    }
+
     if (!drive->make_dir) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED));
         return -1;

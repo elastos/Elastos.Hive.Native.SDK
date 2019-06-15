@@ -5,8 +5,6 @@
 extern "C" {
 #endif
 
-#include "ela_hive.h"
-
 HiveClient *onedrive_client_new(const HiveOptions *options);
 
 #ifdef __cplusplus
