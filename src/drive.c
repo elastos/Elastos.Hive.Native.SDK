@@ -25,7 +25,7 @@ int hive_drive_get_info(HiveDrive *drive, HiveDriveInfo *drive_info)
 int hive_drive_file_stat(HiveDrive *drive, const char *path,
                          HiveFileInfo *file_info)
 {
-    if (!drive || !path || *path != '/'|| !file_info) {
+    if (!drive || !path || path[0] != '/' || strlen(path) > MAXPATHLEN || !file_info) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
     }
@@ -56,7 +56,7 @@ int hive_drive_list_files(HiveDrive *drive, const char *path,
 
 int hive_drive_mkdir(HiveDrive *drive, const char *path)
 {
-    if (!drive || !path || *path != '/') {
+    if (!drive || !path || path[0] != '/' || path[1] == '\0' || strlen(path) > MAXPATHLEN) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
     }
@@ -76,7 +76,9 @@ int hive_drive_mkdir(HiveDrive *drive, const char *path)
 
 int hive_drive_move_file(HiveDrive *drive, const char *old, const char *new)
 {
-    if (!drive || !old || *old != '/' || !new || *new != '/') {
+    if (!drive ||
+        !old || old[0] != '/' || old[1] == '\0' || strlen(old) > MAXPATHLEN ||
+        !new || new[0] != '/' || new[1] == '\0' || strlen(new) > MAXPATHLEN) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
     }
@@ -96,7 +98,9 @@ int hive_drive_move_file(HiveDrive *drive, const char *old, const char *new)
 
 int hive_drive_copy_file(HiveDrive *drive, const char *src, const char *dest)
 {
-    if (!drive || !src || *src != '/' || !dest || *dest != '/') {
+   if (!drive ||
+        !src || src[0] != '/' || src[1] == '\0' || strlen(src) > MAXPATHLEN ||
+        !dest || dest[0] != '/' || dest[1] == '\0' || strlen(dest) > MAXPATHLEN) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
     }
@@ -116,7 +120,8 @@ int hive_drive_copy_file(HiveDrive *drive, const char *src, const char *dest)
 
 int hive_drive_delete_file(HiveDrive *drive, const char *path)
 {
-    if (!drive || !path  || *path != '/') {
+    if (!drive || !path || path[0] != '/' || path[1] == '\0' ||
+        strlen(path) > MAXPATHLEN) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
     }
