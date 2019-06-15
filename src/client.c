@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <crystal.h>
+#include <sys/stat.h>
 
 #include "client.h"
 #include "native_client.h"
@@ -25,6 +26,7 @@ HiveClient *hive_client_new(const HiveOptions *options)
 {
     FactoryMethod *method = &factory_methods[0];
     HiveClient *client = NULL;
+    struct stat st;
     int rc;
 
     if (!options || !options->persistent_location ||
@@ -32,6 +34,13 @@ HiveClient *hive_client_new(const HiveOptions *options)
         hive_set_error(-1);
         return NULL;
     }
+
+    rc = stat(options->persistent_location, &st);
+    if (rc < 0)
+        return NULL;
+
+    if (!S_ISDIR(st.st_mode))
+        return NULL;
 
     for (; method->factory_cb; method++) {
         if (method->drive_type == options->drive_type) {

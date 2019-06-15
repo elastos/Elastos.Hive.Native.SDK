@@ -33,6 +33,12 @@ extern "C" {
 #endif
 
 /******************************************************************************
+ * Generic Constants
+ *****************************************************************************/
+
+#define HIVE_MAX_IP_STRING_LEN 45
+
+/******************************************************************************
  * Client APIs
  *****************************************************************************/
 
@@ -201,12 +207,15 @@ typedef struct OneDriveOptions {
     int (*grant_authorize)(const char *request_url);
 } OneDriveOptions;
 
+typedef struct IPFSTokenOptions {
+    char uid[HIVE_MAX_USER_ID_LEN+1];
+    size_t bootstraps_size;
+    char bootstraps_ip[0][HIVE_MAX_IP_STRING_LEN+1];
+} IPFSTokenOptions;
+
 typedef struct IPFSOptions {
     HiveOptions base;
-
-    char *uid;
-    size_t bootstraps_size;
-    const char *bootstraps_ip[0];
+    IPFSTokenOptions token_options;
 } IPFSOptions;
 
 /**
@@ -232,7 +241,10 @@ HiveClient *hive_client_new(const HiveOptions *options);
 
 /**
  * \~English
- * Destroy all associated resources with the Hive client instance.
+ * Destroy all associated resources with the Hive client instance. If a drive
+ * had been constructed out of the client, it would also be closed. The drive
+ * handle becomes invalid after the call, no functions should be called upon
+ * the drive handle.
  *
  * After calling the function, the client pointer becomes invalid.
  * No other functions should be called.
@@ -268,7 +280,9 @@ int hive_client_login(HiveClient *client);
 /**
  * \~English
  * Dissociate the user from the @client. All client's data in persistent
- * location is deleted.
+ * location is deleted. If a drive had been constructed out of the client,
+ * it would also be closed. The drive handle becomes invalid after the call,
+ * no functions should be called upon the drive handle.
  *
  * This function is effective only when a user is associated with the
  * @client.
