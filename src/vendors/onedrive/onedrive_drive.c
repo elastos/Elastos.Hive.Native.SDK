@@ -31,15 +31,15 @@ typedef struct OneDriveDrive {
     char drv_url[0];
 } OneDriveDrive ;
 
-static int onedrive_drive_decode_drive_info(const char *info_str,
-                                            HiveDriveInfo *result)
+static
+int onedrive_decode_drive_info(const char *info_str, HiveDriveInfo *info)
 {
     cJSON *json;
     cJSON *id;
     int rc;
 
     assert(info_str);
-    assert(result);
+    assert(info);
 
     json = cJSON_Parse(info_str);
     if (!json)
@@ -51,17 +51,17 @@ static int onedrive_drive_decode_drive_info(const char *info_str,
         return -1;
     }
 
-    rc = snprintf(result->drive_id, sizeof(result->drive_id),
+    rc = snprintf(info->driveid, sizeof(info->driveid),
                   "%s", id->valuestring);
     cJSON_Delete(json);
-    if (rc < 0 || rc >= sizeof(result->drive_id))
+    if (rc < 0 || rc >= sizeof(info->driveid))
         return -1;
 
     return 0;
 }
 
 static
-int onedrive_drive_get_info(HiveDrive *base, HiveDriveInfo *result)
+int onedrive_drive_get_info(HiveDrive *base, HiveDriveInfo *info)
 {
     OneDriveDrive *drive = (OneDriveDrive *)base;
     http_client_t *httpc;
@@ -72,7 +72,7 @@ int onedrive_drive_get_info(HiveDrive *base, HiveDriveInfo *result)
 
     assert(drive);
     assert(drive->credential);
-    assert(result);
+    assert(info);
 
     rc = oauth_client_get_access_token(drive->credential, &access_token);
     if (rc) {
@@ -125,7 +125,7 @@ int onedrive_drive_get_info(HiveDrive *base, HiveDriveInfo *result)
         return rc;
     }
 
-    rc = onedrive_drive_decode_drive_info(p, result);
+    rc = onedrive_decode_drive_info(p, info);
     free(p);
     if (rc)
         return -1;
@@ -138,8 +138,16 @@ error_exit:
 }
 
 static
-int onedrive_drive_file_stat(HiveDrive *base, const char *path, char **result)
+int onedrive_decode_file_info(const char *info_str, HiveFileInfo *info)
 {
+    // TODO;
+    return -1;
+}
+
+static
+int onedrive_drive_stat_file(HiveDrive *base, const char *path, HiveFileInfo *info)
+{
+    char **result; // TODO;
     OneDriveDrive *drive = (OneDriveDrive *)base;
     http_client_t *httpc;
     char url[MAXPATHLEN + 1] = {0};
@@ -228,7 +236,11 @@ int onedrive_drive_file_stat(HiveDrive *base, const char *path, char **result)
         return -1;
     }
 
-    *result = p;
+    rc = onedrive_decode_file_info(p, info);
+    free(p);
+    if (rc)
+        return -1;
+
     return 0;
 
 error_exit:
@@ -1018,7 +1030,7 @@ int onedrive_drive_open(oauth_client_t *credential, const char *driveid,
     tmp->credential = credential;
 
     tmp->base.get_info    = &onedrive_drive_get_info;
-    tmp->base.file_stat   = &onedrive_drive_file_stat;
+    tmp->base.stat_file   = &onedrive_drive_stat_file;
     tmp->base.list_files  = &onedrive_drive_list_files;
     tmp->base.makedir     = &onedrive_drive_mkdir;
     tmp->base.move_file   = &onedrive_drive_move_file;

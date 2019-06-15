@@ -5,7 +5,7 @@
 
 struct HiveDrive {
     int (*get_info)     (HiveDrive *, HiveDriveInfo *result);
-    int (*file_stat)    (HiveDrive *, const char *path, char **result);
+    int (*stat_file)    (HiveDrive *, const char *path, HiveFileInfo *);
     int (*list_files)   (HiveDrive *, const char *path, char **result);
     int (*makedir)      (HiveDrive *, const char *path);
     int (*move_file)    (HiveDrive *, const char *from, const char *to);

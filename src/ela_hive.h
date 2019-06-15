@@ -42,8 +42,9 @@ extern "C" {
  * Client APIs
  *****************************************************************************/
 
-typedef struct HiveClient       HiveClient;
-typedef struct HiveClientInfo   HiveClientInfo;
+typedef struct HiveClient   HiveClient;
+typedef struct HiveDrive    HiveDrive;
+typedef struct HiveFile     HiveFile;
 
 /**
  * \~English
@@ -113,43 +114,7 @@ enum HiveDriveType {
 
 /**
  * \~English
- * A structure representing the hive client associated user's information.
- */
-struct HiveClientInfo {
-    /**
-     * \~English
-     * User Id.
-     */
-    char user_id[HIVE_MAX_USER_ID_LEN+1];
-
-    /**
-     * \~English
-     * User's display name.
-     */
-    char display_name[HIVE_MAX_USER_NAME_LEN+1];
-
-    /**
-     * \~English
-     * User's email address.
-     */
-    char email[HIVE_MAX_EMAIL_LEN+1];
-
-    /**
-     * \~English
-     * User's phone number.
-     */
-    char phone_number[HIVE_MAX_PHONE_LEN+1];
-
-    /**
-     * \~English
-     * User's region.
-     */
-    char region[HIVE_MAX_REGION_LEN+1];
-};
-
-/**
- * \~English
- * The common options which clients of all types share.
+ * The common part of options that all kinds of client would need.
  */
 typedef struct HiveOptions {
     /**
@@ -193,37 +158,117 @@ typedef struct OneDriveOptions {
      * The redirect URL through which the client gets the authorization code.
      */
     const char *redirect_url;
+} OneDriveOptions;
+
+typedef struct HiveRpcNode {
+    /**
+     * \~English
+     * The ip address supported with ipv4 protocol.
+     */
+    const char *ipv4;
 
     /**
      * \~English
-     * The Callback to open the authorization page.
-     * @param
-     *      request_url     [in] The URL of the authorization page.
-     *
-     * @return
-     *      On successfully opening the page, return 0. Otherwise, return
-     *      non-zero.
+     * The ip address supported with ipv6 protocol.
      */
-    int (*grant_authorize)(const char *request_url);
-} OneDriveOptions;
+    const char *ipv6;
 
-typedef struct IPFSTokenOptions {
-    char uid[HIVE_MAX_USER_ID_LEN+1];
-    size_t bootstraps_size;
-    char bootstraps_ip[0][HIVE_MAX_IP_STRING_LEN+1];
-} IPFSTokenOptions;
+    /**
+     * \~English
+     * The ip port.
+     * The default value is 9094.
+     */
+    const char *port;
+} HiveRpcNode;
 
 typedef struct IPFSOptions {
+    /**
+     * \~English
+     * Common options.
+     */
     HiveOptions base;
-    IPFSTokenOptions token_options;
+
+    /**
+     * The unique uid for current user.
+     */
+    const char *uid;
+
+    /**
+     * The count of IPFS rpc addresses.
+     */
+    size_t rpc_node_count;
+
+    /**
+     * The array of rpc address of hive IPFS nodes.
+     */
+    HiveRpcNode *rpcNodes;
 } IPFSOptions;
 
 /**
  * \~English
- * Create a new hive client instance to the specific backend. If the data
- * of a former existing client instance exists in @options::persistent_location,
- * the client instance is restored. Otherwise, a fresh new client instance
- * is returned, no user is associated with the client.
+ * A structure representing the hive client associated user's information.
+ */
+typedef struct HiveClientInfo {
+    /**
+     * \~English
+     * User Id.
+     */
+    char user_id[HIVE_MAX_USER_ID_LEN+1];
+
+    /**
+     * \~English
+     * User's display name.
+     */
+    char display_name[HIVE_MAX_USER_NAME_LEN+1];
+
+    /**
+     * \~English
+     * User's email address.
+     */
+    char email[HIVE_MAX_EMAIL_LEN+1];
+
+    /**
+     * \~English
+     * User's phone number.
+     */
+    char phone_number[HIVE_MAX_PHONE_LEN+1];
+
+    /**
+     * \~English
+     * User's region.
+     */
+    char region[HIVE_MAX_REGION_LEN+1];
+} HiveClientInfo;
+
+/**
+ * \~English
+ * Drive ID max length.
+ */
+#define HIVE_MAX_DRIVE_ID_LEN            255
+
+/**
+ * \~English
+ * A structure representing the hive drive information.
+ */
+typedef struct HiveDriveInfo {
+    /**
+     * \~English
+     * Drive Id.
+     */
+    char driveid[HIVE_MAX_DRIVE_ID_LEN+1];
+} HiveDriveInfo;
+
+typedef struct HiveFileInfo {
+    char fileid[128];
+} HiveFileInfo;
+
+/**
+ * \~English
+ * Create a new hive client instance to the specific backend.
+ *
+ * If the data is stored under @options.peristent_location, the client
+ * instance would be created base on it. Otherwise, a new client instance
+ * would be created and returned without any user context.
  *
  * All other hive APIs should be called after having client instance.
  *
@@ -241,13 +286,14 @@ HiveClient *hive_client_new(const HiveOptions *options);
 
 /**
  * \~English
- * Destroy all associated resources with the Hive client instance. If a drive
- * had been constructed out of the client, it would also be closed. The drive
- * handle becomes invalid after the call, no functions should be called upon
- * the drive handle.
+ * Close the hive client instance.
  *
- * After calling the function, the client pointer becomes invalid.
- * No other functions should be called.
+ * After closing client instance, all derived instances of this client,
+ * such as drive and file instances would become invalid. And any calling
+ * APIs with invalid derive and file instance would be undefined.
+ *
+ * All derived instances such drive and files should be closed before
+ * calling this API.
  *
  * @param
  *      client      [in] A handle identifying the Hive client instance.
@@ -308,49 +354,28 @@ int hive_client_logout(HiveClient *client);
  * @param
  *      client      [in] A handle identifying the Hive client instance.
  * @param
- *      result      [out] On success, the HiveClientInfo instance pointed
- *                        to by @result is filled up with client's information.
+ *      client_info [in] The HiveClientInfo pointer to receive the client
+ *                       information.
  *
  * @return
  *      If no error occurs, return 0. Otherwise, return -1, and a specific
  *      error code can be retrieved by calling hive_get_error().
  */
 HIVE_API
-int hive_client_get_info(HiveClient *client, HiveClientInfo *result);
+int hive_client_get_info(HiveClient *client, HiveClientInfo *client_info);
 
 /******************************************************************************
  * Drive APIs
  *****************************************************************************/
-
-typedef struct HiveDrive        HiveDrive;
-typedef struct HiveDriveInfo    HiveDriveInfo;
-
-/**
- * \~English
- * Drive ID max length.
- */
-#define HIVE_MAX_DRIVE_ID_LEN            255
-
-/**
- * \~English
- * A structure representing the hive drive information.
- */
-struct HiveDriveInfo {
-    /**
-     * \~English
-     * Drive Id.
-     */
-    char drive_id[HIVE_MAX_DRIVE_ID_LEN+1];
-};
-
 /**
  * \~English
  *
- * Create a new Hive drive instance representing the default drive of @client's
- * associating user.
+ * Create a new Hive drive instance representing the default drive of
+ * specific client.
  *
- * This function is effective only when a user is associated with the
- * @client.
+ * This function is effective only after the client has logined with
+ * authentication. Caller is reponsible for close this drive instance
+ * to reclaim resources when drive instance would not be used anymore.
  *
  * @param
  *      client      [in] A handle identifying the Hive client instance.
@@ -365,10 +390,10 @@ HiveDrive *hive_drive_open(HiveClient *client);
 
 /**
  * \~English
- * Destroy all associated resources with the Hive drive instance.
+ * Close the hive drive instance to destroy all associated resources.
  *
- * After calling the function, the client pointer becomes invalid.
- * No other functions should be called.
+ * As long as the drive instance is closed, it becomes invalid. And calling
+ * any function related invalid drive instance would be undefined.
  *
  * @param
  *      drive      [in] A handle identifying the Hive drive instance.
@@ -390,39 +415,15 @@ int hive_drive_close(HiveDrive *drive);
  * @param
  *      drive       [in] A handle identifying the Hive drive instance.
  * @param
- *      result      [out] On success, the HiveDriveInfo instance pointed
- *                        to by @result is filled up with drive's information.
+ *      drive_info  [in] The HiveDriveInfo pointer to receive the drive
+ *                       information.
  *
  * @return
  *      If no error occurs, return 0. Otherwise, return -1, and a specific
  *      error code can be retrieved by calling hive_get_error().
  */
 HIVE_API
-int hive_drive_get_info(HiveDrive *drive, HiveDriveInfo *result);
-
-/**
- * \~English
- * Get status of the file specified by @file_path in @drive. The result is
- * a json string(not necessarily null-terminated) passed to @result.
- *
- * This function is effective only when a user is associated with the
- * client generating the @drive.
- *
- * @param
- *      drive      [in] A handle identifying the Hive client instance.
- * @param
- *      file_path  [in] The absolute path to a file in @drive.
- * @param
- *      result     [out] After the call, *result points to the buffer
- *                       holding the result. Call free() to release
- *                       the buffer after use.
- *
- * @return
- *      If no error occurs, return 0. Otherwise, return -1, and a specific
- *      error code can be retrieved by calling hive_get_error().
- */
-HIVE_API
-int hive_drive_file_stat(HiveDrive *drive, const char *file_path, char **result);
+int hive_drive_get_info(HiveDrive *drive, HiveDriveInfo *drive_info);
 
 /**
  * \~English
@@ -478,9 +479,9 @@ int hive_drive_mkdir(HiveDrive *drive, const char *path);
  * @param
  *      drive      [in] A handle identifying the Hive client instance.
  * @param
- *      old        [in] The absolute path to a file in @drive.
+ *      old        [in] The absolute path of file that would be moved.
  * @param
- *      new        [in] The absolute path to a file in @drive.
+ *      new        [in] The absolute path that a file would copy to.
  *
  * @return
  *      If no error occurs, return 0. Otherwise, return -1, and a specific
@@ -499,16 +500,16 @@ int hive_drive_move_file(HiveDrive *drive, const char *old, const char *new);
  * @param
  *      drive      [in] A handle identifying the Hive client instance.
  * @param
- *      src_path   [in] The absolute path to a file in @drive.
+ *      src        [in] The absolute path of file that would be copied.
  * @param
- *      dest_path  [in] The absolute path to a file in @drive.
+ *      dest       [in] The absolute path that a file would copy to.
  *
  * @return
  *      If no error occurs, return 0. Otherwise, return -1, and a specific
  *      error code can be retrieved by calling hive_get_error().
  */
 HIVE_API
-int hive_drive_copy_file(HiveDrive *drive, const char *src_path, const char *dest_path);
+int hive_drive_copy_file(HiveDrive *drive, const char *src, const char *dest);
 
 /**
  * \~English
@@ -529,6 +530,57 @@ int hive_drive_copy_file(HiveDrive *drive, const char *src_path, const char *des
 HIVE_API
 int hive_drive_delete_file(HiveDrive *drive, const char *path);
 
+/**
+ * \~English
+ * Get status of the file specified by @file_path in @drive. The result is
+ * a json string(not necessarily null-terminated) passed to @result.
+ *
+ * This function is effective only when a user is associated with the
+ * client generating the @drive.
+ *
+ * @param
+ *      drive      [in] A handle identifying the Hive client instance.
+ * @param
+ *      path       [in] The absolute path to a file in @drive.
+ * @param
+ *      file_info  [in] The HiveFileInfo pointer to receive the drive
+ *                      information.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
+HIVE_API
+int hive_drive_file_stat(HiveDrive *drive, const char *path,
+                         HiveFileInfo *file_info);
+
+
+HIVE_API
+HiveFile *hive_file_open(HiveDrive *drive, const char *path, const char *mode);
+
+HIVE_API
+int hive_file_close(HiveFile *file);
+
+HIVE_API
+int hive_file_get_info(HiveFile *file, HiveFileInfo *file_info);
+
+HIVE_API
+char *hive_file_get_path(HiveFile *file, char *buf, size_t bufsz);
+
+enum {
+    HiveSeek_Set,
+    HiveSeek_Cur,
+    HiveSeek_End
+};
+
+HIVE_API
+ssize_t hive_file_seek(HiveFile *, uint64_t offset, int whence);
+
+HIVE_API
+ssize_t hive_file_read(HiveFile *, char *buf, size_t bufsz);
+
+HIVE_API
+ssize_t hive_file_write(HiveFile *file, const char *buf, size_t bufsz);
 /******************************************************************************
  * Error handling
  *****************************************************************************/

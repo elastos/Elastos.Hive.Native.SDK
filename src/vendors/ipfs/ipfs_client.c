@@ -321,7 +321,7 @@ static int save_uid_cookie(const char *uid_cookie, const char *uid)
 
 int ipfs_client_new(const HiveOptions *options, HiveClient **client)
 {
-    IPFSOptions *opts = (IPFSOptions *)options;
+    IPFSOptionsDeprecated *opts = (IPFSOptionsDeprecated *)options;
     IPFSTokenOptions *token_opts = &opts->token_options;
     size_t uid_max_len = HIVE_MAX_USER_ID_LEN + 1;
     char uid_cookie[MAXPATHLEN + 1];

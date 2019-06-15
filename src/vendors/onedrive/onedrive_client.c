@@ -355,8 +355,7 @@ int onedrive_client_new(const HiveOptions *options, HiveClient **client)
 
     if (!opts->client_id    || !*opts->client_id    ||
         !opts->redirect_url || !*opts->redirect_url ||
-        !opts->scope        || !*opts->scope        ||
-        !opts->grant_authorize) {
+        !opts->scope        || !*opts->scope) {
         // TOOD;
         return rc;
     }
@@ -423,7 +422,7 @@ int onedrive_client_new(const HiveOptions *options, HiveClient **client)
     oauth_opt.redirect_url    = redirect_url;
     oauth_opt.redirect_port   = port;
     oauth_opt.redirect_path   = path;
-    oauth_opt.grant_authorize = opts->grant_authorize;
+    //oauth_opt.grant_authorize = opts->grant_authorize;
 
     tmp->oauth_client = oauth_client_new(&oauth_opt);
     if (!tmp->oauth_client) {
