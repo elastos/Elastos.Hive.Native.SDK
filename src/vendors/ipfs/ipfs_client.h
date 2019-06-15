@@ -8,6 +8,8 @@ extern "C" {
 #include "ela_hive.h"
 #include "http_client.h"
 
+#define HIVE_MAX_IP_STRING_LEN            255
+
 typedef struct IPFSTokenOptions {
     char uid[HIVE_MAX_USER_ID_LEN+1];
     size_t bootstraps_size;
