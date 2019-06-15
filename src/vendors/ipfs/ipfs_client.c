@@ -389,7 +389,6 @@ int ipfs_client_new(const HiveOptions *options, HiveClient **client)
     tmp->base.login       = &ipfs_client_login;
     tmp->base.logout      = &ipfs_client_logout;
     tmp->base.get_info    = &ipfs_client_get_info;
-    tmp->base.list_drives = &ipfs_client_list_drives;
     tmp->base.get_drive   = &ipfs_client_drive_open;
     tmp->base.finalize    = &ipfs_client_close;
 

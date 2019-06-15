@@ -489,9 +489,8 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
     client->base.login       = &onedrive_client_login;
     client->base.logout      = &onedrive_client_logout;
     client->base.get_info    = &onedrive_client_get_info;
-    client->base.list_drives = &onedrive_client_list_drives;
     client->base.get_drive   = &onedrive_client_drive_open;
-    client->base.finalize    = &onedrive_client_close;
+    client->base.close       = &onedrive_client_close;
 
     return &client->base;
 }

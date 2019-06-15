@@ -12,6 +12,7 @@ extern "C" {
 
 #include <sys/types.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #if defined(HIVE_STATIC)
     #define HIVE_API
@@ -292,11 +293,6 @@ HIVE_API
 HiveClient *hive_client_new(const HiveOptions *options);
 
 /**
- * TODO
- */
-typedef int HiveRequestAuthenticationCallback(const char *url, void *context);
-
-/**
  * \~English
  * Close the hive client instance.
  *
@@ -316,6 +312,11 @@ typedef int HiveRequestAuthenticationCallback(const char *url, void *context);
  */
 HIVE_API
 int hive_client_close(HiveClient *client);
+
+/**
+ * TODO
+ */
+typedef int HiveRequestAuthenticationCallback(const char *url, void *context);
 
 /**
  * \~English
@@ -459,52 +460,50 @@ typedef struct KeyValue {
 
 /**
  * \~English
- * An application-defined function notifying users of details of a file, in the
- * context of one of the iterations of files under a specific directory.
+ * An application-defined function that iterate the each file info item.
+ *
+ * ElaFriendsIterateCallback is the callback function type.
  *
  * @param
  *      info        [in] A pointer to an array of KeyValue carrying various
- *                       properties of the file.
- *                       (NULL indicates the end of iteration).
+ *                       properties of the file. Null means interation end.
  * @param
  *      size        [in] the size of the KeyValue array.
  * @param
  *      context     [in] The application-defined context data.
  *
  * @return
- *      Return true to continue iteration, false to abort.
+ *      Return true to continue iteration, false to abort from interation
+ *      process immediately.
  */
-typedef bool HiveFilesIterateCallback(const KeyValue *info, size_t size, void *context);
+typedef bool HiveFilesIterateCallback(const KeyValue *info, size_t size,
+                                      void *context);
 
 /**
  * \~English
- * Iterate files under the directory specified by @dir_path in @drive. @callback
- * is called once for each file, notifying users of details of that file, with
- * @context passed as argument context; Returning true to continue iteration,
- * false to abort. In absence of abortion, an extra call to @callback takes place
- * at last, with argument info given the NULL value, signaling the end of the
- * iteration, return value is ignored.
+ * Iterate file info under the sepcified directory path.
  *
- * This function is effective only when a user is associated with the
- * client generating the @drive.
+ * Callback would be invoked to iterate information of each file after having
+ * acquired the list of information under the directory from remote drive.
+ *
+ * This function is effective only after the client has been logined.
  *
  * @param
  *      drive      [in] A handle identifying the Hive client instance.
  * @param
- *      dir_path   [in] The absolute path to a directory in @drive.
+ *      path       [in] The absolute path to a directory list its file infos.
  * @param
- *      callback   [in] An application-defined function called once for each
- *                      file under the directory.
+ *      callback   [in] An application-defined function to iterate each
+ *                      file info under directory.
  * @param
- *      context    [in] An application-defined opaque data passed as the
- *                      context argument to @callback.
+ *      context    [in] The application defined context data.
  *
  * @return
  *      If no error occurs, return 0. Otherwise, return -1, and a specific
  *      error code can be retrieved by calling hive_get_error().
  */
 HIVE_API
-int hive_drive_list_files(HiveDrive *drive, const char *dir_path,
+int hive_drive_list_files(HiveDrive *drive, const char *path,
                           HiveFilesIterateCallback *callback, void *context);
 
 /**
@@ -692,177 +691,99 @@ ssize_t hive_file_write(HiveFile *file, const char *buf, size_t bufsz);
 
 /**
  * \~English
- * Control packet is invalid.
- */
-#define HIVEERR_INVALID_CONTROL_PACKET               0x06
-
-/**
- * \~English
  * Credential is invalid.
  */
-#define HIVEERR_INVALID_CREDENTIAL                   0x07
+#define HIVEERR_INVALID_CREDENTIAL                   0x06
 
 /**
  * \~English
- * Carrier ran already.
+ * Hive SDK not ready.
  */
-#define HIVEERR_ALREADY_RUN                          0x08
-
-/**
- * \~English
- * Carrier not ready.
- */
-#define HIVEERR_NOT_READY                            0x09
+#define HIVEERR_NOT_READY                            0x07
 
 /**
  * \~English
  * The requested entity does not exist.
  */
-#define HIVEERR_NOT_EXIST                            0x0A
+#define HIVEERR_NOT_EXIST                            0x08
 
 /**
  * \~English
  * The entity exists already.
  */
-#define HIVEERR_ALREADY_EXIST                        0x0B
-
-/**
- * \~English
- * There are no matched requests.
- */
-#define HIVEERR_NO_MATCHED_REQUEST                   0x0C
+#define HIVEERR_ALREADY_EXIST                        0x09
 
 /**
  * \~English
  * User ID is invalid.
  */
-#define HIVEERR_INVALID_USERID                       0x0D
-
-/**
- * \~English
- * Node ID is invalid.
- */
-#define HIVEERR_INVALID_NODEID                       0x0E
+#define HIVEERR_INVALID_USERID                       0x0A
 
 /**
  * \~English
  * Failed because wrong state.
  */
-#define HIVEERR_WRONG_STATE                          0x0F
+#define HIVEERR_WRONG_STATE                          0x0B
 
 /**
  * \~English
  * Stream busy.
  */
-#define HIVEERR_BUSY                                 0x10
+#define HIVEERR_BUSY                                 0x0C
 
 /**
  * \~English
  * Language binding error.
  */
-#define HIVEERR_LANGUAGE_BINDING                     0x11
+#define HIVEERR_LANGUAGE_BINDING                     0x0D
 
 /**
  * \~English
  * Encryption failed.
  */
-#define HIVEERR_ENCRYPT                              0x12
-
-/**
- * \~English
- * The content size of SDP is too long.
- */
-#define HIVEERR_SDP_TOO_LONG                         0x13
-
-/**
- * \~English
- * Bad SDP information format.
- */
-#define HIVEERR_INVALID_SDP                          0x14
+#define HIVEERR_ENCRYPT                              0x0E
 
 /**
  * \~English
  * Not implemented yet.
  */
-#define HIVEERR_NOT_IMPLEMENTED                      0x15
+#define HIVEERR_NOT_IMPLEMENTED                      0x0F
+
+/**
+ * \~English
+ * Not supported.
+ */
+#define HIVEERR_NOT_SUPPORTED                        0x10
 
 /**
  * \~English
  * Limits are exceeded.
  */
-#define HIVEERR_LIMIT_EXCEEDED                       0x16
-
-/**
- * \~English
- * Allocate port unsuccessfully.
- */
-#define HIVEERR_PORT_ALLOC                           0x17
-
-/**
- * \~English
- * Invalid proxy type.
- */
-#define HIVEERR_BAD_PROXY_TYPE                       0x18
-
-/**
- * \~English
- * Invalid proxy host.
- */
-#define HIVEERR_BAD_PROXY_HOST                       0x19
-
-/**
- * \~English
- * Invalid proxy port.
- */
-#define HIVEERR_BAD_PROXY_PORT                       0x1A
-
-/**
- * \~English
- * Proxy is not available.
- */
-#define HIVEERR_PROXY_NOT_AVAILABLE                  0x1B
+#define HIVEERR_LIMIT_EXCEEDED                       0x11
 
 /**
  * \~English
  * Persistent data is encrypted, load failed.
  */
-#define HIVEERR_ENCRYPTED_PERSISTENT_DATA            0x1C
+#define HIVEERR_ENCRYPTED_PERSISTENT_DATA            0x12
 
 /**
  * \~English
  * Invalid bootstrap host.
  */
-#define HIVEERR_BAD_BOOTSTRAP_HOST                   0x1D
+#define HIVEERR_BAD_BOOTSTRAP_HOST                   0x13
 
 /**
  * \~English
  * Invalid bootstrap port.
  */
-#define HIVEERR_BAD_BOOTSTRAP_PORT                   0x1E
-
-/**
- * \~English
- * Data is too long.
- */
-#define HIVEERR_TOO_LONG                             0x1F
-
-/**
- * \~English
- * Could not friend yourself.
- */
-#define HIVEERR_ADD_SELF                             0x20
+#define HIVEERR_BAD_BOOTSTRAP_PORT                   0x14
 
 /**
  * \~English
  * Invalid address.
  */
-#define HIVEERR_BAD_ADDRESS                          0x21
-
-/**
- * \~English
- * Friend is offline.
- */
-#define HIVEERR_FRIEND_OFFLINE                       0x22
+#define HIVEERR_BAD_ADDRESS                          0x15
 
 /**
  * \~English
