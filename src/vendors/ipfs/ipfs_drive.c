@@ -19,21 +19,27 @@ typedef struct ipfs_drive {
     ipfs_token_t *token;
 } ipfs_drive_t;
 
-static int ipfs_drive_get_info(HiveDrive *base, HiveDriveInfo *result)
+static int ipfs_drive_get_info(HiveDrive *base, HiveDriveInfo *info)
 {
     int rc;
 
+    assert(base);
+    assert(info);
+
     (void)base;
 
-    rc = snprintf(result->drive_id, sizeof(result->drive_id), "");
-    if (rc < 0 || rc >= sizeof(result->drive_id))
+    // TODO:
+    rc = snprintf(info->driveid, sizeof(info->driveid), "");
+    if (rc < 0 || rc >= sizeof(info->driveid))
         return -1;
 
     return 0;
 }
 
-static int ipfs_drive_file_stat(HiveDrive *base, const char *file_path, char **result)
+static int ipfs_drive_stat_file(HiveDrive *base, const char *file_path,
+                                HiveFileInfo *info)
 {
+    char **result;
     ipfs_drive_t *drive = (ipfs_drive_t *)base;
     char node_ip[HIVE_MAX_IP_STRING_LEN + 1];
     char uid[HIVE_MAX_USER_ID_LEN + 1];
@@ -442,7 +448,7 @@ HiveDrive *ipfs_drive_open(ipfs_token_t *token)
     drive->token            = token;
 
     drive->base.get_info    = &ipfs_drive_get_info;
-    drive->base.file_stat   = &ipfs_drive_file_stat;
+    drive->base.stat_file   = &ipfs_drive_stat_file;
     drive->base.list_files  = &ipfs_drive_list_files;
     drive->base.makedir     = &ipfs_drive_makedir;
     drive->base.move_file   = &ipfs_drive_move_file;

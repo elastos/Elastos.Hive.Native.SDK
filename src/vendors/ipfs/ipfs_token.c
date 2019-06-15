@@ -9,6 +9,7 @@
 
 #include "ela_hive.h"
 #include "ipfs_token.h"
+#include "ipfs_client.h"
 #include "ipfs_constants.h"
 #include "http_client.h"
 

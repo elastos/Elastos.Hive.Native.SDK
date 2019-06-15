@@ -8,11 +8,11 @@
 #include "drive.h"
 #include "client.h"
 
-int hive_drive_get_info(HiveDrive *drive, HiveDriveInfo *result)
+int hive_drive_get_info(HiveDrive *drive, HiveDriveInfo *drive_info)
 {
     int rc;
 
-    if (!drive || !result) {
+    if (!drive || !drive_info) {
         hive_set_error(-1);
         return -1;
     }
@@ -23,39 +23,23 @@ int hive_drive_get_info(HiveDrive *drive, HiveDriveInfo *result)
     }
 
     ref(drive);
-    rc = drive->get_info(drive, result);
+    rc = drive->get_info(drive, drive_info);
     deref(drive);
 
     return rc;
 }
 
-void hive_drive_info_free(HiveDriveInfo *info)
-{
-#define FREE(ptr)           \
-    do {                    \
-        if (ptr) free(ptr); \
-    } while (0)
-
-    if (!info)
-        return;
-
-    FREE(info->drive_id);
-
-    free(info);
-#undef FREE
-}
-
-int hive_drive_file_stat(HiveDrive *drive, const char *path, char **result)
+int hive_drive_file_stat(HiveDrive *drive, const char *path, HiveFileInfo *file_info)
 {
     int rc;
 
-    if (!drive || !path || !*path || !result || path[0] != '/') {
+    if (!drive || !path || !*path || !file_info || path[0] != '/') {
         hive_set_error(-1);
         return  -1;
     }
 
     ref(drive);
-    rc = drive->file_stat(drive, path, result);
+    rc = drive->stat_file(drive, path, file_info);
     deref(drive);
 
     return rc;
