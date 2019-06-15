@@ -19,7 +19,7 @@ enum {
 struct HiveClient {
     uint32_t state;  // login state.
 
-    int (*login)        (HiveClient *);
+    int (*login)        (HiveClient *, HiveRequestAuthenticationCallback *, void *);
     int (*logout)       (HiveClient *);
     int (*get_info)     (HiveClient *, HiveClientInfo *result);
     int (*finalize)     (HiveClient *);

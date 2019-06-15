@@ -11,12 +11,12 @@
 
 typedef struct FactoryMethod {
     int drive_type;
-    int (*factory_cb)(const HiveOptions *, HiveClient **);
+    HiveClient *(*factory_cb)(const HiveOptions *);
 } FactoryMethod;
 
 static FactoryMethod factory_methods[] = {
     { HiveDriveType_Native,    native_client_new   },
-    { HiveDriveType_IPFS,      ipfs_client_new     },
+    // { HiveDriveType_IPFS,      ipfs_client_new     },
     { HiveDriveType_OneDrive,  onedrive_client_new },
     { HiveDriveType_ownCloud,  owncloud_client_new },
     { HiveDriveType_Butt,      NULL }
@@ -25,7 +25,7 @@ static FactoryMethod factory_methods[] = {
 HiveClient *hive_client_new(const HiveOptions *options)
 {
     FactoryMethod *method = &factory_methods[0];
-    HiveClient *client = NULL;
+    HiveClient *client;
     struct stat st;
     int rc;
 
@@ -44,18 +44,13 @@ HiveClient *hive_client_new(const HiveOptions *options)
 
     for (; method->factory_cb; method++) {
         if (method->drive_type == options->drive_type) {
-            rc = method->factory_cb(options, &client);
+            client = method->factory_cb(options);
             break;
         }
     }
 
     if (!method->factory_cb) {
         hive_set_error(-1);
-        return NULL;
-    }
-
-    if (rc < 0) {
-        hive_set_error(rc);
         return NULL;
     }
 
@@ -75,7 +70,9 @@ int hive_client_close(HiveClient *client)
     return 0;
 }
 
-int hive_client_login(HiveClient *client)
+int hive_client_login(HiveClient *client,
+                      HiveRequestAuthenticationCallback *callback,
+                      void *context)
 {
     int rc;
 
@@ -110,7 +107,7 @@ int hive_client_login(HiveClient *client)
         return -1;
     }
 
-    rc = client->login(client);
+    rc = client->login(client, callback, context);
     if (rc < 0) {
         // recover back to 'RAW' state.
         _test_and_swap32(&client->state, LOGINING, RAW);

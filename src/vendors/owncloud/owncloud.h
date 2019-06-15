@@ -7,7 +7,7 @@ extern "C" {
 
 #include "ela_hive.h"
 
-int owncloud_client_new(const HiveOptions *, HiveClient **);
+HiveClient *owncloud_client_new(const  HiveOptions *);
 
 #ifdef __cplusplus
 }

@@ -163,7 +163,7 @@ typedef struct OneDriveOptions {
 typedef struct HiveRpcNode {
     /**
      * \~English
-     * The ip address supported with ipv4 protocol.
+     * The Callback to open the authorization page.
      */
     const char *ipv4;
 
@@ -302,6 +302,9 @@ HiveClient *hive_client_new(const HiveOptions *options);
  *      If no error occurs, return 0. Otherwise, return -1, and a specific
  *      error code can be retrieved by calling hive_get_error().
  */
+
+typedef int HiveRequestAuthenticationCallback(const char *url, void *context);
+
 HIVE_API
 int hive_client_close(HiveClient *client);
 
@@ -321,7 +324,9 @@ int hive_client_close(HiveClient *client);
  *      error code can be retrieved by calling hive_get_error().
  */
 HIVE_API
-int hive_client_login(HiveClient *client);
+int hive_client_login(HiveClient *client,
+                      HiveRequestAuthenticationCallback *callback,
+                      void *context);
 
 /**
  * \~English
@@ -593,7 +598,14 @@ ssize_t hive_file_write(HiveFile *file, const char *buf, size_t bufsz);
 #define HIVEF_HTTP_CLIENT                            0x05
 #define HIVEF_HTTP_SERVER                            0x06
 
-#define HIVESUCCESS                                  0
+#define  HIVE_HTTP_STATUS                            0x07
+
+
+/**
+ * \~English
+ * Success.
+ */
+#define HIVEOK                                       0
 
 /**
  * \~English
@@ -814,6 +826,8 @@ ssize_t hive_file_write(HiveFile *file, const char *buf, size_t bufsz);
 #define HIVE_HTTPC_ERROR(code)         HIVE_MK_ERROR(HIVEF_HTTP_CLIENT, code)
 #define HIVE_HTTPS_ERROR(code)         HIVE_MK_ERROR(HIVEF_HTTP_SERVER, code)
 #define HIVE_HTTP_TSX_ERROR(code)      HIVE_MK_ERROR(HIVEF_HTTP_TRANSACTION, code)
+
+#define HIVE_HTTP_STATUS_ERROR(code)   HIVE_MK_ERROR(HIVE_HTTP_STATUS, code);
 
 /*
  * \~English

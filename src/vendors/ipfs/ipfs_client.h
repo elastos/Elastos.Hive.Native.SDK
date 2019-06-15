@@ -19,8 +19,9 @@ typedef struct IPFSOptionsDeprecated {
     IPFSTokenOptions token_options;
 } IPFSOptionsDeprecated;
 
-int ipfs_client_new(const HiveOptions *, HiveClient **);
+HiveClient *ipfs_client_new(const HiveOptions *);
 
+int ipfs_client_synchronize(HiveClient *);
 #ifdef __cplusplus
 }
 #endif
