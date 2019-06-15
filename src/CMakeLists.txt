@@ -141,9 +141,9 @@ if(ENABLE_SHARED)
     endif()
     if(DARWIN OR IOS)
         set_property(SOURCE ${SRC} APPEND PROPERTY
-            OBJECT_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/export_symbols.txt")
+            OBJECT_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/symbols.txt")
         set_property(TARGET elahive-shared APPEND_STRING PROPERTY
-            LINK_FLAGS " -Wl,-exported_symbols_list,\"${CMAKE_CURRENT_SOURCE_DIR}/export_symbols.txt\"")
+            LINK_FLAGS " -Wl,-exported_symbols_list,\"${CMAKE_CURRENT_SOURCE_DIR}/symbols.txt\"")
     endif()
     target_link_libraries(elahive-shared ${LIBS} ${SYSTEM_LIBS})
 

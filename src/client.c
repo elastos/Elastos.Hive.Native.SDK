@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include <assert.h>
 #include <crystal.h>
 #include <sys/stat.h>
 
@@ -30,10 +29,8 @@ HiveClient *hive_client_new(const HiveOptions *options)
     int rc;
 
     if (!options || !options->persistent_location ||
-        !*options->persistent_location) {
-        hive_set_error(-1);
+        !*options->persistent_location)
         return NULL;
-    }
 
     rc = stat(options->persistent_location, &st);
     if (rc < 0)
@@ -59,13 +56,11 @@ HiveClient *hive_client_new(const HiveOptions *options)
 
 int hive_client_close(HiveClient *client)
 {
-    if (!client) {
-        hive_set_error(-1);
-        return -1;
-    }
+    if (!client)
+        return 0;
 
-    if (client->finalize)
-        client->finalize(client);
+    if (client->close)
+        client->close(client);
 
     return 0;
 }
@@ -76,14 +71,9 @@ int hive_client_login(HiveClient *client,
 {
     int rc;
 
-    if (!client) {
-        hive_set_error(-1);
+    if (!client || !callback) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
-    }
-
-    if (!client->login) {
-        hive_set_error(-1);
-        return 0;
     }
 
     /*
@@ -103,11 +93,13 @@ int hive_client_login(HiveClient *client,
 
     case -1:
     default:
-        hive_set_error(-1);
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_WRONG_STATE));
         return -1;
     }
 
-    rc = client->login(client, callback, context);
+    if (client->login)
+        rc = client->login(client, callback, context);
+
     if (rc < 0) {
         // recover back to 'RAW' state.
         _test_and_swap32(&client->state, LOGINING, RAW);
@@ -126,13 +118,8 @@ int hive_client_logout(HiveClient *client)
     int rc;
 
     if (!client) {
-        hive_set_error(-1);
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
-    }
-
-    if (!client->logout) {
-        hive_set_error(-1);
-        return 0;
     }
 
     rc = client_try_logout(client);
@@ -145,61 +132,39 @@ int hive_client_logout(HiveClient *client)
 
     case -1:
     default:
-        hive_set_error(-1);
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_WRONG_STATE));
         return -1;
     }
 
-    rc = client->logout(client);
+    if (client->logout)
+        client->logout(client);
+
     _test_and_swap32(&client->state, LOGOUTING, RAW);
-
-    if (rc < 0) {
-        hive_set_error(rc);
-        return -1;
-    }
 
     return 0;
 }
 
-int hive_client_get_info(HiveClient *client, HiveClientInfo *result)
+int hive_client_get_info(HiveClient *client, HiveClientInfo *info)
 {
-    if (!client || !result) {
-        hive_set_error(-1);
+    if (!client || !info) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
     }
 
     if (!is_client_ready(client))  {
-        hive_set_error(-1);
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_READY));
         return -1;
     }
 
     if (!client->get_info) {
-        hive_set_error(-1);
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED));
         return -1;
     }
 
-    return client->get_info(client, result);
+    return client->get_info(client, info);
 }
 
-void hive_client_info_free(HiveClientInfo *info)
-{
-#define FREE(ptr)           \
-    do {                    \
-        if (ptr) free(ptr); \
-    } while (0)
-
-    if (!info)
-        return;
-
-    FREE(info->user_id);
-    FREE(info->display_name);
-    FREE(info->email);
-    FREE(info->phone_number);
-    FREE(info->region);
-
-    free(info);
-#undef FREE
-}
-
+#if 0
 int hive_client_list_drives(HiveClient *client, char **result)
 {
     int rc;
@@ -227,6 +192,7 @@ int hive_client_list_drives(HiveClient *client, char **result)
 
     return 0;
 }
+#endif
 
 HiveDrive *hive_drive_open(HiveClient *client)
 {
@@ -257,6 +223,7 @@ HiveDrive *hive_drive_open(HiveClient *client)
     return drive;
 }
 
+#if 0
 int hive_client_invalidate_credential(HiveClient *client)
 {
     int rc;
@@ -279,3 +246,4 @@ int hive_client_invalidate_credential(HiveClient *client)
 
     return 0;
 }
+#endif

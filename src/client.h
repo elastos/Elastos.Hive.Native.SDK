@@ -1,6 +1,10 @@
 #ifndef __HIVE_CLIENT_H__
 #define __HIVE_CLIENT_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdbool.h>
 #include <stdint.h>
 #if defined(_WIN32) || defined(_WIN64)
@@ -8,6 +12,7 @@
 #endif
 
 #include "ela_hive.h"
+#include "error.h"
 
 enum {
     RAW          = (uint32_t)0,    // The primitive state.
@@ -22,29 +27,19 @@ struct HiveClient {
     int (*login)        (HiveClient *, HiveRequestAuthenticationCallback *, void *);
     int (*logout)       (HiveClient *);
     int (*get_info)     (HiveClient *, HiveClientInfo *result);
-    int (*finalize)     (HiveClient *);
-    int (*list_drives)  (HiveClient *, char **result);
     int (*get_drive)    (HiveClient *, HiveDrive **);
-
-    int (*invalidate_credential)(HiveClient *);
+    int (*close)        (HiveClient *);
 };
 
-inline static void hive_set_error(int error) { }
-
-static inline uint32_t _test_and_swap32(uint32_t *ptr, uint32_t oldval, uint32_t newval)
-{
 #if defined(_WIN32) || defined(_WIN64)
-    return InterlockedCompareExchange(ptr, newval, oldval);
+#define _test_and_swap32(ptr, oldval, newval) \
+                    InterlockedCompareExchange(ptr, newval, oldval)
 #else
-    uint32_t tmp = oldval;
-    __atomic_compare_exchange(ptr, &tmp, &newval, false,
-                              __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
-    return tmp;
+#define _test_and_swap32(ptr, oldval, newval) \
+                    __sync_val_compare_and_swap(ptr, oldval, newval)
 #endif
-}
 
-inline static
-int client_try_login(HiveClient *client)
+inline static int client_try_login(HiveClient *client)
 {
     int rc;
 
@@ -96,10 +91,11 @@ int client_try_logout(HiveClient *client)
 inline static
 bool is_client_ready(HiveClient *client)
 {
-    int rc;
-
-    rc = _test_and_swap32(&client->state, LOGINED, LOGINED);
-    return (rc == LOGINED);
+    return LOGINED == _test_and_swap32(&client->state, LOGINED, LOGINED);
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __HIVE_CLIENT_H__

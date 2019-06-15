@@ -953,7 +953,7 @@ int onedrive_drive_open(oauth_token_t *token, const char *driveid,
     tmp->base.get_info    = &onedrive_drive_get_info;
     tmp->base.stat_file   = &onedrive_drive_stat_file;
     tmp->base.list_files  = &onedrive_drive_list_files;
-    tmp->base.makedir     = &onedrive_drive_mkdir;
+    tmp->base.make_dir    = &onedrive_drive_mkdir;
     tmp->base.move_file   = &onedrive_drive_move_file;
     tmp->base.copy_file   = &onedrive_drive_copy_file;
     tmp->base.delete_file = &onedrive_drive_delete_file;

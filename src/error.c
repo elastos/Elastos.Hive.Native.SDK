@@ -1,9 +1,5 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
-
-#include <crystal.h>
 
 #include "error.h"
 #include "ela_hive.h"
@@ -76,35 +72,19 @@ const ErrorDesc error_codes[] = {
     { HIVEERR_BUFFER_TOO_SMALL,            "Too small buffer size"   },
     { HIVEERR_BAD_PERSISTENT_DATA,         "Bad persistent data"     },
     { HIVEERR_INVALID_PERSISTENCE_FILE,    "Invalid persistent file" },
-    { HIVEERR_INVALID_CONTROL_PACKET,      "Invalid control packet"  },
     { HIVEERR_INVALID_CREDENTIAL,          "Invalid credential"      },
-    { HIVEERR_ALREADY_RUN,                 "Carrier is already being running" },
-    { HIVEERR_NOT_READY,                   "Carrier is not ready"    },
-    { HIVEERR_NOT_EXIST,                   "Friend does not exist"   },
-    { HIVEERR_ALREADY_EXIST,               "Friend already exists"   },
-    { HIVEERR_NO_MATCHED_REQUEST,          "Unmatched request"       },
-    { HIVEERR_INVALID_USERID,              "Invalid carrier userid"  },
-    { HIVEERR_INVALID_NODEID,              "Invalid carrier nodeid"  },
+    { HIVEERR_INVALID_USERID,              "Invalid userid"          },
     { HIVEERR_WRONG_STATE,                 "Being in wrong state"    },
     { HIVEERR_BUSY,                        "Instance is being busy"  },
     { HIVEERR_LANGUAGE_BINDING,            "Language binding error"  },
     { HIVEERR_ENCRYPT,                     "Encrypt error"           },
-    { HIVEERR_SDP_TOO_LONG,                "SDP is too long"         },
-    { HIVEERR_INVALID_SDP,                 "Invalid SDP"             },
     { HIVEERR_NOT_IMPLEMENTED,             "Not implemented yet"     },
+    { HIVEERR_NOT_SUPPORTED,               "Not supported"           },
     { HIVEERR_LIMIT_EXCEEDED,              "Exceeding the limit"     },
-    { HIVEERR_PORT_ALLOC,                  "Allocate port error"     },
-    { HIVEERR_BAD_PROXY_TYPE,              "Bad proxy type"          },
-    { HIVEERR_BAD_PROXY_HOST,              "Bad proxy host"          },
-    { HIVEERR_BAD_PROXY_PORT,              "Bad proxy port"          },
-    { HIVEERR_PROXY_NOT_AVAILABLE,         "No proxy available"      },
     { HIVEERR_ENCRYPTED_PERSISTENT_DATA,   "Load encrypted persistent data error"},
     { HIVEERR_BAD_BOOTSTRAP_HOST,          "Bad bootstrap host"      },
     { HIVEERR_BAD_BOOTSTRAP_PORT,          "Bad bootstrap port"      },
-    { HIVEERR_TOO_LONG,                    "Data content too long"   },
-    { HIVEERR_ADD_SELF,                    "Try add myself as friend"},
     { HIVEERR_BAD_ADDRESS,                 "Bad carrier node address"},
-    { HIVEERR_FRIEND_OFFLINE,              "Friend is being offline" },
     { HIVEERR_UNKNOWN,                     "Unknown error"           }
 };
 
