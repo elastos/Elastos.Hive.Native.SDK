@@ -12,12 +12,9 @@
 #include <crystal.h>
 #include <cjson/cJSON.h>
 
-#include "onedrive_client.h"
-#include "onedrive_drive.h"
+#include "onedrive_misc.h"
 #include "onedrive_constants.h"
 #include "http_client.h"
-#include "oauth_token.h"
-#include "client.h"
 
 typedef struct OneDriveClient {
     HiveClient base;
@@ -88,17 +85,11 @@ static int onedrive_client_logout(HiveClient *base)
 }
 
 #define DECODE_INFO_FIELD(json, name, field) do { \
-        cJSON *item = cJSON_GetObjectItemCaseSensitive(json, name); \
-        if (!cJSON_IsString(item) || \
-            !item->valuestring || !*item->valuestring) { \
+        int rc; \
+        rc = decode_info_field(json, name, field, sizeof(field)); \
+        if (rc < 0) \
             cJSON_Delete(json); \
-            return -1; \
-        } \
-        if (strlen(item->valuestring) >= sizeof(field)) { \
-            cJSON_Delete(json); \
-            return -2; \
-        } \
-        strcpy(field, item->valuestring); \
+        return rc; \
     } while(0)
 
 static

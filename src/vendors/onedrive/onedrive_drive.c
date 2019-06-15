@@ -16,12 +16,9 @@
 #include <crystal.h>
 #include <cjson/cJSON.h>
 
-#include "onedrive_client.h"
-#include "onedrive_drive.h"
+#include "onedrive_misc.h"
 #include "onedrive_constants.h"
 #include "http_client.h"
-#include "oauth_token.h"
-#include "client.h"
 
 #define ARGV(args, index) ((void **)args)[index]
 
@@ -30,12 +27,18 @@ typedef struct OneDriveDrive {
     oauth_token_t *token;
 } OneDriveDrive ;
 
+#define DECODE_INFO_FIELD(json, name, field) do { \
+        int rc; \
+        rc = decode_info_field(json, name, field, sizeof(field)); \
+        if (rc < 0) \
+            cJSON_Delete(json); \
+        return rc; \
+    } while(0)
+
 static
 int onedrive_decode_drive_info(const char *info_str, HiveDriveInfo *info)
 {
     cJSON *json;
-    cJSON *id;
-    int rc;
 
     assert(info_str);
     assert(info);
@@ -44,18 +47,9 @@ int onedrive_decode_drive_info(const char *info_str, HiveDriveInfo *info)
     if (!json)
         return -1;
 
-    id = cJSON_GetObjectItemCaseSensitive(json, "id");
-    if (!cJSON_IsString(id) || !id->valuestring || !*id->valuestring) {
-        cJSON_Delete(json);
-        return -1;
-    }
+    DECODE_INFO_FIELD(json, "id", info->driveid);
 
-    rc = snprintf(info->driveid, sizeof(info->driveid),
-                  "%s", id->valuestring);
     cJSON_Delete(json);
-    if (rc < 0 || rc >= sizeof(info->driveid))
-        return -1;
-
     return 0;
 }
 
@@ -79,10 +73,8 @@ int onedrive_drive_get_info(HiveDrive *base, HiveDriveInfo *info)
     }
 
     httpc = http_client_new();
-    if (!httpc) {
-        // TODO: rc;
-        return rc;
-    }
+    if (!httpc)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     http_client_set_url_escape(httpc, URL_API);
     http_client_set_method(httpc, HTTP_METHOD_GET);
@@ -116,17 +108,27 @@ int onedrive_drive_get_info(HiveDrive *base, HiveDriveInfo *info)
     p = http_client_move_response_body(httpc, NULL);
     http_client_close(httpc);
 
-    if (!p) {
-        // TODO: rc;
-        return rc;
-    }
+    if (!p)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     rc = onedrive_decode_drive_info(p, info);
     free(p);
-    if (rc)
-        return -1;
 
-    return 0;
+    switch(rc) {
+    case -1:
+        rc = -1; // TODO;
+        break;
+
+    case -2:
+        rc = HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
+        break;
+
+    default:
+        rc = 0;
+        break;
+    }
+
+    return rc;
 
 error_exit:
     http_client_close(httpc);
@@ -143,7 +145,6 @@ int onedrive_decode_file_info(const char *info_str, HiveFileInfo *info)
 static
 int onedrive_drive_stat_file(HiveDrive *base, const char *path, HiveFileInfo *info)
 {
-    char **result; // TODO;
     OneDriveDrive *drive = (OneDriveDrive *)base;
     http_client_t *httpc;
     char url[MAX_URL_LENGTH + 1] = {0};
@@ -155,8 +156,8 @@ int onedrive_drive_stat_file(HiveDrive *base, const char *path, HiveFileInfo *in
     assert(drive);
     assert(drive->token);
     assert(path);
-    assert(*path);
-    assert(result);
+    assert(*path == '/');
+    assert(info);
 
     rc = oauth_token_check_expire(drive->token);
     if (rc < 0) {
@@ -165,10 +166,8 @@ int onedrive_drive_stat_file(HiveDrive *base, const char *path, HiveFileInfo *in
     }
 
     httpc = http_client_new();
-    if (!httpc) {
-        // TODO:
-        return rc;
-    }
+    if (!httpc)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     if (!strcmp(path, "/"))
         rc = snprintf(url, sizeof(url), "%s/root", URL_API);
@@ -177,6 +176,7 @@ int onedrive_drive_stat_file(HiveDrive *base, const char *path, HiveFileInfo *in
 
     if (rc < 0 || rc >= sizeof(url)) {
         vlogE("Hive: Generating url to stat file with path (%s) error", path);
+        rc = HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
         goto error_exit;
     }
 
@@ -195,7 +195,7 @@ int onedrive_drive_stat_file(HiveDrive *base, const char *path, HiveFileInfo *in
     rc = http_client_request(httpc);
     http_client_memory_free(escaped_url);
 
-    if (rc) {
+    if (rc < 0) {
         // TODO: rc;
         goto error_exit;
     }
@@ -227,10 +227,22 @@ int onedrive_drive_stat_file(HiveDrive *base, const char *path, HiveFileInfo *in
 
     rc = onedrive_decode_file_info(p, info);
     free(p);
-    if (rc)
-        return -1;
 
-    return 0;
+    switch(rc) {
+    case -1:
+        rc = -1; // TODO;
+        break;
+
+    case -2:
+        rc = HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
+        break;
+
+    default:
+        rc = 0;
+        break;
+    }
+
+    return rc;
 
 error_exit:
     http_client_close(httpc);
@@ -355,14 +367,17 @@ int onedrive_drive_list_files(HiveDrive *base, const char *path,
 
     if (rc < 0 || rc >= sizeof(url)) {
         vlogE("Hive: Generating url to list files with path (%s) error", path);
+        rc = HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
         goto error_exit;
     }
 
     escaped_url = http_client_escape(httpc, url, strlen(url));
     http_client_reset(httpc);
 
-    if (!escaped_url)
+    if (!escaped_url) {
+        rc = HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
         goto error_exit;
+    }
 
     while (escaped_url) {
         char *p;
@@ -376,7 +391,7 @@ int onedrive_drive_list_files(HiveDrive *base, const char *path,
         rc = http_client_request(httpc);
         first_iteration ? http_client_memory_free(escaped_url) : free(escaped_url);
 
-        if (rc)
+        if (rc < 0)
             break;
 
         rc = http_client_get_response_code(httpc, &resp_code);
@@ -385,28 +400,36 @@ int onedrive_drive_list_files(HiveDrive *base, const char *path,
 
         if (resp_code == 401) {
             oauth_token_set_expired(drive->token);
+            rc = -1; // TODO;
             break;
         }
 
-        if (resp_code != 200)
+        if (resp_code != 200) {
+            rc = -1; // TODO;
             break;
+        }
 
         p = http_client_move_response_body(httpc, NULL);
-        if (!p)
+        if (!p) {
+            rc = -1;
             break;
+        }
 
+        // TODO: need invoke callback once all files has been acquired.
         rc = parse_response_and_notify_user(p, callback, context, &escaped_url);
         if (rc < 0)
             break;
 
-        if (!escaped_url)
+        if (!escaped_url) {
+            rc = -1;
             break;
+        }
 
         first_iteration = false;
     }
 
     http_client_close(httpc);
-    return 0;
+    return rc;
 
 error_exit:
     http_client_close(httpc);
@@ -464,10 +487,8 @@ static int onedrive_drive_mkdir(HiveDrive *base, const char *path)
     }
 
     httpc = http_client_new();
-    if (!httpc) {
-        // TODO: rc;
-        return rc;
-    }
+    if (!httpc)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     dir = dirname((char *)path);
     if (!strcmp(dir, "/"))
@@ -477,19 +498,22 @@ static int onedrive_drive_mkdir(HiveDrive *base, const char *path)
 
     if (rc < 0 || rc >= (int)sizeof(url)) {
         vlogE("Hive: Generating url to list files with path (%s) error", path);
+        rc = HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
         goto error_exit;
     }
 
     escaped_url = http_client_escape(httpc, url, strlen(url));
     http_client_reset(httpc);
 
-    if (!escaped_url)
+    if (!escaped_url) {
+        rc = HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
         goto error_exit;
+    }
 
     body = create_mkdir_request_body(path);
     if (!body) {
         http_client_memory_free(escaped_url);
-        // TODO: rc;
+        rc = HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
         goto error_exit;
     }
 
@@ -534,7 +558,7 @@ error_exit:
     return rc;
 }
 
-static char *create_copy_move_request_body(const char *path)
+static char *create_cp_mv_request_body(const char *path)
 {
     char parent[MAX_URL_LENGTH + 1] = {0};
     cJSON *body;
@@ -546,8 +570,7 @@ static char *create_copy_move_request_body(const char *path)
     if (!body)
         return NULL;
 
-    rc = snprintf(parent, sizeof(parent), "%s/root:%s",
-                  URL_API,
+    rc = snprintf(parent, sizeof(parent), "%s/root:%s", URL_API,
                   dirname((char *)path));
     if (rc < 0 || rc >= (int)sizeof(parent))
         goto error_exit;
@@ -594,10 +617,8 @@ static int onedrive_drive_move_file(HiveDrive *base, const char *old, const char
     }
 
     httpc = http_client_new();
-    if (!httpc) {
-        // TODO: rc;
-        return rc;
-    }
+    if (!httpc)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     if (!strcmp(old, "/"))
         rc = snprintf(url, sizeof(url), "%s/root", URL_API);
@@ -606,18 +627,22 @@ static int onedrive_drive_move_file(HiveDrive *base, const char *old, const char
 
     if (rc < 0 || rc >= (int)sizeof(url)) {
         vlogE("Hive: Generating url to move file from %s to %s error", old, new);
+        rc = HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
         goto error_exit;
     }
 
     escaped_url = http_client_escape(httpc, url, strlen(url));
     http_client_reset(httpc);
 
-    if (!escaped_url)
+    if (!escaped_url) {
+        rc = HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
         goto error_exit;
+    }
 
-    body = create_copy_move_request_body(new);
+    body = create_cp_mv_request_body(new);
     if (!body) {
         http_client_memory_free(escaped_url);
+        rc = HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
         goto error_exit;
     }
 
@@ -767,10 +792,8 @@ int onedrive_drive_copy_file(HiveDrive *base, const char *src, const char *dest)
     }
 
     httpc = http_client_new();
-    if (!httpc) {
-        // TODO;
-        return rc;
-    }
+    if (!httpc)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     if (!strcmp(src, "/"))
         rc = snprintf(url, sizeof(url), "%s/root/copy", URL_API);
@@ -778,7 +801,9 @@ int onedrive_drive_copy_file(HiveDrive *base, const char *src, const char *dest)
         rc = snprintf(url, sizeof(url), "%s/root:%s:/copy", URL_API, src);
 
     if (rc < 0 || rc >= (int)sizeof(url)) {
-        vlogE("Hive: Generating url to copy file from %s to %s error", src, dest);
+        vlogE("Hive: Generating url to copy file from %s to %s error",
+              src, dest);
+        rc = HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
         goto error_exit;
     }
 
@@ -786,12 +811,15 @@ int onedrive_drive_copy_file(HiveDrive *base, const char *src, const char *dest)
     http_client_reset(httpc);
     memset(url, 0, sizeof(url));
 
-    if (!escaped_url)
+    if (!escaped_url) {
+        rc = HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
         goto error_exit;
+    }
 
-    body = create_copy_move_request_body(src);
+    body = create_cp_mv_request_body(src);
     if (!body) {
         http_client_memory_free(escaped_url);
+        rc = HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
         goto error_exit;
     }
 
@@ -858,22 +886,23 @@ static int onedrive_drive_delete_file(HiveDrive *base, const char *path)
     }
 
     httpc = http_client_new();
-    if (!httpc) {
-        // TODO: rc;
-        return rc;
-    }
+    if (!httpc)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     rc = snprintf(url, sizeof(url), "%s/root:%s:", URL_API, path);
     if (rc < 0 || rc >= sizeof(url)) {
         vlogE("Hive: Generating url to delete file with path (%s) error", path);
+        rc = HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
         goto error_exit;
     }
 
     escaped_url = http_client_escape(httpc, url, strlen(url));
     http_client_reset(httpc);
 
-    if (!escaped_url)
+    if (!escaped_url) {
+        rc = HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
         goto error_exit;
+    }
 
     http_client_set_url(httpc, escaped_url);
     http_client_set_method(httpc, HTTP_METHOD_DELETE);
@@ -943,22 +972,22 @@ int onedrive_drive_open(oauth_token_t *token, const char *driveid,
 
     url_len = strlen(URL_API) + strlen(path) + 1;
     tmp = (OneDriveDrive *)rc_zalloc(sizeof(OneDriveDrive) + url_len, NULL);
-    if (!tmp) {
-        // TODO:
-        return -1;
-    }
+    if (!tmp)
+        return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
 
     tmp->token = token;
 
-    tmp->base.get_info    = &onedrive_drive_get_info;
-    tmp->base.stat_file   = &onedrive_drive_stat_file;
-    tmp->base.list_files  = &onedrive_drive_list_files;
-    tmp->base.make_dir    = &onedrive_drive_mkdir;
-    tmp->base.move_file   = &onedrive_drive_move_file;
-    tmp->base.copy_file   = &onedrive_drive_copy_file;
-    tmp->base.delete_file = &onedrive_drive_delete_file;
-    tmp->base.close       = &onedrive_drive_close;
+    tmp->base.get_info    = onedrive_drive_get_info;
+    tmp->base.stat_file   = onedrive_drive_stat_file;
+    tmp->base.list_files  = onedrive_drive_list_files;
+    tmp->base.make_dir    = onedrive_drive_mkdir;
+    tmp->base.move_file   = onedrive_drive_move_file;
+    tmp->base.copy_file   = onedrive_drive_copy_file;
+    tmp->base.delete_file = onedrive_drive_delete_file;
+    tmp->base.close       = onedrive_drive_close;
 
     *drive = &tmp->base;
+    // TODO: need refrence.
+
     return 0;
 }

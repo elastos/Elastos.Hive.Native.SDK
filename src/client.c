@@ -6,7 +6,7 @@
 #include "client.h"
 #include "native_client.h"
 #include "ipfs_client.h"
-#include "onedrive_client.h"
+#include "onedrive.h"
 #include "owncloud.h"
 
 typedef struct FactoryMethod {
