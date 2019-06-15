@@ -39,16 +39,18 @@ int hive_drive_file_stat(HiveDrive *drive, const char *path, HiveFileInfo *file_
     return rc;
 }
 
-int hive_drive_list_files(HiveDrive *drive, const char *path, char **result)
+int hive_drive_list_files(HiveDrive *drive, const char *dir_path,
+                          HiveFilesIterateCallback *callback, void *context)
 {
     int rc;
 
-    if (!drive || !path || !*path || !result || path[0] != '/') {
+    if (!drive || !dir_path || dir_path[0] != '/' || strlen(dir_path) > MAXPATHLEN ||
+        !callback ) {
         hive_set_error(-1);
         return  -1;
     }
 
-    rc = drive->list_files(drive, path, result);
+    rc = drive->list_files(drive, dir_path, callback, context);
     return rc;
 }
 

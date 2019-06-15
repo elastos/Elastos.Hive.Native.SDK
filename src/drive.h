@@ -6,7 +6,8 @@
 struct HiveDrive {
     int (*get_info)     (HiveDrive *, HiveDriveInfo *result);
     int (*stat_file)    (HiveDrive *, const char *path, HiveFileInfo *);
-    int (*list_files)   (HiveDrive *, const char *path, char **result);
+    int (*list_files)   (HiveDrive *, const char *path,
+                         HiveFilesIterateCallback *callback, void *context);
     int (*makedir)      (HiveDrive *, const char *path);
     int (*move_file)    (HiveDrive *, const char *from, const char *to);
     int (*copy_file)    (HiveDrive *, const char *from, const char *to);
