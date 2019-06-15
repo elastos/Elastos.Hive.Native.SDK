@@ -238,116 +238,105 @@ error_exit:
 }
 
 static
-int add_list_files_to_arry(cJSON *to_array, const char *resp, bool *has_next)
+int parse_response_and_notify_user(const char *response,
+                                   HiveFilesIterateCallback *callback,
+                                   void *context, char **next_url)
 {
-/*
     cJSON *json;
     cJSON *array;
+    cJSON *next_link;
     cJSON *item;
-    int array_sz;
-    int i;
 
-    assert(to_array);
-    assert(resp);
-    assert(has_next);
+    assert(response);
+    assert(callback);
+    assert(next_url);
 
-    json = cJSON_Parse(resp);
+    json = cJSON_Parse(response);
     if (!json)
         return -1;
 
     array = cJSON_GetObjectItemCaseSensitive(json,  "value");
-    if (!array || !cJSON_IsArray(array))
-        goto error_exit;
-
-    array_sz = cJSON_GetArraySize(array);
-    for (i = 0; i < array_sz;  i++) {
-        item = cJSON_DetachItemFromArray(array, i);
-        cJSON_AddItemToArray(to_array, item);
+    if (!array || !cJSON_IsArray(array) || !cJSON_GetArraySize(array)) {
+        cJSON_Delete(json);
+        return -1;
     }
 
-    item = cJSON_GetObjectItemCaseSensitive(json, "@odata.nextLink");
-    if (!IS_STRING_NODE(item))
+    cJSON_ArrayForEach(item, array) {
+        cJSON *name;
+        char *type;
+        KeyValue properties[2];
+        bool resume;
 
-        resp_part = cJSON_Parse(resp_body_str);
-        free(resp_body_str);
-        resp_body_str = NULL;
-        if (!resp_part) {
-            hive_set_error(-1);
-            goto error_exit;
+        if (!cJSON_IsObject(item)) {
+            cJSON_Delete(json);
+            return -1;
         }
 
-        val_part = cJSON_GetObjectItemCaseSensitive(resp_part, "value");
-        if (!val_part || !cJSON_IsArray(val_part)) {
-            hive_set_error(-1);
-            goto error_exit;
+        name = cJSON_GetObjectItemCaseSensitive(item, "name");
+        if (!name || !cJSON_IsString(name) || !name->valuestring ||
+            !*name->valuestring) {
+            cJSON_Delete(json);
+            return -1;
         }
 
-        val_sz = cJSON_GetArraySize(val_part);
-        for (i = 0; i < val_sz; ++i) {
-            elem = cJSON_DetachItemFromArray(val_part, 0);
-            cJSON_AddItemToArray(val, elem);
+        if (cJSON_GetObjectItemCaseSensitive(item, "file"))
+            type = "file";
+        else if (cJSON_GetObjectItemCaseSensitive(item, "folder"))
+            type = "direcotry";
+        else {
+            cJSON_Delete(json);
+            return -1;
         }
 
-        next_link = cJSON_GetObjectItemCaseSensitive(resp_part, "@odata.nextLink");
-        if (next_link && (!cJSON_IsString(next_link) || !*next_link->valuestring)) {
-            cJSON_Delete(resp_part);
-            resp_part = NULL;
-            hive_set_error(-1);
-            goto error_exit;
+        properties[0].key   = "name";
+        properties[0].value = name->valuestring;
+
+        properties[1].key   = "type";
+        properties[1].value = type;
+
+        resume = callback(properties, sizeof(properties) / sizeof(properties[0]),
+                          context);
+        if (!resume) {
+            cJSON_Delete(json);
+            return 0;
         }
+    }
 
-        if (next_link) {
-            rc = snprintf(url, sizeof(url), "%s", next_link->valuestring);
-            cJSON_Delete(resp_part);
-            resp_part = NULL;
+    next_link = cJSON_GetObjectItemCaseSensitive(json, "@odata.nextLink");
+    if (next_link && (!cJSON_IsString(next_link) || !next_link->valuestring ||
+                      !*next_link->valuestring)) {
+        cJSON_Delete(json);
+        return -1;
+    }
 
-            if (rc < 0 || rc >= sizeof(url)) {
-                hive_set_error(-1);
-                goto error_exit;
-            }
-            http_client_reset(httpc);
-            continue;
-        }
+    if (next_link) {
+        *next_url = next_link->valuestring;
+        next_link->valuestring = NULL;
+    } else {
+        *next_url = NULL;
+        callback(NULL, 0, context);
+    }
 
-        http_client_close(httpc);
-        httpc = NULL;
-        *result = cJSON_PrintUnformatted(resp);
-        cJSON_Delete(resp);
-        resp = NULL;
-        free(access_token);
-        access_token = NULL;
-
-        if (!*result) {
-            hive_set_error(-1);
-            goto error_exit;
-        }
-    */
-    return -1;
+    return 0;
 }
 
 static
-int onedrive_drive_list_files(HiveDrive *base, const char *path, char **result)
+int onedrive_drive_list_files(HiveDrive *base, const char *path,
+                              HiveFilesIterateCallback *callback, void *context)
 {
     OneDriveDrive *drive = (OneDriveDrive *)base;
     http_client_t *httpc;
-    cJSON *json = NULL;
-    cJSON *array;
-    bool has_next = true;
     char url[MAX_URL_LENGTH + 1] = {0};
     char *escaped_url = NULL;
-    char *p;
-    int rc;
-
-    int val_sz, i;
     long resp_code;
-    cJSON *resp_part = NULL, *next_link, *resp = NULL, *val_part, *elem, *val;
-    char *resp_body_str = NULL;
+    bool first_iteration = true;
+    int rc;
 
     assert(drive);
     assert(drive->token);
     assert(path);
-    assert(*path);
-    assert(result);
+    assert(*path == '/');
+    assert(callback);
 
     rc = oauth_token_check_expire(drive->token);
     if (rc < 0) {
@@ -356,15 +345,13 @@ int onedrive_drive_list_files(HiveDrive *base, const char *path, char **result)
     }
 
     httpc = http_client_new();
-    if (!httpc) {
-        // TODO: rc;
+    if (!httpc)
         return rc;
-    }
 
     if (!strcmp(path, "/"))
-        rc = snprintf(url, sizeof(url), "%s/root/children", URL_API);
+        rc = snprintf(url, sizeof(url), "%s/root/children", MY_DRIVE);
     else
-        rc = snprintf(url, sizeof(url), "%s/root:%s:/children", URL_API, path);
+        rc = snprintf(url, sizeof(url), "%s/root:%s:/children", MY_DRIVE, path);
 
     if (rc < 0 || rc >= sizeof(url)) {
         vlogE("Hive: Generating url to list files with path (%s) error", path);
@@ -377,88 +364,48 @@ int onedrive_drive_list_files(HiveDrive *base, const char *path, char **result)
     if (!escaped_url)
         goto error_exit;
 
-    json = cJSON_CreateObject();
-    if (!json) {
-        http_client_memory_free(escaped_url);
-        goto error_exit;
-    }
-
-    array = cJSON_AddArrayToObject(json, "value");
-    if (!array) {
-        http_client_memory_free(escaped_url);
-        cJSON_Delete(json);
-        goto error_exit;
-    }
-
-    while (has_next) {
+    while (escaped_url) {
         char *p;
 
         http_client_reset(httpc);
         http_client_set_url_escape(httpc, escaped_url);
         http_client_set_method(httpc, HTTP_METHOD_GET);
-        http_client_set_header(httpc, "Content-Type", "application/json");
         http_client_set_header(httpc, "Authorization", get_bearer_token(drive->token));
         http_client_enable_response_body(httpc);
 
         rc = http_client_request(httpc);
-        http_client_memory_free(escaped_url);
+        first_iteration ? http_client_memory_free(escaped_url) : free(escaped_url);
 
-        if (rc) {
-            // TODO: rc;
+        if (rc)
             break;
-        }
 
         rc = http_client_get_response_code(httpc, &resp_code);
-        if (rc < 0) {
-            // TODO: rc;
+        if (rc < 0)
             break;
-        }
 
         if (resp_code == 401) {
             oauth_token_set_expired(drive->token);
-            // TODO: rc;
             break;
         }
 
-        if (resp_code != 200) {
-            // TODO;
+        if (resp_code != 200)
             break;
-        }
 
         p = http_client_move_response_body(httpc, NULL);
-        if (!p) {
-            // TODO: rc;
-            break;
-        }
-
-        rc = add_list_files_to_arry(array, p, &has_next);
-        if (rc < 0) {
-            // TODO;
-            break;
-        }
-
-        if (!has_next)
+        if (!p)
             break;
 
-        // TODO;
+        rc = parse_response_and_notify_user(p, callback, context, &escaped_url);
+        if (rc < 0)
+            break;
+
+        if (!escaped_url)
+            break;
+
+        first_iteration = false;
     }
 
-    http_client_memory_free(escaped_url);
     http_client_close(httpc);
-
-    if (has_next) {
-        vlogE("Hive: Try to next list files, but happen error");
-        cJSON_Delete(json);
-        return rc;
-    }
-
-    p = cJSON_PrintUnformatted(json);
-    cJSON_Delete(json);
-
-    if (!p)
-        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
-
-    *result = p;
     return 0;
 
 error_exit:

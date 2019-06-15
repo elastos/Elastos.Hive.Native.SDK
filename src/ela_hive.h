@@ -11,6 +11,7 @@ extern "C" {
 #endif
 
 #include <sys/types.h>
+#include <stdbool.h>
 
 #if defined(HIVE_STATIC)
     #define HIVE_API
@@ -440,8 +441,49 @@ int hive_drive_get_info(HiveDrive *drive, HiveDriveInfo *drive_info);
 
 /**
  * \~English
- * List files under the directory specified by @dir_path in @drive. The
- * result is a json string(not necessarily null-terminated) passed to @result.
+ * A structure aimed at describing one of the properties of a file.
+ */
+typedef struct KeyValue {
+    /**
+     * \~English
+     * Denotes the property's name.
+     */
+    char *key;
+
+    /**
+     * \~English
+     * Denotes the property's value.
+     */
+    char *value;
+} KeyValue;
+
+/**
+ * \~English
+ * An application-defined function notifying users of details of a file, in the
+ * context of one of the iterations of files under a specific directory.
+ *
+ * @param
+ *      info        [in] A pointer to an array of KeyValue carrying various
+ *                       properties of the file.
+ *                       (NULL indicates the end of iteration).
+ * @param
+ *      size        [in] the size of the KeyValue array.
+ * @param
+ *      context     [in] The application-defined context data.
+ *
+ * @return
+ *      Return true to continue iteration, false to abort.
+ */
+typedef bool HiveFilesIterateCallback(const KeyValue *info, size_t size, void *context);
+
+/**
+ * \~English
+ * Iterate files under the directory specified by @dir_path in @drive. @callback
+ * is called once for each file, notifying users of details of that file, with
+ * @context passed as argument context; Returning true to continue iteration,
+ * false to abort. In absence of abortion, an extra call to @callback takes place
+ * at last, with argument info given the NULL value, signaling the end of the
+ * iteration, return value is ignored.
  *
  * This function is effective only when a user is associated with the
  * client generating the @drive.
@@ -451,16 +493,19 @@ int hive_drive_get_info(HiveDrive *drive, HiveDriveInfo *drive_info);
  * @param
  *      dir_path   [in] The absolute path to a directory in @drive.
  * @param
- *      result     [out] After the call, *result points to the buffer
- *                       holding the result. Call free() to release
- *                       the buffer after use.
+ *      callback   [in] An application-defined function called once for each
+ *                      file under the directory.
+ * @param
+ *      context    [in] An application-defined opaque data passed as the
+ *                      context argument to @callback.
  *
  * @return
  *      If no error occurs, return 0. Otherwise, return -1, and a specific
  *      error code can be retrieved by calling hive_get_error().
  */
 HIVE_API
-int hive_drive_list_files(HiveDrive *drive, const char *dir_path, char **result);
+int hive_drive_list_files(HiveDrive *drive, const char *dir_path,
+                          HiveFilesIterateCallback *callback, void *context);
 
 /**
  * \~English
