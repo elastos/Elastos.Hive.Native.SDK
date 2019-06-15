@@ -16,7 +16,7 @@ typedef struct FactoryMethod {
 
 static FactoryMethod factory_methods[] = {
     { HiveDriveType_Native,    native_client_new   },
-    { HiveDriveType_IPFS,      ipfs_client_new     },
+    // { HiveDriveType_IPFS,      ipfs_client_new     },
     { HiveDriveType_OneDrive,  onedrive_client_new },
     { HiveDriveType_ownCloud,  owncloud_client_new },
     { HiveDriveType_Butt,      NULL }

@@ -22,10 +22,7 @@ int hive_drive_get_info(HiveDrive *drive, HiveDriveInfo *drive_info)
         return -1;
     }
 
-    ref(drive);
     rc = drive->get_info(drive, drive_info);
-    deref(drive);
-
     return rc;
 }
 
@@ -38,10 +35,7 @@ int hive_drive_file_stat(HiveDrive *drive, const char *path, HiveFileInfo *file_
         return  -1;
     }
 
-    ref(drive);
     rc = drive->stat_file(drive, path, file_info);
-    deref(drive);
-
     return rc;
 }
 
@@ -54,10 +48,7 @@ int hive_drive_list_files(HiveDrive *drive, const char *path, char **result)
         return  -1;
     }
 
-    ref(drive);
     rc = drive->list_files(drive, path, result);
-    deref(drive);
-
     return rc;
 }
 
@@ -70,10 +61,7 @@ int hive_drive_mkdir(HiveDrive *drive, const char *path)
         return  -1;
     }
 
-    ref(drive);
     rc = drive->makedir(drive, path);
-    deref(drive);
-
     return rc;
 }
 
@@ -89,10 +77,7 @@ int hive_drive_move_file(HiveDrive *drive, const char *old, const char *new)
         return -1;
     }
 
-    ref(drive);
     rc = drive->move_file(drive, old, new);
-    deref(drive);
-
     return rc;
 }
 
@@ -108,10 +93,7 @@ int hive_drive_copy_file(HiveDrive *drive, const char *src, const char *dest)
         return -1;
     }
 
-    ref(drive);
     rc = drive->copy_file(drive, src, dest);
-    deref(drive);
-
     return rc;
 }
 
@@ -124,10 +106,7 @@ int hive_drive_delete_file(HiveDrive *drive, const char *path)
         return -1;
     }
 
-    ref(drive);
     rc = drive->delete_file(drive, path);
-    deref(drive);
-
     return rc;
 }
 

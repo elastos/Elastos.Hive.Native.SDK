@@ -970,13 +970,6 @@ error_exit:
 static void onedrive_drive_close(HiveDrive *base)
 {
     assert(base);
-    deref(base);
-}
-
-static void onedrive_drive_destroy(void *p)
-{
-    OneDriveDrive *drive = (OneDriveDrive *)p;
-    deref(drive->token);
 }
 
 int onedrive_drive_open(oauth_token_t *token, const char *driveid,
@@ -1002,14 +995,12 @@ int onedrive_drive_open(oauth_token_t *token, const char *driveid,
         snprintf(path, sizeof(path), "/drives/%s", driveid);
 
     url_len = strlen(URL_API) + strlen(path) + 1;
-    tmp = (OneDriveDrive *)rc_zalloc(sizeof(OneDriveDrive) + url_len,
-                                     &onedrive_drive_destroy);
+    tmp = (OneDriveDrive *)rc_zalloc(sizeof(OneDriveDrive) + url_len, NULL);
     if (!tmp) {
         // TODO:
-        return rc;
+        return -1;
     }
 
-    ref(token);
     tmp->token = token;
 
     tmp->base.get_info    = &onedrive_drive_get_info;
