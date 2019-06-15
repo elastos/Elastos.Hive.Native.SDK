@@ -1,6 +1,7 @@
 #include <stdlib.h>
-#include <crystal.h>
 #include <sys/stat.h>
+
+#include <crystal.h>
 
 #include "client.h"
 #include "native_client.h"

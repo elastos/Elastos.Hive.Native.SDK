@@ -1,8 +1,8 @@
 #include <stdlib.h>
 #include <errno.h>
-#include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #ifdef HAVE_SYS_PARAM_H
 #include <sys/param.h>
 #endif
@@ -87,100 +87,43 @@ static int onedrive_client_logout(HiveClient *base)
     return 0;
 }
 
-static int onedrive_client_decode_client_info(const char *info_str,
-                                              HiveClientInfo *result)
+#define DECODE_INFO_FIELD(json, name, field) do { \
+        cJSON *item = cJSON_GetObjectItemCaseSensitive(json, name); \
+        if (!cJSON_IsString(item) || \
+            !item->valuestring || !*item->valuestring) { \
+            cJSON_Delete(json); \
+            return -1; \
+        } \
+        if (strlen(item->valuestring) >= sizeof(field)) { \
+            cJSON_Delete(json); \
+            return -2; \
+        } \
+        strcpy(field, item->valuestring); \
+    } while(0)
+
+static
+int onedrive_decode_client_info(const char *info_str, HiveClientInfo *info)
 {
-    cJSON *display_name;
-    cJSON *phone_number;
-    cJSON *region;
     cJSON *json;
-    cJSON *mail;
-    cJSON *id;
-    int rc;
 
     assert(info_str);
-    assert(result);
+    assert(info);
 
     json = cJSON_Parse(info_str);
     if (!json)
         return -1;
 
-    id = cJSON_GetObjectItemCaseSensitive(json, "id");
-    if (!cJSON_IsString(id) || !id->valuestring || !*id->valuestring) {
-        cJSON_Delete(json);
-        return -1;
-    }
-
-    display_name = cJSON_GetObjectItemCaseSensitive(json, "displayName");
-    if (!cJSON_IsString(display_name) || !display_name->valuestring ||
-        !*display_name->valuestring) {
-        cJSON_Delete(json);
-        return -1;
-    }
-
-    mail = cJSON_GetObjectItemCaseSensitive(json, "mail");
-    if (!cJSON_IsString(mail) || !mail->valuestring) {
-        cJSON_Delete(json);
-        return -1;
-    }
-
-    phone_number = cJSON_GetObjectItemCaseSensitive(json, "mobilePhone");
-    if (!cJSON_IsString(phone_number) || !phone_number->valuestring) {
-        cJSON_Delete(json);
-        return -1;
-    }
-
-    region = cJSON_GetObjectItemCaseSensitive(json, "officeLocation");
-    if (!cJSON_IsString(region) || !region->valuestring) {
-        cJSON_Delete(json);
-        return -1;
-    }
-
-    rc = snprintf(result->user_id, sizeof(result->user_id), "%s", id->valuestring);
-    if (rc < 0 || rc >= sizeof(result->user_id)) {
-        cJSON_Delete(json);
-        return -1;
-    }
-
-    rc = snprintf(result->display_name, sizeof(result->display_name),
-                  "%s", display_name->valuestring);
-    if (rc < 0 || rc >= sizeof(result->display_name)) {
-        cJSON_Delete(json);
-        return -1;
-    }
-
-    rc = snprintf(result->email, sizeof(result->email), "%s", mail->valuestring);
-    if (rc < 0 || rc >= sizeof(result->email)) {
-        cJSON_Delete(json);
-        return -1;
-    }
-
-    rc = snprintf(result->phone_number, sizeof(result->phone_number),
-                  "%s", phone_number->valuestring);
-    if (rc < 0 || rc >= sizeof(result->phone_number)) {
-        cJSON_Delete(json);
-        return -1;
-    }
-
-    rc = snprintf(result->phone_number, sizeof(result->phone_number),
-                  "%s", phone_number->valuestring);
-    if (rc < 0 || rc >= sizeof(result->phone_number)) {
-        cJSON_Delete(json);
-        return -1;
-    }
-
-    rc = snprintf(result->region, sizeof(result->region),
-                  "%s", region->valuestring);
-    if (rc < 0 || rc >= sizeof(result->region)) {
-        cJSON_Delete(json);
-        return -1;
-    }
+    DECODE_INFO_FIELD(json, "id", info->user_id);
+    DECODE_INFO_FIELD(json, "displayName", info->display_name);
+    DECODE_INFO_FIELD(json, "mail", info->email);
+    DECODE_INFO_FIELD(json, "mobilePhone", info->phone_number);
+    DECODE_INFO_FIELD(json, "officeLocation", info->region);
 
     cJSON_Delete(json);
     return 0;
 }
 
-static int onedrive_client_get_info(HiveClient *base, HiveClientInfo *result)
+static int onedrive_client_get_info(HiveClient *base, HiveClientInfo *info)
 {
     OneDriveClient *client = (OneDriveClient *)base;
     http_client_t *httpc;
@@ -190,7 +133,7 @@ static int onedrive_client_get_info(HiveClient *base, HiveClientInfo *result)
 
     assert(client);
     assert(client->token);
-    assert(result);
+    assert(info);
 
     rc = oauth_token_check_expire(client->token);
     if (rc < 0) {
@@ -231,18 +174,31 @@ static int onedrive_client_get_info(HiveClient *base, HiveClientInfo *result)
     if (!p)
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
-    rc = onedrive_client_decode_client_info(p, result);
+    rc = onedrive_decode_client_info(p, info);
     free(p);
-    if (rc)
-        return -1;
 
-    return 0;
+    switch(rc) {
+    case -1:
+        rc = -1; // TODO;
+        break;
+
+    case -2:
+        rc = HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
+        break;
+
+    default:
+        rc = 0;
+        break;
+    }
+
+    return rc;
 
 error_exit:
     http_client_close(httpc);
     return rc;
 }
 
+#if 0
 static int onedrive_client_list_drives(HiveClient *base, char **result)
 {
     OneDriveClient *client = (OneDriveClient *)base;
@@ -303,11 +259,11 @@ error_exit:
     http_client_close(httpc);
     return rc;
 }
+#endif
 
 static int onedrive_client_drive_open(HiveClient *base, HiveDrive **drive)
 {
     OneDriveClient *client = (OneDriveClient *)base;
-    HiveDrive *tmp;
     int rc;
 
     assert(client);
@@ -315,18 +271,11 @@ static int onedrive_client_drive_open(HiveClient *base, HiveDrive **drive)
     assert(drive);
 
     if (client->drive)
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_ALREADY_EXIST);
 
-    rc = onedrive_drive_open(client->token, "default", &tmp);
+    rc = onedrive_drive_open(client->token, "default", drive);
     if (rc < 0)
         return -1;
-
-    if (_test_and_swap_ptr((void **)&client->drive, NULL, tmp)) {
-        deref(tmp);
-        return -1;
-    }
-
-    *drive = tmp;
 
     return 0;
 }
