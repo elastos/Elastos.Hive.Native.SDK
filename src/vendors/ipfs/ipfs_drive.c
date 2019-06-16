@@ -43,6 +43,8 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *file_path,
     ipfs_drive_t *drive = (ipfs_drive_t *)base;
     char url[MAXPATHLEN + 1] = {0};
     http_client_t *httpc;
+    cJSON *response;
+    cJSON *hash;
     long resp_code;
     char *p;
     int rc;
@@ -91,7 +93,20 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *file_path,
         return -1;
     }
 
-    *result = p;
+    response = cJSON_Parse(p);
+    free(p);
+    if (!response)
+        return -1;
+
+    hash = cJSON_GetObjectItemCaseSensitive(response, "Hash");
+    if (!hash || !cJSON_IsString(hash) || !hash->valuestring ||
+        !*hash->valuestring || strlen(hash->valuestring) >= sizeof(info->fileid)) {
+        cJSON_Delete(response);
+        return -1;
+    }
+
+    strcpy(info->fileid, hash->valuestring);
+    cJSON_Delete(response);
     return 0;
 
 error_exit:
