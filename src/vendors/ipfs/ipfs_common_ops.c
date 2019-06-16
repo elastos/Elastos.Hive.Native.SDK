@@ -13,16 +13,14 @@
 
 static int ipfs_resolve(ipfs_token_t *token, const char *peerid, char **result)
 {
-    char node_ip[HIVE_MAX_IP_STRING_LEN+1];
     char url[MAXPATHLEN + 1] = {0};
     http_client_t *httpc;
     long resp_code = 0;
     char *p;
     int rc;
 
-    ipfs_token_get_node_in_use(token, node_ip, sizeof(node_ip));
     rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/name/resolve",
-                  node_ip, NODE_API_PORT);
+                  ipfs_token_get_node_in_use(token), NODE_API_PORT);
     if (rc < 0 || rc >= sizeof(url)) {
         hive_set_error(-1);
         return -1;
@@ -69,16 +67,13 @@ error_exit:
 
 static int ipfs_login(ipfs_token_t *token, const char *hash)
 {
-    char node_ip[HIVE_MAX_IP_STRING_LEN+1];
-    char uid[HIVE_MAX_USER_ID_LEN + 1];
     char url[MAXPATHLEN + 1] = {0};
     http_client_t *httpc;
     long resp_code = 0;
     int rc;
 
-    ipfs_token_get_node_in_use(token, node_ip, sizeof(node_ip));
     rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/uid/login",
-                  node_ip, NODE_API_PORT);
+                  ipfs_token_get_node_in_use(token), NODE_API_PORT);
     if (rc < 0 || rc >= sizeof(url)) {
         hive_set_error(-1);
         return -1;
@@ -90,10 +85,8 @@ static int ipfs_login(ipfs_token_t *token, const char *hash)
         return -1;
     }
 
-    ipfs_token_get_uid(token, uid, sizeof(uid));
-
     http_client_set_url(httpc, url);
-    http_client_set_query(httpc, "uid", uid);
+    http_client_set_query(httpc, "uid", ipfs_token_get_uid(token));
     http_client_set_query(httpc, "hash", hash);
     http_client_set_method(httpc, HTTP_METHOD_POST);
 
@@ -174,16 +167,13 @@ int ipfs_synchronize(ipfs_token_t *token)
 
 int ipfs_publish(ipfs_token_t *token, const char *path)
 {
-    char node_ip[HIVE_MAX_IP_STRING_LEN + 1];
-    char uid[HIVE_MAX_USER_ID_LEN + 1];
     char url[MAXPATHLEN + 1] = {0};
     http_client_t *httpc;
     long resp_code;
     int rc;
 
-    ipfs_token_get_node_in_use(token, node_ip, sizeof(node_ip));
     rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/name/publish",
-                  node_ip, NODE_API_PORT);
+                  ipfs_token_get_node_in_use(token), NODE_API_PORT);
     if (rc < 0 || rc >= sizeof(url)) {
         hive_set_error(-1);
         return -1;
@@ -195,10 +185,8 @@ int ipfs_publish(ipfs_token_t *token, const char *path)
         return -1;
     }
 
-    ipfs_token_get_uid(token, uid, sizeof(uid));
-
     http_client_set_url(httpc, url);
-    http_client_set_query(httpc, "uid", uid);
+    http_client_set_query(httpc, "uid", ipfs_token_get_uid(token));
     http_client_set_query(httpc, "path", path);
     http_client_set_method(httpc, HTTP_METHOD_POST);
 

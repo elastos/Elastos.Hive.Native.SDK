@@ -31,7 +31,7 @@
 typedef struct IPFSClient {
     HiveClient base;
     HiveDrive *drive;
-    char uid_cookie[MAXPATHLEN];
+    char token_cookie[MAXPATHLEN + 1];
     ipfs_token_t *token;
 } IPFSClient;
 
@@ -56,14 +56,19 @@ static inline void *_exchange_ptr(void **ptr, void *val)
     __atomic_exchange(ptr, &val, &old, __ATOMIC_SEQ_CST);
     return old;
 #endif
-
 }
-static int ipfs_client_login(HiveClient *base)
+
+static int ipfs_client_login(HiveClient *base,
+                             HiveRequestAuthenticationCallback *cb,
+                             void *user_data)
 {
     IPFSClient *client = (IPFSClient *)base;
     int rc;
 
     assert(client);
+
+    (void)cb;
+    (void)user_data;
 
     rc = ipfs_synchronize(client->token);
     if (rc < 0) {
@@ -86,25 +91,20 @@ static int ipfs_client_logout(HiveClient *base)
     if (drive)
         deref(drive);
 
-    rc = remove(client->uid_cookie);
-    if (rc < 0)
-        return -1;
-
+    ipfs_token_reset(client->token);
     return 0;
 }
 
 static int ipfs_client_get_info(HiveClient *base, HiveClientInfo *result)
 {
     IPFSClient *client = (IPFSClient *)base;
-    char uid[HIVE_MAX_USER_ID_LEN + 1];
     int rc;
 
     assert(client);
     assert(result);
 
-    ipfs_token_get_uid(client->token, uid, sizeof(uid));
-
-    rc = snprintf(result->user_id, sizeof(result->user_id), "%s", uid);
+    rc = snprintf(result->user_id, sizeof(result->user_id), "%s",
+                  ipfs_token_get_uid(client->token));
     if (rc < 0 || rc >= sizeof(result->user_id))
         return -1;
 
@@ -130,17 +130,14 @@ static int ipfs_client_get_info(HiveClient *base, HiveClientInfo *result)
 static int ipfs_client_list_drives(HiveClient *base, char **result)
 {
     IPFSClient *client = (IPFSClient *)base;
-    char node_ip[HIVE_MAX_IP_STRING_LEN + 1];
-    char uid[HIVE_MAX_USER_ID_LEN + 1];
     char url[MAXPATHLEN + 1] = {0};
     http_client_t *httpc;
     long resp_code = 0;
     char *p;
     int rc;
 
-    ipfs_token_get_node_in_use(client->token, node_ip, sizeof(node_ip));
     rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/files/stat",
-                  node_ip, NODE_API_PORT);
+                  ipfs_token_get_node_in_use(client->token), NODE_API_PORT);
     if (rc < 0 || rc >= sizeof(url)) {
         hive_set_error(-1);
         return -1;
@@ -156,10 +153,8 @@ static int ipfs_client_list_drives(HiveClient *base, char **result)
     if (rc)
         return -1;
 
-    ipfs_token_get_uid(client->token, uid, sizeof(uid));
-
     http_client_set_url(httpc, url);
-    http_client_set_query(httpc, "uid", uid);
+    http_client_set_query(httpc, "uid", ipfs_token_get_uid(client->token));
     http_client_set_query(httpc, "path", "/");
     http_client_set_method(httpc, HTTP_METHOD_POST);
     http_client_enable_response_body(httpc);
@@ -231,12 +226,6 @@ static int ipfs_client_close(HiveClient *base)
     return 0;
 }
 
-static int ipfs_client_invalidate_credential(HiveClient *obj)
-{
-    (void)obj;
-    return 0;
-}
-
 static void ipfs_client_destructor(void *p)
 {
     IPFSClient *client = (IPFSClient *)p;
@@ -248,152 +237,214 @@ static void ipfs_client_destructor(void *p)
         ipfs_token_close(client->token);
 }
 
-static bool is_valid_ip(const char *ip)
+static inline bool is_valid_ip(const char *ip)
 {
-    int rc;
-
-    rc = inet_pton(AF_INET, ip, NULL);
-    if (rc < 0)
-        return false;
-
-    return true;
+    return inet_pton(AF_INET, ip, NULL) > 0 ? true : false;
 }
 
-static int load_uid_cookie(const char *uid_cookie, char *uid, size_t len)
+static inline bool is_valid_ipv6(const char *ip)
+{
+    return inet_pton(AF_INET6, ip, NULL) > 0 ? true : false;
+}
+
+static cJSON *load_ipfs_token_cookie(const char *token_cookie)
 {
     struct stat st;
     size_t n2read;
     ssize_t nread;
+    cJSON *json;
+    char *buf;
+    char *cur;
     int rc;
     int fd;
 
-    rc = stat(uid_cookie, &st);
+    assert(token_cookie);
+
+    rc = stat(token_cookie, &st);
     if (rc < 0)
-        return -1;
+        return NULL;
 
-    if (!st.st_size || st.st_size > len)
-        return -1;
+    if (!st.st_size)
+        return NULL;
 
-    fd = open(uid_cookie, O_RDONLY);
+    fd = open(token_cookie, O_RDONLY);
     if (fd < 0)
-        return -1;
+        return NULL;
 
-    for (n2read = st.st_size; n2read; n2read -= nread, uid += nread) {
-        nread = read(fd, uid, n2read);
+    buf = malloc(st.st_size);
+    if (!buf) {
+        close(fd);
+        return NULL;
+    }
+
+    for (n2read = st.st_size, cur = buf; n2read; n2read -= nread, cur += nread) {
+        nread = read(fd, cur, n2read);
         if (!nread || (nread < 0 && errno != EINTR)) {
             close(fd);
-            return -1;
+            free(buf);
+            return NULL;
         }
         if (nread < 0)
             nread = 0;
     }
     close(fd);
 
-    if (*(uid - 1))
-        return -1;
+    json = cJSON_Parse(buf);
+    free(buf);
 
-    return 0;
+    return json;
 }
 
-static int save_uid_cookie(const char *uid_cookie, const char *uid)
+static int writeback_token(const cJSON *json, void *user_data)
 {
+    IPFSClient *client = (IPFSClient *)user_data;
     int fd;
     size_t n2write;
     ssize_t nwrite;
+    char *json_str;
+    char *tmp;
 
-    fd = open(uid_cookie, O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
-    if (fd < 0)
+    json_str = cJSON_PrintUnformatted(json);
+    if (!json_str || !*json_str)
         return -1;
 
-    for (n2write = strlen(uid) + 1; n2write; n2write -= nwrite, uid += nwrite) {
-        nwrite = write(fd, uid, n2write);
+    fd = open(client->token_cookie, O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
+    if (fd < 0) {
+        free(json_str);
+        return -1;
+    }
+
+    for (n2write = strlen(json_str), tmp = json_str;
+         n2write; n2write -= nwrite, tmp += nwrite) {
+        nwrite = write(fd, tmp, n2write);
         if (!nwrite || (nwrite < 0 && errno != EINTR)) {
+            free(json_str);
             close(fd);
             return -1;
         }
         if (nwrite < 0)
             nwrite = 0;
     }
+    free(json_str);
     close(fd);
 
     return 0;
 }
 
-int ipfs_client_new(const HiveOptions *options, HiveClient **client)
+HiveClient *ipfs_client_new(const HiveOptions *options)
 {
-    IPFSOptionsDeprecated *opts = (IPFSOptionsDeprecated *)options;
-    IPFSTokenOptions *token_opts = &opts->token_options;
-    size_t uid_max_len = HIVE_MAX_USER_ID_LEN + 1;
-    char uid_cookie[MAXPATHLEN + 1];
-    bool uid_cookie_exists;
-    ipfs_token_t *token;
-    IPFSClient *tmp;
+    IPFSOptions *opts = (IPFSOptions *)options;
+    ipfs_token_options_t *token_options;
+    size_t token_options_sz;
+    char token_cookie[MAXPATHLEN + 1];
+    cJSON *token_cookie_json = NULL;
+    IPFSClient *client;
     int rc;
-    char *uid;
     size_t i;
 
-    assert(client);
+    assert(options);
+
+    token_options_sz = sizeof(*token_options) +
+                       sizeof(rpc_node_t) * opts->rpc_node_count;
+    token_options = alloca(token_options_sz);
+    memset(token_options, 0, token_options_sz);
 
     // check uid configuration
-    if (strlen(token_opts->uid) >= sizeof(token_opts->uid))
-        return -1;
+    if (opts->uid && (!*opts->uid || strlen(opts->uid) >= sizeof(token_options->uid)))
+        return NULL;
 
-    rc = snprintf(uid_cookie, sizeof(uid_cookie), "%s/uid",
-                  opts->base.persistent_location);
-    if (rc < 0 || rc >= sizeof(uid_cookie))
-        return -1;
-
-    uid_cookie_exists = !access(uid_cookie, F_OK) ? true : false;
-    if (!token_opts->uid[0] && uid_cookie_exists) {
-        uid = alloca(uid_max_len);
-        rc = load_uid_cookie(uid_cookie, uid, uid_max_len);
-        if (rc < 0)
-            return -1;
-    } else
-        uid = token_opts->uid;
+    if (opts->uid)
+        strcpy(token_options->uid, opts->uid);
 
     // check bootstraps configuration
-    if (!token_opts->bootstraps_size)
-        return -1;
+    token_options->rpc_nodes_count = opts->rpc_node_count;
+    for (i = 0; i < opts->rpc_node_count; ++i) {
+        HiveRpcNode *node = &opts->rpcNodes[i];
+        rpc_node_t *node_options = &token_options->rpc_nodes[i];
+        size_t ipv4_len;
+        size_t ipv6_len;
+        char *endptr;
+        long port;
 
-    for (i = 0; i < token_opts->bootstraps_size; ++i) {
-        size_t ip_len = strlen(token_opts->bootstraps_ip[i]);
+        ipv4_len = node->ipv4 ? strlen(node->ipv4) : 0;
+        ipv6_len = node->ipv6 ? strlen(node->ipv6) : 0;
 
-        if (!ip_len || ip_len >= sizeof(token_opts->bootstraps_ip[i]))
-            return -1;
+        if (!ipv4_len && !ipv6_len)
+            return NULL;
 
-        if (!is_valid_ip(token_opts->bootstraps_ip[i]))
-            return -1;
+        if (ipv4_len) {
+            if (ipv4_len >= sizeof(node_options->ipv4))
+                return NULL;
+
+            if (!is_valid_ip(node->ipv4))
+                return NULL;
+
+            strcpy(node_options->ipv4, node->ipv4);
+        }
+
+        if (ipv6_len) {
+            if (ipv6_len >= sizeof(node_options->ipv6))
+                return NULL;
+
+            if (!is_valid_ipv6(node->ipv6))
+                return NULL;
+
+            strcpy(node_options->ipv6, node->ipv6);
+        }
+
+        if (!node->port || !*node->port)
+            return NULL;
+
+        port = strtol(node->port, &endptr, 10);
+        if (*endptr)
+            return NULL;
+
+        if (port < 1 || port > 65535)
+            return NULL;
+
+        node_options->port = (uint16_t)port;
     }
 
-    rc = ipfs_token_new(uid, token_opts->bootstraps_size,
-                        token_opts->bootstraps_ip, &token);
-    if (rc < 0)
-        return -1;
+    // check token cookie
+    rc = snprintf(token_cookie, sizeof(token_cookie), "%s/ipfs.json",
+                  opts->base.persistent_location);
+    if (rc < 0 || rc >= sizeof(token_cookie))
+        return NULL;
 
-    uid = alloca(uid_max_len);
-    ipfs_token_get_uid(token, uid, uid_max_len);
-    rc = save_uid_cookie(uid_cookie, uid);
-    if (rc < 0) {
-        ipfs_token_close(token);
-        return -1;
+    if (!access(token_cookie, F_OK)) {
+        token_cookie_json = load_ipfs_token_cookie(token_cookie);
+        if (!token_cookie_json)
+            return NULL;
     }
 
-    tmp = (IPFSClient *)rc_zalloc(sizeof(IPFSClient), ipfs_client_destructor);
-    if (!tmp)
-        return -1;
+    token_options->store = token_cookie_json;
 
-    tmp->token = token;
-    strcpy(tmp->uid_cookie, uid_cookie);
+    if (!token_options->store && (!*token_options->uid ||
+                                  !token_options->rpc_nodes_count))
+        return NULL;
 
-    tmp->base.login       = &ipfs_client_login;
-    tmp->base.logout      = &ipfs_client_logout;
-    tmp->base.get_info    = &ipfs_client_get_info;
-    tmp->base.get_drive   = &ipfs_client_drive_open;
-    tmp->base.finalize    = &ipfs_client_close;
+    client = (IPFSClient *)rc_zalloc(sizeof(IPFSClient), &ipfs_client_destructor);
+    if (!client) {
+        if (token_options->store)
+            cJSON_Delete(token_options->store);
+        return NULL;
+    }
 
-    tmp->base.invalidate_credential = &ipfs_client_invalidate_credential;
+    client->token = ipfs_token_new(token_options, &writeback_token, client);
+    if (token_options->store)
+        cJSON_Delete(token_options->store);
+    if (!client->token) {
+        deref(client);
+        return NULL;
+    }
 
-    *client = (HiveClient *)tmp;
-    return 0;
+    strcpy(client->token_cookie, token_cookie);
+
+    client->base.login       = &ipfs_client_login;
+    client->base.logout      = &ipfs_client_logout;
+    client->base.get_info    = &ipfs_client_get_info;
+    client->base.get_drive   = &ipfs_client_drive_open;
+    client->base.close       = &ipfs_client_close;
+
+    return &client->base;
 }
