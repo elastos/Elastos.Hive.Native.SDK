@@ -20,7 +20,7 @@ static FactoryMethod factory_methods[] = {
     { HiveDriveType_IPFS,      ipfs_client_new     },
     { HiveDriveType_OneDrive,  onedrive_client_new },
     { HiveDriveType_ownCloud,  owncloud_client_new },
-    { HiveDriveType_Butt,      NULL }
+    { HiveDriveType_Bott,      NULL }
 };
 
 HiveClient *hive_client_new(const HiveOptions *options)
@@ -69,7 +69,7 @@ int hive_client_close(HiveClient *client)
 }
 
 int hive_client_login(HiveClient *client,
-                      HiveRequestAuthenticationCallback *callback,
+                      HiveRequestAuthenticationCallback callback,
                       void *context)
 {
     int rc;

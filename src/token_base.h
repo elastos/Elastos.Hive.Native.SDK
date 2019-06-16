@@ -12,7 +12,7 @@ typedef struct token_base token_base_t;
 struct token_base {
     int state;
 
-    int (*login)        (token_base_t *, HiveRequestAuthenticationCallback *, void *);
+    int (*login)        (token_base_t *, HiveRequestAuthenticationCallback, void *);
     int (*logout)       (token_base_t *);
 };
 
@@ -93,7 +93,7 @@ inline static bool has_valid_token(token_base_t *token)
 }
 
 int token_login(token_base_t *token,
-                HiveRequestAuthenticationCallback *callback,
+                HiveRequestAuthenticationCallback callback,
                 void *context);
 int token_logout(token_base_t *token);
 

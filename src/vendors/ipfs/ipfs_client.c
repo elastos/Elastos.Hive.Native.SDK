@@ -59,7 +59,7 @@ static inline void *_exchange_ptr(void **ptr, void *val)
 }
 
 static int ipfs_client_login(HiveClient *base,
-                             HiveRequestAuthenticationCallback *cb,
+                             HiveRequestAuthenticationCallback cb,
                              void *user_data)
 {
     IPFSClient *client = (IPFSClient *)base;

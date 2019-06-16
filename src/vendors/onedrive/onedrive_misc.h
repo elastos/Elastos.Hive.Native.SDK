@@ -15,9 +15,14 @@ int decode_info_field(cJSON *json, const char *name, char *buf, size_t len)
     cJSON *item;
 
     item = cJSON_GetObjectItemCaseSensitive(json, name);
-    if (!cJSON_IsString(item) || \
-        !item->valuestring || !*item->valuestring)
+    if (!item || (!cJSON_IsNull(item) &&
+                  !(cJSON_IsString(item) && item->valuestring && *item->valuestring)))
         return -1;
+
+    if (cJSON_IsNull(item)) {
+        buf[0] = '\0';
+        return 0;
+    }
 
     if (strlen(item->valuestring) >= len)
         return -2;
