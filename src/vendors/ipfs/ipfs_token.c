@@ -9,13 +9,12 @@
 
 #include "ela_hive.h"
 #include "ipfs_token.h"
-#include "ipfs_client.h"
 #include "ipfs_constants.h"
 #include "http_client.h"
 
 struct ipfs_token {
     size_t bootstrap_in_use;
-    IPFSTokenOptions options;
+    ipfs_token_options_t options;
 };
 
 static int test_reachable(const char *ipaddr)
@@ -108,13 +107,14 @@ error_exit:
 
 int ipfs_token_get_uid_info(ipfs_token_t *token, char **result)
 {
-    assert(token);
+    return -1;
+    /* assert(token);
 
     return _ipfs_token_get_uid_info(token->options.bootstraps_ip[token->bootstrap_in_use],
-                                    token->options.uid, result);
+                                    token->options.uid, result); */
 }
 
-static int get_usable_bootstrap(size_t bootstraps_size,
+/* static int get_usable_bootstrap(size_t bootstraps_size,
                                 char bootstraps_ip[][HIVE_MAX_IP_STRING_LEN+1],
                                 size_t *usable_bootstrap_idx)
 {
@@ -129,7 +129,7 @@ static int get_usable_bootstrap(size_t bootstraps_size,
         }
     }
     return -1;
-}
+} */
 
 static int uid_new(const char *node_ip, char *uid, size_t uid_len)
 {
@@ -190,21 +190,23 @@ error_exit:
     return -1;
 }
 
-void ipfs_token_get_uid(ipfs_token_t *token, char *uid, size_t uid_len)
+const char *ipfs_token_get_uid(ipfs_token_t *token)
 {
-    int rc;
+    return NULL;
+    /* int rc;
 
     assert(token);
     assert(uid);
     assert(uid_len);
 
     rc = snprintf(uid, uid_len, "%s", token->options.uid);
-    assert(rc > 0 && rc < uid_len);
+    assert(rc > 0 && rc < uid_len); */
 }
 
-void ipfs_token_get_node_in_use(ipfs_token_t *token, char *node_ip, size_t node_ip_len)
+const char *ipfs_token_get_node_in_use(ipfs_token_t *token)
 {
-    int rc;
+    return NULL;
+    /* int rc;
 
     assert(token);
     assert(node_ip);
@@ -212,14 +214,15 @@ void ipfs_token_get_node_in_use(ipfs_token_t *token, char *node_ip, size_t node_
 
     rc = snprintf(node_ip, node_ip_len, "%s",
                   token->options.bootstraps_ip[token->bootstrap_in_use]);
-    assert(rc > 0 && rc < node_ip_len);
+    assert(rc > 0 && rc < node_ip_len); */
 }
 
-int ipfs_token_new(const char *uid, size_t bootstraps_size,
-                   char bootstraps_ip[][HIVE_MAX_IP_STRING_LEN+1],
-                   ipfs_token_t **token)
+ipfs_token_t *ipfs_token_new(ipfs_token_options_t *options,
+                             ipfs_token_writeback_func_t cb,
+                             void *user_data)
 {
-    size_t candidate_bootstrap;
+    return NULL;
+    /* size_t candidate_bootstrap;
     ipfs_token_t *tmp;
     size_t bootstraps_nbytes;
     int rc;
@@ -252,7 +255,11 @@ int ipfs_token_new(const char *uid, size_t bootstraps_size,
     memcpy(tmp->options.bootstraps_ip, bootstraps_ip, bootstraps_nbytes);
 
     *token = tmp;
-    return 0;
+    return 0; */
+}
+
+void ipfs_token_reset(ipfs_token_t *token)
+{
 }
 
 int ipfs_token_close(ipfs_token_t *token)
