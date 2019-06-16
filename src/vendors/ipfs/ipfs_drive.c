@@ -269,10 +269,6 @@ static int ipfs_drive_make_dir(HiveDrive *base, const char *path)
         return -1;
     }
 
-    rc = ipfs_synchronize(drive->token);
-    if (rc)
-        goto error_exit;
-
     http_client_set_url(httpc, url);
     http_client_set_query(httpc, "uid", ipfs_token_get_uid(drive->token));
     http_client_set_query(httpc, "path", path);
@@ -362,7 +358,12 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
     char url[MAXPATHLEN + 1] = {0};
     http_client_t *httpc;
     long resp_code;
+    HiveFileInfo src_info;
     int rc;
+
+    rc = ipfs_drive_stat_file(base, src_path, &src_info);
+    if (rc < 0)
+        return -1;
 
     rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/files/cp",
                   ipfs_token_get_node_in_use(drive->token), NODE_API_PORT);
@@ -379,7 +380,7 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
 
     http_client_set_url(httpc, url);
     http_client_set_query(httpc, "uid", ipfs_token_get_uid(drive->token));
-    http_client_set_query(httpc, "source", src_path);
+    http_client_set_query(httpc, "source", src_info.fileid);
     http_client_set_query(httpc, "dest", dest_path);
     http_client_set_method(httpc, HTTP_METHOD_POST);
 
