@@ -169,7 +169,7 @@ typedef struct OneDriveOptions {
 typedef struct HiveRpcNode {
     /**
      * \~English
-     * The Callback to open the authorization page.
+     * The ip address supported with ipv4 protocol.
      */
     const char *ipv4;
 

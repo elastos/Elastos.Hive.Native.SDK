@@ -1,9 +1,10 @@
 #include <stdlib.h>
 #include <sys/stat.h>
-
 #include <crystal.h>
 
-#include "client.h"
+#include "hive_error.h"
+#include "hive_client.h"
+
 #include "native_client.h"
 #include "ipfs_client.h"
 #include "onedrive.h"
@@ -11,7 +12,7 @@
 
 typedef struct FactoryMethod {
     int drive_type;
-    HiveClient *(*factory_cb)(const HiveOptions *);
+    HiveClient *(*create_client)(const HiveOptions *);
 } FactoryMethod;
 
 static FactoryMethod factory_methods[] = {
@@ -33,21 +34,23 @@ HiveClient *hive_client_new(const HiveOptions *options)
         !*options->persistent_location)
         return NULL;
 
+    /*
     rc = stat(options->persistent_location, &st);
     if (rc < 0)
         return NULL;
 
     if (!S_ISDIR(st.st_mode))
         return NULL;
+    */
 
-    for (; method->factory_cb; method++) {
+    for (; method->create_client; method++) {
         if (method->drive_type == options->drive_type) {
-            client = method->factory_cb(options);
+            client = method->create_client(options);
             break;
         }
     }
 
-    if (!method->factory_cb) {
+    if (!method->create_client) {
         hive_set_error(-1);
         return NULL;
     }
@@ -59,6 +62,8 @@ int hive_client_close(HiveClient *client)
 {
     if (!client)
         return 0;
+
+    // TODO: token;
 
     if (client->close)
         client->close(client);
@@ -83,7 +88,7 @@ int hive_client_login(HiveClient *client,
      * 2. if being in progress of logining, then return error. else
      * 3. It's in raw state, conduct the login process.
      */
-    rc = client_try_login(client);
+    rc = check_and_login(client);
     switch(rc) {
     case 0:
         break;
@@ -103,14 +108,14 @@ int hive_client_login(HiveClient *client,
 
     if (rc < 0) {
         // recover back to 'RAW' state.
-        _test_and_swap32(&client->state, LOGINING, RAW);
+        _test_and_swap(&client->state, LOGINING, RAW);
         hive_set_error(rc);
         return -1;
     }
 
     // When conducting all login stuffs successfully, then change to be
     // 'LOGINED'.
-    _test_and_swap32(&client->state, LOGINING, LOGINED);
+    _test_and_swap(&client->state, LOGINING, LOGINED);
     return 0;
 }
 
@@ -123,7 +128,7 @@ int hive_client_logout(HiveClient *client)
         return -1;
     }
 
-    rc = client_try_logout(client);
+    rc = check_and_logout(client);
     switch(rc) {
     case 0:
         break;
@@ -140,19 +145,21 @@ int hive_client_logout(HiveClient *client)
     if (client->logout)
         client->logout(client);
 
-    _test_and_swap32(&client->state, LOGOUTING, RAW);
+    _test_and_swap(&client->state, LOGOUTING, RAW);
 
     return 0;
 }
 
 int hive_client_get_info(HiveClient *client, HiveClientInfo *info)
 {
+    int rc;
+
     if (!client || !info) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
     }
 
-    if (!is_client_ready(client))  {
+    if (!has_valid_token(client))  {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_READY));
         return -1;
     }
@@ -162,38 +169,14 @@ int hive_client_get_info(HiveClient *client, HiveClientInfo *info)
         return -1;
     }
 
-    return client->get_info(client, info);
-}
-
-#if 0
-int hive_client_list_drives(HiveClient *client, char **result)
-{
-    int rc;
-
-    if (!client || !result) {
+    rc = client->get_info(client, info);
+    if (rc < 0) {
         hive_set_error(-1);
-        return -1;
-    }
-
-    if (!is_client_ready(client))  {
-        hive_set_error(-1);
-        return -1;
-    }
-
-    if (!client->list_drives) {
-        hive_set_error(-1);
-        return -1;
-    }
-
-    rc = client->list_drives(client, result);
-    if (rc < 0)  {
-        hive_set_error(rc);
         return -1;
     }
 
     return 0;
 }
-#endif
 
 HiveDrive *hive_drive_open(HiveClient *client)
 {
@@ -201,17 +184,17 @@ HiveDrive *hive_drive_open(HiveClient *client)
     int rc;
 
     if (!client) {
-        hive_set_error(-1);
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return NULL;
     }
 
-    if (!is_client_ready(client))  {
-        hive_set_error(-1);
+    if (!has_valid_token(client))  {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_READY));
         return NULL;
     }
 
     if  (!client->get_drive) {
-        hive_set_error(-1);
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED));
         return NULL;
     }
 
@@ -223,28 +206,3 @@ HiveDrive *hive_drive_open(HiveClient *client)
 
     return drive;
 }
-
-#if 0
-int hive_client_invalidate_credential(HiveClient *client)
-{
-    int rc;
-
-    if (!client) {
-        hive_set_error(-1);
-        return -1;
-    }
-
-    if (!is_client_ready(client))  {
-        hive_set_error(-1);
-        return -1;
-    }
-
-    rc = client->invalidate_credential(client);
-    if (rc < 0) {
-        hive_set_error(rc);
-        return -1;
-    }
-
-    return 0;
-}
-#endif

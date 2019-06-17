@@ -12,6 +12,7 @@
 #include <crystal.h>
 #include <cjson/cJSON.h>
 
+#include "hive_error.h"
 #include "onedrive_misc.h"
 #include "onedrive_constants.h"
 #include "http_client.h"

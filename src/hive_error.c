@@ -1,8 +1,8 @@
 #include <string.h>
 #include <pthread.h>
 
-#include "error.h"
 #include "ela_hive.h"
+#include "hive_error.h"
 #include "http_client.h"
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -151,7 +151,7 @@ static int http_server_error(int errcode, char *buf, size_t len)
 
 typedef struct FacilityDesc {
     const char *desc;
-    strerror_t errstring;
+    strerror_func_t *errstring;
 } FacilityDesc;
 
 static FacilityDesc facility_codes[] = {
@@ -205,7 +205,7 @@ char *hive_get_strerror(int errnum, char *buf, size_t len)
     return buf;
 }
 
-int hive_register_strerror(int facility, strerror_t strerr)
+int hive_register_strerror(int facility, strerror_func_t *strerr)
 {
     FacilityDesc *faci_desc;
 

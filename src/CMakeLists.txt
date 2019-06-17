@@ -40,9 +40,9 @@ if(HAVE_SYS_PARAM_H)
 endif()
 
 set(SRC
-    client.c
-    drive.c
-    error.c
+    hive_error.c
+    hive_drive.c
+    hive_client.c
     sandbird/sandbird.c
     http/http_client.c
     oauth/oauth_token.c

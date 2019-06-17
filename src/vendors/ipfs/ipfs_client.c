@@ -19,14 +19,14 @@
 #endif
 
 #include "ela_hive.h"
-#include "client.h"
 #include "ipfs_client.h"
 #include "ipfs_drive.h"
 #include "ipfs_token.h"
 #include "ipfs_common_ops.h"
 #include "ipfs_constants.h"
 #include "http_client.h"
-#include "error.h"
+#include "hive_error.h"
+#include "hive_client.h"
 
 typedef struct IPFSClient {
     HiveClient base;

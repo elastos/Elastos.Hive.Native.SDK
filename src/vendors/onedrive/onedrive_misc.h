@@ -7,8 +7,7 @@ extern "C" {
 
 #include "ela_hive.h"
 #include "oauth_token.h"
-#include "client.h"
-#include "drive.h"
+#include "hive_client.h"
 
 static inline
 int decode_info_field(cJSON *json, const char *name, char *buf, size_t len)
