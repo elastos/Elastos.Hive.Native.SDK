@@ -787,6 +787,18 @@ ssize_t hive_file_write(HiveFile *file, const char *buf, size_t bufsz);
 
 /**
  * \~English
+ * Bad json format.
+ */
+#define HIVEERR_BAD_JSON_FORMAT                      0x16
+
+/**
+ * \~English
+ * Try to call this api again.
+ */
+#define HIVEERR_TRY_AGAIN                            0x17
+
+/**
+ * \~English
  * Unknown error.
  */
 #define HIVEERR_UNKNOWN                              0xFF
