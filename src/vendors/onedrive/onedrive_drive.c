@@ -3,14 +3,12 @@
 #include <string.h>
 #include <limits.h>
 #include <errno.h>
-#ifdef HAVE_LIBGEN_H
-#include <libgen.h>
-#endif
-#ifdef HAVE_SYS_PARAM_H
-#include <sys/param.h>
-#endif
+
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
+#ifdef HAVE_LIBGEN_H
+#include <libgen.h>
 #endif
 
 #include <crystal.h>

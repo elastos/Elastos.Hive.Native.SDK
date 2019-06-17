@@ -3,11 +3,13 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <assert.h>
-#include <unistd.h>
+#include <limits.h>
 #include <sys/stat.h>
-#ifdef HAVE_SYS_PARAM_H
-#include <sys/param.h>
+
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
 #endif
+
 #include <crystal.h>
 #include <cjson/cJSON.h>
 

@@ -5,14 +5,10 @@
 extern "C" {
 #endif
 
-#if defined(_WIN32) || defined(_WIN64)
-#include <winnt.h>
-#endif
-
 #include "ela_hive.h"
 
 struct HiveClient {
-    uint32_t state;  // login state.
+    int state;  // login state.
 
     int (*login)        (HiveClient *, HiveRequestAuthenticationCallback *, void *);
     int (*logout)       (HiveClient *);
@@ -45,12 +41,17 @@ enum {
 };
 
 #if defined(_WIN32) || defined(_WIN64)
-#define _test_and_swap(ptr, oldval, newval) \
-                    InterlockedCompareExchange(ptr, newval, oldval)
-#else
-#define _test_and_swap(ptr, oldval, newval) \
-                    __sync_val_compare_and_swap(ptr, oldval, newval)
+#include <winnt.h>
+
+inline static
+int __sync_val_compare_and_swap(int *ptr, int oldval, int newval)
+{
+    return (int)InterlockedCompareExchange((LONG *)ptr,
+                                           (LONG)newval, (LONG)oldval);
+}
 #endif
+
+#define _test_and_swap __sync_val_compare_and_swap
 
 inline static int check_and_login(HiveClient *client)
 {
