@@ -12,7 +12,8 @@
 #include "ipfs_constants.h"
 #include "ipfs_common_ops.h"
 #include "http_client.h"
-#include "error.h"
+#include "hive_error.h"
+#include "hive_client.h"
 
 typedef struct ipfs_drive {
     HiveDrive base;

@@ -7,9 +7,9 @@ extern "C" {
 
 void hive_set_error(int err);
 
-typedef int (*strerror_t)(int errnum, char *, size_t);
+typedef int strerror_func_t(int errnum, char *, size_t);
 
-int hive_register_strerror(int facility, strerror_t strerr);
+int hive_register_strerror(int facility, strerror_func_t *cb);
 
 #ifdef __cplusplus
 } // extern "C"
