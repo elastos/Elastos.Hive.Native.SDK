@@ -43,6 +43,8 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *file_path,
     ipfs_drive_t *drive = (ipfs_drive_t *)base;
     char url[MAXPATHLEN + 1] = {0};
     http_client_t *httpc;
+    cJSON *response;
+    cJSON *hash;
     long resp_code;
     char *p;
     int rc;
@@ -91,7 +93,20 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *file_path,
         return -1;
     }
 
-    *result = p;
+    response = cJSON_Parse(p);
+    free(p);
+    if (!response)
+        return -1;
+
+    hash = cJSON_GetObjectItemCaseSensitive(response, "Hash");
+    if (!hash || !cJSON_IsString(hash) || !hash->valuestring ||
+        !*hash->valuestring || strlen(hash->valuestring) >= sizeof(info->fileid)) {
+        cJSON_Delete(response);
+        return -1;
+    }
+
+    strcpy(info->fileid, hash->valuestring);
+    cJSON_Delete(response);
     return 0;
 
 error_exit:
@@ -99,13 +114,78 @@ error_exit:
     return -1;
 }
 
-static int ipfs_drive_list_files(HiveDrive *base, const char *dir_path,
+static cJSON *parse_list_files_response(const char *response)
+{
+    cJSON *json;
+    cJSON *entries;
+    cJSON *entry;
+
+    assert(response);
+
+    json = cJSON_Parse(response);
+    if (!json)
+        return NULL;
+
+    entries = cJSON_GetObjectItemCaseSensitive(json, "Entries");
+    if (!entries || !cJSON_IsArray(entries)) {
+        cJSON_Delete(json);
+        return NULL;
+    }
+
+    cJSON_ArrayForEach(entry, entries) {
+        cJSON *name;
+
+        if (!cJSON_IsObject(entry)) {
+            cJSON_Delete(json);
+            return NULL;
+        }
+
+        name = cJSON_GetObjectItemCaseSensitive(entry, "name");
+        if (!name || !cJSON_IsString(name) || !name->valuestring ||
+            !*name->valuestring) {
+            cJSON_Delete(json);
+            return NULL;
+        }
+    }
+
+    return json;
+}
+
+static void notify_file_entries(cJSON *entries,
+                                HiveFilesIterateCallback *callback,
+                                void *context)
+{
+    cJSON *entry;
+
+    assert(entries);
+    assert(callback);
+
+    cJSON_ArrayForEach(entry, entries) {
+        cJSON *name;
+        KeyValue properties[1];
+        bool resume;
+
+        name = cJSON_GetObjectItemCaseSensitive(entry, "name");
+
+        properties[0].key   = "name";
+        properties[0].value = name->valuestring;
+
+        resume = callback(properties, sizeof(properties) / sizeof(properties[0]),
+                          context);
+        if (!resume)
+            return;
+    }
+    callback(NULL, 0, context);
+}
+
+static int ipfs_drive_list_files(HiveDrive *base, const char *path,
                                  HiveFilesIterateCallback *callback, void *context)
 {
     ipfs_drive_t *drive = (ipfs_drive_t *)base;
     char url[MAXPATHLEN + 1] = {0};
     http_client_t *httpc;
     long resp_code;
+    cJSON *response;
     char *p;
     int rc;
 
@@ -124,7 +204,7 @@ static int ipfs_drive_list_files(HiveDrive *base, const char *dir_path,
 
     http_client_set_url(httpc, url);
     http_client_set_query(httpc, "uid", ipfs_token_get_uid(drive->token));
-    http_client_set_query(httpc, "path", dir_path);
+    http_client_set_query(httpc, "path", path);
     http_client_set_method(httpc, HTTP_METHOD_POST);
     http_client_enable_response_body(httpc);
 
@@ -153,7 +233,14 @@ static int ipfs_drive_list_files(HiveDrive *base, const char *dir_path,
         return -1;
     }
 
-    // *result = p;
+    response = parse_list_files_response(p);
+    free(p);
+    if (!response)
+        return -1;
+
+    notify_file_entries(cJSON_GetObjectItemCaseSensitive(response, "Entries"),
+                        callback, context);
+    cJSON_Delete(response);
     return 0;
 
 error_exit:
@@ -181,10 +268,6 @@ static int ipfs_drive_make_dir(HiveDrive *base, const char *path)
         hive_set_error(-1);
         return -1;
     }
-
-    rc = ipfs_synchronize(drive->token);
-    if (rc)
-        goto error_exit;
 
     http_client_set_url(httpc, url);
     http_client_set_query(httpc, "uid", ipfs_token_get_uid(drive->token));
@@ -275,7 +358,12 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
     char url[MAXPATHLEN + 1] = {0};
     http_client_t *httpc;
     long resp_code;
+    HiveFileInfo src_info;
     int rc;
+
+    rc = ipfs_drive_stat_file(base, src_path, &src_info);
+    if (rc < 0)
+        return -1;
 
     rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/files/cp",
                   ipfs_token_get_node_in_use(drive->token), NODE_API_PORT);
@@ -292,7 +380,7 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
 
     http_client_set_url(httpc, url);
     http_client_set_query(httpc, "uid", ipfs_token_get_uid(drive->token));
-    http_client_set_query(httpc, "source", src_path);
+    http_client_set_query(httpc, "source", src_info.fileid);
     http_client_set_query(httpc, "dest", dest_path);
     http_client_set_method(httpc, HTTP_METHOD_POST);
 
