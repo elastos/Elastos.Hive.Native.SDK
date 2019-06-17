@@ -34,14 +34,11 @@ HiveClient *hive_client_new(const HiveOptions *options)
         !*options->persistent_location)
         return NULL;
 
-    /*
     rc = stat(options->persistent_location, &st);
-    if (rc < 0)
+    if (rc < 0|| !S_ISDIR(st.st_mode)) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return NULL;
-
-    if (!S_ISDIR(st.st_mode))
-        return NULL;
-    */
+    }
 
     for (; method->create_client; method++) {
         if (method->drive_type == options->drive_type) {
@@ -193,7 +190,7 @@ HiveDrive *hive_drive_open(HiveClient *client)
         return NULL;
     }
 
-    if  (!client->get_drive) {
+    if (!client->get_drive) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED));
         return NULL;
     }

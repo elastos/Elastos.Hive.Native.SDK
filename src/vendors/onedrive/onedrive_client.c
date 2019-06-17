@@ -1,13 +1,12 @@
+#include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
 #include <fcntl.h>
+#include <errno.h>
+#include <assert.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #ifdef HAVE_SYS_PARAM_H
 #include <sys/param.h>
-#endif
-#if defined(_WIN32) || defined(_WIN64)
-#include <winnt.h>
 #endif
 #include <crystal.h>
 #include <cjson/cJSON.h>
@@ -21,31 +20,8 @@ typedef struct OneDriveClient {
     HiveClient base;
     HiveDrive *drive;
     oauth_token_t *token;
-    char oauth_cookie[MAXPATHLEN + 1];
+    char keystore_path[PATH_MAX];
 } OneDriveClient;
-
-static inline void *_test_and_swap_ptr(void **ptr, void *oldval, void *newval)
-{
-#if defined(_WIN32) || defined(_WIN64)
-    return InterlockedCompareExchangePointer(ptr, newval, oldval);
-#else
-    void *tmp = oldval;
-    __atomic_compare_exchange(ptr, &tmp, &newval, false,
-                              __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
-    return tmp;
-#endif
-}
-
-static inline void *_exchange_ptr(void **ptr, void *val)
-{
-#if defined(_WIN32) || defined(_WIN64)
-    return _InterlockedExchangePointer(ptr, val);
-#else
-    void *old;
-    __atomic_exchange(ptr, &val, &old, __ATOMIC_SEQ_CST);
-    return old;
-#endif
-}
 
 static int onedrive_client_login(HiveClient *base,
                                  HiveRequestAuthenticationCallback *callback,
@@ -76,10 +52,6 @@ static int onedrive_client_logout(HiveClient *base)
 
     assert(client);
     assert(client->token);
-
-    drive = _exchange_ptr((void **)&client->drive, NULL);
-    if (drive)
-        deref(drive);
 
     oauth_token_reset(client->token);
     return 0;
@@ -144,19 +116,25 @@ static int onedrive_client_get_info(HiveClient *base, HiveClientInfo *info)
     http_client_enable_response_body(httpc);
 
     rc = http_client_request(httpc);
-    if (rc < 0)
+    if (rc < 0) {
+        // TODO:
         goto error_exit;
+    }
 
     rc = http_client_get_response_code(httpc, &resp_code);
-    if (rc < 0)
+    if (rc < 0) {
+        // TODO:
         goto error_exit;
+    }
 
     if (resp_code == 401) {
         oauth_token_set_expired(client->token);
+        rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
         goto error_exit;
     }
 
     if (resp_code != 200) {
+        // TODO:
         goto error_exit;
     }
 
@@ -171,7 +149,7 @@ static int onedrive_client_get_info(HiveClient *base, HiveClientInfo *info)
 
     switch(rc) {
     case -1:
-        rc = -1; // TODO;
+        rc = HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
         break;
 
     case -2:
@@ -190,69 +168,6 @@ error_exit:
     return rc;
 }
 
-#if 0
-static int onedrive_client_list_drives(HiveClient *base, char **result)
-{
-    OneDriveClient *client = (OneDriveClient *)base;
-    http_client_t *httpc;
-    char url[MAX_URL_LENGTH] = {0};
-    long resp_code = 0;
-    char *p;
-    int rc;
-
-    assert(client);
-    assert(client->token);
-    assert(result);
-
-    rc = oauth_token_check_expire(client->token);
-    if (rc < 0) {
-        vlogE("Hive: Checking access token expired error.");
-        return rc;
-    }
-
-    httpc = http_client_new();
-    if (!httpc)
-        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
-
-    snprintf(url, sizeof(url), "%s/drives", URL_API);
-
-    http_client_set_url_escape(httpc, url);
-    http_client_set_method(httpc, HTTP_METHOD_GET);
-    http_client_set_header(httpc, "Content-Type", "application/json");
-    http_client_set_header(httpc, "Authorization", get_bearer_token(client->token));
-    http_client_enable_response_body(httpc);
-
-    rc = http_client_request(httpc);
-    if (rc < 0)
-        goto error_exit;
-
-    rc = http_client_get_response_code(httpc, &resp_code);
-    if (rc < 0)
-        goto error_exit;
-
-    if (resp_code == 401) {
-        oauth_token_set_expired(client->token);
-        goto error_exit;
-    }
-
-    if (resp_code != 200)
-        goto error_exit;
-
-    p = http_client_move_response_body(httpc, NULL);
-    http_client_close(httpc);
-
-    if (!p)
-        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
-
-    *result = p;
-    return 0;
-
-error_exit:
-    http_client_close(httpc);
-    return rc;
-}
-#endif
-
 static int onedrive_client_drive_open(HiveClient *base, HiveDrive **drive)
 {
     OneDriveClient *client = (OneDriveClient *)base;
@@ -262,19 +177,34 @@ static int onedrive_client_drive_open(HiveClient *base, HiveDrive **drive)
     assert(client->token);
     assert(drive);
 
-    if (client->drive)
-        return HIVE_GENERAL_ERROR(HIVEERR_ALREADY_EXIST);
+    if (client->drive) {
+        *drive = client->drive;
+        ref(*drive);
+        return 0;
+    }
 
     rc = onedrive_drive_open(client->token, "default", drive);
-    if (rc < 0)
-        return -1;
+    if (rc < 0) {
+        vlogE("Hive: Opening onedrive drive handle error (error: 0x%x)", rc);
+        return rc;
+    }
+
+    client->drive = *drive;
+    ref(client->drive);
 
     return 0;
 }
 
 static int onedrive_client_close(HiveClient *base)
 {
+    OneDriveClient *client = (OneDriveClient *)base;
     assert(base);
+
+    if (client->drive)
+        client->drive->close(client->drive);
+
+    if (client->token)
+        oauth_token_delete(client->token);
 
     deref(base);
     return 0;
@@ -284,57 +214,52 @@ static void client_destroy(void *p)
 {
     OneDriveClient *client = (OneDriveClient *)p;
 
-    if (client->drive)
+    // Double check
+    if (client->drive) {
         deref(client->drive);
+        client->drive = NULL;
+    }
 
-    if (client->token)
-        oauth_token_delete(client->token);
+    if (client->token) {
+        deref(client->token);
+        client->token = NULL;
+    }
 }
 
-static cJSON *load_oauth_cache(const char *oauth_cookie)
+static cJSON *load_keystore_in_json(const char *path)
 {
     struct stat st;
-    size_t n2read;
-    ssize_t nread;
+    char buf[124] = {0};
     cJSON *json;
-    char *buf;
-    char *cur;
     int rc;
     int fd;
 
-    assert(oauth_cookie);
+    assert(path);
 
-    rc = stat(oauth_cookie, &st);
+    rc = stat(path, &st);
     if (rc < 0)
         return NULL;
 
-    if (!st.st_size)
+    if (!st.st_size || st.st_size > 1024) {
+        errno = ERANGE;
         return NULL;
+    }
 
-    fd = open(oauth_cookie, O_RDONLY);
+    fd = open(path, O_RDONLY);
     if (fd < 0)
         return NULL;
 
-    buf = malloc(st.st_size);
-    if (!buf) {
-        close(fd);
-        return NULL;
-    }
-
-    for (n2read = st.st_size, cur = buf; n2read; n2read -= nread, cur += nread) {
-        nread = read(fd, cur, n2read);
-        if (!nread || (nread < 0 && errno != EINTR)) {
-            close(fd);
-            free(buf);
-            return NULL;
-        }
-        if (nread < 0)
-            nread = 0;
-    }
+    rc = (int)read(fd, buf, st.st_size);
     close(fd);
 
+    if (rc < 0 || rc != st.st_size)
+        return NULL;
+
     json = cJSON_Parse(buf);
-    free(buf);
+    if (!json) {
+        errno = ENOMEM;
+        return NULL;
+    }
 
     return json;
 }
@@ -342,35 +267,26 @@ static cJSON *load_oauth_cache(const char *oauth_cookie)
 static int oauth_writeback(const cJSON *json, void *user_data)
 {
     OneDriveClient *client = (OneDriveClient *)user_data;
-    int fd;
-    size_t n2write;
-    ssize_t nwrite;
     char *json_str;
-    char *tmp;
+    int fd;
+    int bytes;
 
     json_str = cJSON_PrintUnformatted(json);
-    if (!json_str || !*json_str)
-        return -1;
-
-    fd = open(client->oauth_cookie, O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
-    if (fd < 0) {
-        free(json_str);
+    if (!json_str || !*json_str) {
+        errno = ENOMEM;
         return -1;
     }
 
-    for (n2write = strlen(json_str), tmp = json_str;
-         n2write; n2write -= nwrite, tmp += nwrite) {
-        nwrite = write(fd, tmp, n2write);
-        if (!nwrite || (nwrite < 0 && errno != EINTR)) {
-            free(json_str);
-            close(fd);
-            return -1;
-        }
-        if (nwrite < 0)
-            nwrite = 0;
-    }
+    fd = open(client->keystore_path, O_WRONLY | O_TRUNC | O_CREAT);
+    if (fd < 0)
+        return -1;
+
+    bytes = (int)write(fd, json_str, strlen(json_str) + 1);
     free(json_str);
     close(fd);
+
+    if (bytes < 0 || bytes == (int)strlen(json_str) + 1)
+        return -1;
 
     return 0;
 }
@@ -378,32 +294,21 @@ static int oauth_writeback(const cJSON *json, void *user_data)
 HiveClient *onedrive_client_new(const HiveOptions *options)
 {
     OneDriveOptions *opts = (OneDriveOptions *)options;
-    char oauth_cookie[MAXPATHLEN + 1];
     oauth_options_t oauth_opts;
     OneDriveClient *client;
     oauth_token_t *token;
-    cJSON *oauth_cookie_json = NULL;
+    char keystore_path[PATH_MAX] = {0};
+    cJSON *keystore = NULL;
     int rc;
 
     assert(opts);
-    assert(opts->base.drive_type == HiveDriveType_OneDrive);
 
     if (!opts->client_id    || !*opts->client_id    ||
         !opts->redirect_url || !*opts->redirect_url ||
-        !opts->scope        || !*opts->scope) {
+        !opts->scope        || !*opts->scope        ||
+        opts->base.drive_type != HiveDriveType_OneDrive) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return NULL;
-    }
-
-    rc = snprintf(oauth_cookie, sizeof(oauth_cookie), "%s/onedrive.json",
-                  options->persistent_location);
-    if (rc < 0 || rc >= sizeof(oauth_cookie))
-        return NULL;
-
-    if (!access(oauth_cookie, F_OK)) {
-        oauth_cookie_json = load_oauth_cache(oauth_cookie);
-        if (!oauth_cookie_json)
-            return NULL;
     }
 
     client = (OneDriveClient *)rc_zalloc(sizeof(OneDriveClient), client_destroy);
@@ -412,7 +317,20 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
         return NULL;
     }
 
-    oauth_opts.store         = oauth_cookie_json;
+    rc = snprintf(client->keystore_path, sizeof(client->keystore_path),
+                  "%s/onedrive.json", options->persistent_location);
+    if (rc < 0 || rc >= (int)sizeof(client->keystore_path)) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
+        return NULL;
+    }
+
+    keystore = load_keystore_in_json(client->keystore_path);
+    if (!keystore) {
+        hive_set_error(HIVE_SYS_ERROR(errno));
+        return NULL;
+    }
+
+    oauth_opts.store         = keystore;
     oauth_opts.authorize_url = URL_OAUTH METHOD_AUTHORIZE;
     oauth_opts.token_url     = URL_OAUTH METHOD_TOKEN;
     oauth_opts.client_id     = opts->client_id;
@@ -420,18 +338,19 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
     oauth_opts.redirect_url  = opts->redirect_url;
 
     client->token = oauth_token_new(&oauth_opts, &oauth_writeback, client);
+    cJSON_Delete(keystore);
+
     if (!client->token) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY));
         deref(client);
         return NULL;
     }
 
-    memcpy(client->oauth_cookie, oauth_cookie, strlen(oauth_cookie) + 1);
-    client->base.login       = &onedrive_client_login;
-    client->base.logout      = &onedrive_client_logout;
-    client->base.get_info    = &onedrive_client_get_info;
-    client->base.get_drive   = &onedrive_client_drive_open;
-    client->base.close       = &onedrive_client_close;
+    client->base.login       = onedrive_client_login;
+    client->base.logout      = onedrive_client_logout;
+    client->base.get_info    = onedrive_client_get_info;
+    client->base.get_drive   = onedrive_client_drive_open;
+    client->base.close       = onedrive_client_close;
 
     return &client->base;
 }
