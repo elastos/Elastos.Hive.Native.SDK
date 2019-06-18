@@ -8,12 +8,12 @@ int hive_drive_get_info(HiveDrive *drive, HiveDriveInfo *info)
 {
     int rc;
 
-    if (!drive || !drive->client || !info) {
+    if (!drive || !info) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
     }
 
-    if (!has_valid_token(drive->client))  {
+    if (!has_valid_token(drive->token))  {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_READY));
         return -1;
     }
@@ -36,7 +36,7 @@ int hive_drive_file_stat(HiveDrive *drive, const char *path, HiveFileInfo *info)
 {
     int rc;
 
-    if (!drive || !drive->client || !info) {
+    if (!drive || !info) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
     }
@@ -46,7 +46,7 @@ int hive_drive_file_stat(HiveDrive *drive, const char *path, HiveFileInfo *info)
         return -1;
     }
 
-    if (!has_valid_token(drive->client))  {
+    if (!has_valid_token(drive->token))  {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_READY));
         return -1;
     }
@@ -70,7 +70,7 @@ int hive_drive_list_files(HiveDrive *drive, const char *path,
 {
     int rc;
 
-    if (!drive || !drive->client || !callback) {
+    if (!drive || !callback) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
     }
@@ -80,7 +80,7 @@ int hive_drive_list_files(HiveDrive *drive, const char *path,
         return -1;
     }
 
-    if (!has_valid_token(drive->client))  {
+    if (!has_valid_token(drive->token))  {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_READY));
         return -1;
     }
@@ -103,7 +103,7 @@ int hive_drive_mkdir(HiveDrive *drive, const char *path)
 {
     int rc;
 
-    if (!drive || !drive->client) {
+    if (!drive) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
     }
@@ -113,7 +113,7 @@ int hive_drive_mkdir(HiveDrive *drive, const char *path)
         return -1;
     }
 
-    if (!has_valid_token(drive->client))  {
+    if (!has_valid_token(drive->token))  {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_READY));
         return -1;
     }
@@ -136,7 +136,7 @@ int hive_drive_move_file(HiveDrive *drive, const char *from, const char *to)
 {
     int rc;
 
-    if (!drive || !drive->client) {
+    if (!drive) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
     }
@@ -147,7 +147,7 @@ int hive_drive_move_file(HiveDrive *drive, const char *from, const char *to)
         return -1;
     }
 
-    if (!has_valid_token(drive->client))  {
+    if (!has_valid_token(drive->token))  {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_READY));
         return -1;
     }
@@ -170,7 +170,7 @@ int hive_drive_copy_file(HiveDrive *drive, const char *src, const char *dest)
 {
     int rc;
 
-    if (!drive || !drive->client) {
+    if (!drive) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
     }
@@ -182,7 +182,7 @@ int hive_drive_copy_file(HiveDrive *drive, const char *src, const char *dest)
         return -1;
     }
 
-    if (!has_valid_token(drive->client))  {
+    if (!has_valid_token(drive->token))  {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_READY));
         return -1;
     }
@@ -205,7 +205,7 @@ int hive_drive_delete_file(HiveDrive *drive, const char *path)
 {
     int rc;
 
-    if (!drive || !drive->client) {
+    if (!drive) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
     }
@@ -215,7 +215,7 @@ int hive_drive_delete_file(HiveDrive *drive, const char *path)
         return -1;
     }
 
-    if (!has_valid_token(drive->client))  {
+    if (!has_valid_token(drive->token))  {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_READY));
         return -1;
     }
