@@ -245,28 +245,45 @@ error_exit:
 }
 
 static
-int parse_response_and_notify_user(const char *response,
-                                   HiveFilesIterateCallback *callback,
-                                   void *context, char **next_url)
+int merge_array(cJSON *sub, cJSON *array)
 {
-    cJSON *json;
-    cJSON *array;
-    cJSON *next_link;
     cJSON *item;
+    size_t sub_sz = cJSON_GetArraySize(sub);
+    size_t i;
 
-    assert(response);
-    assert(callback);
-    assert(next_url);
+    for (i = 0; i < sub_sz; ++i) {
+        cJSON *name;
+        cJSON *file;
+        cJSON *folder;
 
-    json = cJSON_Parse(response);
-    if (!json)
-        return -1;
+        item = cJSON_GetArrayItem(sub, i);
 
-    array = cJSON_GetObjectItemCaseSensitive(json,  "value");
-    if (!array || !cJSON_IsArray(array) || !cJSON_GetArraySize(array)) {
-        cJSON_Delete(json);
-        return -1;
+        name = cJSON_GetObjectItemCaseSensitive(item, "name");
+        if (!name || !cJSON_IsString(name) || !name->valuestring || !*name->valuestring)
+            return -1;
+
+        file = cJSON_GetObjectItemCaseSensitive(item, "file");
+        folder = cJSON_GetObjectItemCaseSensitive(item, "folder");
+        if ((file && folder) || (!file && !folder))
+            return -1;
+
+        if (file && !cJSON_IsObject(file))
+            return -1;
+
+        if (folder && !cJSON_IsObject(folder))
+            return -1;
+
+        cJSON_AddItemToArray(array, cJSON_DetachItemFromArray(sub, i));
     }
+
+    return 0;
+}
+
+static
+void notify_user_files(cJSON *array, HiveFilesIterateCallback *callback,
+                       void *context)
+{
+    cJSON *item;
 
     cJSON_ArrayForEach(item, array) {
         cJSON *name;
@@ -274,26 +291,13 @@ int parse_response_and_notify_user(const char *response,
         KeyValue properties[2];
         bool resume;
 
-        if (!cJSON_IsObject(item)) {
-            cJSON_Delete(json);
-            return -1;
-        }
-
         name = cJSON_GetObjectItemCaseSensitive(item, "name");
-        if (!name || !cJSON_IsString(name) || !name->valuestring ||
-            !*name->valuestring) {
-            cJSON_Delete(json);
-            return -1;
-        }
+        assert(name);
 
         if (cJSON_GetObjectItemCaseSensitive(item, "file"))
             type = "file";
-        else if (cJSON_GetObjectItemCaseSensitive(item, "folder"))
-            type = "direcotry";
-        else {
-            cJSON_Delete(json);
-            return -1;
-        }
+        else
+            type = "directory";
 
         properties[0].key   = "name";
         properties[0].value = name->valuestring;
@@ -303,28 +307,10 @@ int parse_response_and_notify_user(const char *response,
 
         resume = callback(properties, sizeof(properties) / sizeof(properties[0]),
                           context);
-        if (!resume) {
-            cJSON_Delete(json);
-            return 0;
-        }
+        if (!resume)
+            return;
     }
-
-    next_link = cJSON_GetObjectItemCaseSensitive(json, "@odata.nextLink");
-    if (next_link && (!cJSON_IsString(next_link) || !next_link->valuestring ||
-                      !*next_link->valuestring)) {
-        cJSON_Delete(json);
-        return -1;
-    }
-
-    if (next_link) {
-        *next_url = next_link->valuestring;
-        next_link->valuestring = NULL;
-    } else {
-        *next_url = NULL;
-        callback(NULL, 0, context);
-    }
-
-    return 0;
+    callback(NULL, 0, context);
 }
 
 static
@@ -334,9 +320,10 @@ int onedrive_drive_list_files(HiveDrive *base, const char *path,
     OneDriveDrive *drive = (OneDriveDrive *)base;
     http_client_t *httpc;
     char url[MAX_URL_LEN] = {0};
-    char *escaped_url = NULL;
+    char *next_url = NULL;
     long resp_code;
-    bool use_free = false;
+    cJSON *array;
+    cJSON *json = NULL;
     int rc;
 
     assert(drive);
@@ -359,29 +346,31 @@ int onedrive_drive_list_files(HiveDrive *base, const char *path,
         return rc;
 
     if (!strcmp(path, "/"))
-        sprintf(url, "%s/drive/root/children", URL_API);
+        sprintf(url, "%s/drive/root/children", MY_DRIVE);
     else
-        sprintf(url, "%s/drive/root:%s:/children", URL_API, path);
+        sprintf(url, "%s/drive/root:%s:/children", MY_DRIVE, path);
 
-    escaped_url = http_client_escape(httpc, url, strlen(url));
-    http_client_reset(httpc);
-
-    if (!escaped_url) {
+    array = cJSON_CreateArray();
+    if (!array) {
         rc = HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
         goto error_exit;
     }
 
-    while (escaped_url) {
+    next_url = url;
+    while (next_url) {
         char *p;
+        cJSON *sub_array;
+        cJSON *next_link;
 
         http_client_reset(httpc);
-        http_client_set_url_escape(httpc, escaped_url);
+        http_client_set_url(httpc, next_url);
         http_client_set_method(httpc, HTTP_METHOD_GET);
         http_client_set_header(httpc, "Authorization", get_bearer_token(drive->token));
         http_client_enable_response_body(httpc);
 
         rc = http_client_request(httpc);
-        use_free ? free(escaped_url) : http_client_memory_free(escaped_url);
+        if (json)
+            cJSON_Delete(json);
 
         if (rc < 0)
             break;
@@ -407,19 +396,44 @@ int onedrive_drive_list_files(HiveDrive *base, const char *path,
             break;
         }
 
-        // TODO: need invoke callback once all files has been acquired.
-        rc = parse_response_and_notify_user(p, callback, context, &escaped_url);
-        if (rc < 0)
-            break;
-
-        if (!escaped_url) {
+        json = cJSON_Parse(p);
+        http_client_memory_free(p);
+        if (!json) {
             rc = -1;
             break;
         }
 
-        use_free = false;
+        sub_array = cJSON_GetObjectItemCaseSensitive(json, "value");
+        if (!sub_array || !cJSON_IsArray(sub_array) || !cJSON_GetArraySize(sub_array)) {
+            cJSON_Delete(json);
+            rc = -1;
+            break;
+        }
+
+        rc = merge_array(sub_array, array);
+        if (rc < 0) {
+            cJSON_Delete(json);
+            break;
+        }
+
+        next_link = cJSON_GetObjectItemCaseSensitive(json, "@odata.nextLink");
+        if (next_link && (!cJSON_IsString(next_link) || !next_link->valuestring ||
+                          !*next_link->valuestring)) {
+            cJSON_Delete(json);
+            rc = -1;
+            break;
+        }
+
+        if (next_link)
+            next_url = next_link->valuestring;
+        else {
+            cJSON_Delete(json);
+            notify_user_files(array, callback, context);
+            rc = 0;
+        }
     }
 
+    cJSON_Delete(array);
     http_client_close(httpc);
     return rc;
 
