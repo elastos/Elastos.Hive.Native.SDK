@@ -28,13 +28,6 @@
 
 #define ARGV(args, index) (((void **)(args))[index])
 
-typedef struct stored_token {
-    const char *token_type;
-    const char *access_token;
-    const char *refresh_token;
-    double expires_at;
-} stored_token_t;
-
 struct oauth_token {
     token_base_t base;
 
@@ -68,72 +61,31 @@ struct oauth_token {
      */
     oauth_writeback_func_t *writeback_cb;
     void *user_data;
-
-    /*
-     *  padding buffer.
-     */
-    char padding[4];
 };
 
-static int writeback_tokens(oauth_token_t *token)
+static void writeback_tokens(oauth_token_t *token)
 {
     cJSON *json;
     int rc;
 
+    assert(token);
+    assert(token->token_type);
+
     json = cJSON_CreateObject();
     if (!json)
-        return -1;
+        return;
 
-    if (!cJSON_AddStringToObject(json, "authorize_url", token->authorize_url)) {
-        cJSON_Delete(json);
-        return -1;
-    }
-
-    if (!cJSON_AddStringToObject(json, "token_url", token->token_url)) {
-        cJSON_Delete(json);
-        return -1;
-    }
-
-    if (!cJSON_AddStringToObject(json, "client_id", token->client_id)) {
-        cJSON_Delete(json);
-        return -1;
-    }
-
-    if (!cJSON_AddStringToObject(json, "scope", token->scope)) {
-        cJSON_Delete(json);
-        return -1;
-    }
-
-    if (!cJSON_AddStringToObject(json, "redirect_url", token->redirect_url)) {
-        cJSON_Delete(json);
-        return -1;
-    }
-
-    if (token->token_type) {
-        if (!cJSON_AddStringToObject(json, "token_type", token->token_type)) {
-            cJSON_Delete(json);
-            return -1;
-        }
-
-        if (!cJSON_AddStringToObject(json, "access_token", token->access_token)) {
-            cJSON_Delete(json);
-            return -1;
-        }
-
-        if (!cJSON_AddStringToObject(json, "refresh_token", token->refresh_token)) {
-            cJSON_Delete(json);
-            return -1;
-        }
-
-        if (!cJSON_AddNumberToObject(json, "expires_at", token->expires_at.tv_sec)) {
-            cJSON_Delete(json);
-            return -1;
-        }
-    }
+    cJSON_AddStringToObject(json, "client_id", token->client_id);
+    cJSON_AddStringToObject(json, "token_type", token->token_type);
+    cJSON_AddStringToObject(json, "access_token", token->access_token);
+    cJSON_AddStringToObject(json, "refresh_token", token->refresh_token);
+    cJSON_AddNumberToObject(json, "expires_at", token->expires_at.tv_sec);
 
     rc = token->writeback_cb(json, token->user_data);
+    if (rc < 0)
+        vlogE("Hive: Write access token to persistent storage error");
+
     cJSON_Delete(json);
-    return rc;
 }
 
 static void oauth_token_destrcutor(void *p)
@@ -143,97 +95,73 @@ static void oauth_token_destrcutor(void *p)
 
     if (token->token_type)
         free(token->token_type);
-
-    if (token->access_token)
-        free(token->access_token);
-
-    if (token->refresh_token)
-        free(token->refresh_token);
 }
 
-static bool load_stored_token(const oauth_options_t *opts, stored_token_t *token)
+static int restore_access_token(const cJSON *json, oauth_token_t *token)
 {
-    cJSON *authorize_url;
-    cJSON *token_url;
     cJSON *client_id;
-    cJSON *scope;
-    cJSON *redirect_url;
     cJSON *token_type;
     cJSON *access_token;
     cJSON *refresh_token;
     cJSON *expires_at;
+    size_t mem_len = 0;
+    char *p;
 
-    authorize_url = cJSON_GetObjectItemCaseSensitive(opts->store, "authorize_url");
-    if (!authorize_url || !cJSON_IsString(authorize_url) || !authorize_url->valuestring ||
-        strcmp(opts->authorize_url, authorize_url->valuestring))
-        return false;
+    assert(token);
+    assert(token->client_id);
 
-    token_url = cJSON_GetObjectItemCaseSensitive(opts->store, "token_url");
-    if (!token_url || !cJSON_IsString(token_url) || !token_url->valuestring ||
-        strcmp(opts->token_url, token_url->valuestring))
-        return false;
+    if (!json)
+        return 0;
 
-    client_id = cJSON_GetObjectItemCaseSensitive(opts->store, "client_id");
-    if (!client_id || !cJSON_IsString(client_id) || !client_id->valuestring ||
-        strcmp(opts->client_id, client_id->valuestring))
-        return false;
+    client_id = cJSON_GetObjectItem(json, "client_id");
+    if (cJSON_IsString(client_id) ||
+        strcmp(token->client_id, client_id->valuestring) != 0)
+        return 0;
 
-    scope = cJSON_GetObjectItemCaseSensitive(opts->store, "scope");
-    if (!scope || !cJSON_IsString(scope) || !scope->valuestring ||
-        strcmp(opts->scope, scope->valuestring))
-        return false;
+    token_type    = cJSON_GetObjectItem(json, "token_type");
+    access_token  = cJSON_GetObjectItem(json, "access_token");
+    refresh_token = cJSON_GetObjectItem(json, "refresh_token");
+    expires_at    = cJSON_GetObjectItem(json, "expires_at");
 
-    redirect_url = cJSON_GetObjectItemCaseSensitive(opts->store, "redirect_url");
-    if (!redirect_url || !cJSON_IsString(redirect_url) ||
-        !redirect_url->valuestring || strcmp(opts->redirect_url,
-                                             redirect_url->valuestring))
-        return false;
+    if (!cJSON_IsString(token_type) ||
+        !cJSON_IsString(access_token) ||
+        !cJSON_IsString(refresh_token) ||
+        !cJSON_IsNumber(expires_at))
+        return 0;
 
-    token_type    = cJSON_GetObjectItemCaseSensitive(opts->store, "token_type");
-    access_token  = cJSON_GetObjectItemCaseSensitive(opts->store, "access_token");
-    refresh_token = cJSON_GetObjectItemCaseSensitive(opts->store, "refresh_token");
-    expires_at    = cJSON_GetObjectItemCaseSensitive(opts->store, "expires_at");
+    mem_len += strlen(token_type->valuestring) + 1;
+    mem_len += strlen(access_token->valuestring) + 1;
+    mem_len += strlen(refresh_token->valuestring) + 1;
 
-    if (!token_type && !access_token && !refresh_token && !expires_at) {
-        memset(token, 0, sizeof(*token));
-        return true;
-    } else if (token_type && access_token && refresh_token && expires_at) {
-        if (!cJSON_IsString(token_type) || !token_type->valuestring ||
-            !*token_type->valuestring)
-            return false;
+    token->expires_at.tv_sec = expires_at->valueint; // TODO:
+    p = (char *)calloc(1, mem_len);
+    if (!p)
+        return 0;
 
-        if (!cJSON_IsString(access_token) || !access_token->valuestring ||
-            !*access_token->valuestring)
-            return false;
+    token->token_type = p;
+    strcpy(p, token_type->valuestring);
+    p += strlen(p) + 1;
 
-        if (!cJSON_IsString(refresh_token) || !refresh_token->valuestring ||
-            !*refresh_token->valuestring)
-            return false;
+    token->access_token = p;
+    strcpy(p, access_token->valuestring);
+    p += strlen(p) + 1;
 
-        if (!cJSON_IsNumber(expires_at))
-            return false;
+    token->refresh_token = p;
+    strcpy(p, refresh_token->valuestring);
 
-        token->token_type    = token_type->valuestring;
-        token->access_token  = access_token->valuestring;
-        token->refresh_token = refresh_token->valuestring;
-        token->expires_at    = expires_at->valuedouble;
-
-        return true;
-    } else
-        return false;
+    return 1;
 }
 
 static int oauth_token_request(token_base_t *base,
                                HiveRequestAuthenticationCallback *callback,
                                void *context);
-static int oauth_token_reset(token_base_t *base);
+static int oauth_token_clean(token_base_t *base);
 
 oauth_token_t *oauth_token_new(const oauth_options_t *opts, oauth_writeback_func_t cb,
                                void *user_data)
 {
     oauth_token_t *token;
     size_t extra_len = 0;
-    stored_token_t stored_token;
     char *p;
     int rc;
 
@@ -244,10 +172,11 @@ oauth_token_t *oauth_token_new(const oauth_options_t *opts, oauth_writeback_func
     assert(opts->client_id[0]);
     assert(opts->redirect_url);
     assert(opts->redirect_url[0]);
+    assert(opts->authorize_url);
+    assert(opts->authorize_url[0]);
+    assert(opts->token_url);
+    assert(opts->token_url[0]);
     assert(cb);
-
-    if (opts->store && !load_stored_token(opts, &stored_token))
-        return NULL;
 
     extra_len += strlen(opts->authorize_url) + 1;
     extra_len += strlen(opts->token_url) + 1;
@@ -260,77 +189,66 @@ oauth_token_t *oauth_token_new(const oauth_options_t *opts, oauth_writeback_func
     if (!token)
         return NULL;
 
-    if (opts->store && stored_token.token_type) {
-        token->token_type        = strdup(stored_token.token_type);
-        token->access_token      = strdup(stored_token.access_token);
-        token->refresh_token     = strdup(stored_token.refresh_token);
-        token->expires_at.tv_sec = stored_token.expires_at;
-        if (!token->token_type || !token->access_token || !token->refresh_token) {
-            deref(token);
-            return NULL;
-        }
-    }
+    /*
+     * set value for essential fields from options.
+     */
+    p = (char *)(token + 1);
 
-    token->base.login  = &oauth_token_request;
-    token->base.logout = &oauth_token_reset;
-
-    p = token->padding;
     token->authorize_url = p;
     strcpy(p, opts->authorize_url);
-
     p += strlen(p) + 1;
+
     token->token_url = p;
     strcpy(p, opts->token_url);
-
     p += strlen(p) + 1;
+
     token->client_id = p;
     strcpy(p, opts->client_id);
-
     p += strlen(p) + 1;
+
     token->scope = p;
     strcpy(p, opts->scope);
-
     p += strlen(p) + 1;
+
     token->redirect_url = p;
     strcpy(p, opts->redirect_url);
+    p += strlen(p) + 1;
+
+    /*
+     * set callbacks.
+     */
+    token->base.login  = oauth_token_request;
+    token->base.logout = oauth_token_clean;
 
     token->writeback_cb = cb;
     token->user_data = user_data;
 
-    if (!opts->store)
-        writeback_tokens(token);
+    /*
+     * try restore access/refresh token from parsed json object.
+     */
+    rc = restore_access_token(opts->store, token);
+    if (rc > 0)
+        vlogW("Hive: Could not load access token from json object");
 
     return token;
 }
 
 int oauth_token_delete(oauth_token_t *token)
 {
-    int rc;
     assert(token);
-
     deref(token);
     return 0;
 }
 
-static int oauth_token_reset(token_base_t *base)
+static int oauth_token_clean(token_base_t *base)
 {
     oauth_token_t *token = (oauth_token_t *)base;
     int rc;
 
     assert(token->token_type);
-    assert(token->access_token);
-    assert(token->refresh_token);
 
     free(token->token_type);
     token->token_type = NULL;
-
-    free(token->access_token);
-    token->access_token = NULL;
-
-    free(token->refresh_token);
-    token->refresh_token = NULL;
-
-    writeback_tokens(token);
 
     return 0;
 }
