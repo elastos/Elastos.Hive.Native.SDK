@@ -330,7 +330,9 @@ static int oauth_token_reset(token_base_t *base)
     free(token->refresh_token);
     token->refresh_token = NULL;
 
-    return writeback_tokens(token);
+    writeback_tokens(token);
+
+    return 0;
 }
 
 static int handle_auth_redirect(sb_Event *e)
@@ -377,7 +379,7 @@ static void *request_auth_entry(void *args)
 }
 
 static char *get_authorize_code(oauth_token_t *token,
-                                HiveRequestAuthenticationCallback cb, void *user_data,
+                                HiveRequestAuthenticationCallback *cb, void *user_data,
                                 char *code_buf, size_t bufsz)
 {
     http_client_t *httpc;
@@ -458,7 +460,7 @@ static char *get_authorize_code(oauth_token_t *token,
         };
 
         void *thread_args[] = {
-            &cb,
+            cb,
             user_data,
             url
         };
@@ -540,7 +542,7 @@ static int decode_access_token(oauth_token_t *token, const char *json_str)
 
     // Parse 'scope' item.
     item = cJSON_GetObjectItemCaseSensitive(json, "scope");
-    if (!IS_STRING_NODE(item) || strcmp(item->valuestring, token->scope)) {
+    if (!IS_STRING_NODE(item)) {
         free(token_type);
         goto error_exit;
     }
@@ -609,36 +611,51 @@ static int redeem_access_token(oauth_token_t *token, char *code)
     char buf[512] = {0};
     char *body;
     long resp_code = 0;
+    char *client_id;
+    char *redirect_uri;
+    char *code_escaped;
     int rc;
 
     assert(token);
     assert(code);
 
-    rc = snprintf(buf, sizeof(buf),
-                  "client_id=%s&redirect_uri=%s&code=%s&grant_type=authorization_code",
-                  token->client_id,
-                  token->redirect_url, code);
-    if (rc < 0 || rc >= (int)sizeof(buf))
-        return -1;
-
     httpc = http_client_new();
     if (!httpc)
         return -1;
 
-    body = http_client_escape(httpc, buf, strlen(buf));
-    http_client_reset(httpc);
+    client_id = http_client_escape(httpc, token->client_id, strlen(token->client_id));
+    if (!client_id)
+        goto error_exit;
 
-    if (!body)
+    redirect_uri = http_client_escape(httpc, token->redirect_url,
+                                      strlen(token->redirect_url));
+    if (!redirect_uri) {
+        http_client_memory_free(client_id);
+        goto error_exit;
+    }
+
+    code_escaped = http_client_escape(httpc, code, strlen(code));
+    if (!code_escaped) {
+        http_client_memory_free(client_id);
+        http_client_memory_free(redirect_uri);
+        goto error_exit;
+    }
+
+    rc = snprintf(buf, sizeof(buf),
+                  "client_id=%s&redirect_uri=%s&code=%s&grant_type=authorization_code",
+                  client_id, redirect_uri, code_escaped);
+    http_client_memory_free(client_id);
+    http_client_memory_free(redirect_uri);
+    http_client_memory_free(code_escaped);
+    if (rc < 0 || rc >= (int)sizeof(buf))
         goto error_exit;
 
     http_client_set_url(httpc, token->token_url);
     http_client_set_method(httpc, HTTP_METHOD_POST);
-    http_client_set_request_body_instant(httpc, body, strlen(body));
+    http_client_set_request_body_instant(httpc, buf, strlen(buf));
     http_client_enable_response_body(httpc);
 
     rc = http_client_request(httpc);
-    http_client_memory_free(body);
-
     if (rc < 0)
         goto error_exit;
 
@@ -656,7 +673,7 @@ static int redeem_access_token(oauth_token_t *token, char *code)
         return -1;
 
     rc = decode_access_token(token, body);
-    http_client_memory_free(body);
+    free(body);
 
     return rc;
 
@@ -677,6 +694,9 @@ static int oauth_token_request(token_base_t *base,
     assert(base);
     assert(callback);
 
+    if (token->access_token)
+        return 0;
+
     code = get_authorize_code(token, callback, context,
                               authorize_code, sizeof(authorize_code));
     if (!code)
@@ -686,43 +706,60 @@ static int oauth_token_request(token_base_t *base,
     if (rc < 0)
         return -1;
 
+    writeback_tokens(token);
+
     return 0;
 }
 
 static int refresh_access_token(oauth_token_t *token)
 {
     http_client_t *httpc;
-    char buf[512] = {0};
+    char buf[4096] = {0};
     char *body;
     long resp_code = 0;
+    char *client_id;
+    char *redirect_uri;
+    char *refresh_token;
     int rc;
-
-    rc = snprintf(buf, sizeof(buf),
-                  "client_id=%s&redirect_uri=%s&refresh_token=%sgrant_type=refresh_token",
-                  token->client_id,
-                  token->redirect_url,
-                  token->refresh_token);
-    if (rc < 0 || rc >= sizeof(buf))
-        return -1;
 
     httpc = http_client_new();
     if (!httpc)
         return -1;
 
-    body = http_client_escape(httpc, buf, strlen(buf));
-    http_client_reset(httpc);
+    client_id = http_client_escape(httpc, token->client_id, strlen(token->client_id));
+    if (!client_id)
+        goto error_exit;
 
-    if (!body)
+    redirect_uri = http_client_escape(httpc, token->redirect_url,
+                                      strlen(token->redirect_url));
+    if (!redirect_uri) {
+        http_client_memory_free(client_id);
+        goto error_exit;
+    }
+
+    refresh_token = http_client_escape(httpc, token->refresh_token,
+                                       strlen(token->refresh_token));
+    if (!refresh_token) {
+        http_client_memory_free(client_id);
+        http_client_memory_free(redirect_uri);
+        goto error_exit;
+    }
+
+    rc = snprintf(buf, sizeof(buf),
+                  "client_id=%s&redirect_uri=%s&refresh_token=%s&grant_type=refresh_token",
+                  client_id, redirect_uri, refresh_token);
+    http_client_memory_free(client_id);
+    http_client_memory_free(redirect_uri);
+    http_client_memory_free(refresh_token);
+    if (rc < 0 || rc >= sizeof(buf))
         goto error_exit;
 
     http_client_set_url(httpc, token->token_url);
     http_client_set_method(httpc, HTTP_METHOD_POST);
-    http_client_set_request_body_instant(httpc, body, strlen(body));
+    http_client_set_request_body_instant(httpc, buf, strlen(buf));
     http_client_enable_response_body(httpc);
 
     rc = http_client_request(httpc);
-    http_client_memory_free(body);
-
     if (rc < 0)
         goto error_exit;
 
@@ -740,13 +777,17 @@ static int refresh_access_token(oauth_token_t *token)
         return -1;
 
     rc = decode_access_token(token, body);
-    http_client_memory_free(body);
+    free(body);
+    if (rc < 0)
+        return -1;
 
-    return  rc;
+    writeback_tokens(token);
+
+    return 0;
 
 error_exit:
     http_client_close(httpc);
-    return 0;
+    return -1;
 }
 
 void oauth_token_set_expired(oauth_token_t *token)

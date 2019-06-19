@@ -69,7 +69,7 @@ enum HiveDriveType {
 
     /**
      * \~English
-     * Drive type buttom(not a valid type).
+     * Drive type bottom(not a valid type).
      */
     HiveDriveType_Butt      = 0x99
 };

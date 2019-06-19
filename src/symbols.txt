@@ -7,6 +7,7 @@ _hive_client_logout
 _hive_client_get_info
 _hive_drive_open
 _hive_drive_get_info
+_hive_drive_list_files
 _hive_drive_file_stat
 _hive_drive_mkdir
 _hive_drive_move_file
