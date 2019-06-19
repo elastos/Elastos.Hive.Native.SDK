@@ -305,7 +305,6 @@ oauth_token_t *oauth_token_new(const oauth_options_t *opts, oauth_writeback_func
 
 int oauth_token_delete(oauth_token_t *token)
 {
-    int rc;
     assert(token);
 
     deref(token);
@@ -315,7 +314,6 @@ int oauth_token_delete(oauth_token_t *token)
 static int oauth_token_reset(token_base_t *base)
 {
     oauth_token_t *token = (oauth_token_t *)base;
-    int rc;
 
     assert(token->token_type);
     assert(token->access_token);

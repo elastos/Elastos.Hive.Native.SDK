@@ -30,14 +30,14 @@ int token_login(token_base_t *token,
         return -1;
     }
 
-    if (token->login)
+    if (token->login) {
         rc = token->login(token, callback, context);
-
-    if (rc < 0) {
-        // recover back to 'RAW' state.
-        _test_and_swap(&token->state, LOGINING, RAW);
-        hive_set_error(rc);
-        return -1;
+        if (rc < 0) {
+            // recover back to 'RAW' state.
+            _test_and_swap(&token->state, LOGINING, RAW);
+            hive_set_error(rc);
+            return -1;
+        }
     }
 
     // When conducting all login stuffs successfully, then change to be
