@@ -32,22 +32,6 @@ oauth_token_t *oauth_token_new(const oauth_options_t *opts, oauth_writeback_func
 int oauth_token_delete(oauth_token_t *token);
 
 /*
- * Reset token
- */
-int oauth_token_reset(oauth_token_t *token);
-
-/*
- * The prototype of function to request authentication from user.
- */
-typedef int oauth_request_func_t(const char *reqeust_url, void *user_data);
-
-/*
- * Request and acquire the refresh and access tokens.
- */
-int oauth_token_request(oauth_token_t *token, oauth_request_func_t cb,
-                        void *user_data);
-
-/*
  * Make the access token expired.
  */
 void oauth_token_set_expired(oauth_token_t *token);

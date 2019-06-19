@@ -43,6 +43,7 @@ set(SRC
     hive_error.c
     hive_drive.c
     hive_client.c
+    token_base.c
     sandbird/sandbird.c
     http/http_client.c
     oauth/oauth_token.c

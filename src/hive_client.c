@@ -79,70 +79,26 @@ int hive_client_login(HiveClient *client,
         return -1;
     }
 
-    /*
-     * Check login state.
-     * 1. If already logined, return OK immediately, else
-     * 2. if being in progress of logining, then return error. else
-     * 3. It's in raw state, conduct the login process.
-     */
-    rc = check_and_login(client);
-    switch(rc) {
-    case 0:
-        break;
-
-    case 1:
-        vlogD("Hive: This client logined already");
-        return 0;
-
-    case -1:
-    default:
-        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_WRONG_STATE));
-        return -1;
-    }
-
-    if (client->login)
+    if (client->login) {
         rc = client->login(client, callback, context);
-
-    if (rc < 0) {
-        // recover back to 'RAW' state.
-        _test_and_swap(&client->state, LOGINING, RAW);
-        hive_set_error(rc);
-        return -1;
+        if (rc < 0) {
+            hive_set_error(rc);
+            return -1;
+        }
     }
 
-    // When conducting all login stuffs successfully, then change to be
-    // 'LOGINED'.
-    _test_and_swap(&client->state, LOGINING, LOGINED);
     return 0;
 }
 
 int hive_client_logout(HiveClient *client)
 {
-    int rc;
-
     if (!client) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
     }
 
-    rc = check_and_logout(client);
-    switch(rc) {
-    case 0:
-        break;
-
-    case 1:
-        return 0;
-
-    case -1:
-    default:
-        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_WRONG_STATE));
-        return -1;
-    }
-
     if (client->logout)
         client->logout(client);
-
-    _test_and_swap(&client->state, LOGOUTING, RAW);
 
     return 0;
 }
@@ -156,7 +112,7 @@ int hive_client_get_info(HiveClient *client, HiveClientInfo *info)
         return -1;
     }
 
-    if (!has_valid_token(client))  {
+    if (!has_valid_token(client->token))  {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_READY));
         return -1;
     }
@@ -185,7 +141,7 @@ HiveDrive *hive_drive_open(HiveClient *client)
         return NULL;
     }
 
-    if (!has_valid_token(client))  {
+    if (!has_valid_token(client->token))  {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_READY));
         return NULL;
     }
