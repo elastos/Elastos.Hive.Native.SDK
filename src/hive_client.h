@@ -11,7 +11,7 @@ extern "C" {
 struct HiveClient {
     token_base_t *token;
 
-    int (*login)        (HiveClient *, HiveRequestAuthenticationCallback, void *);
+    int (*login)        (HiveClient *, HiveRequestAuthenticationCallback *, void *);
     int (*logout)       (HiveClient *);
     int (*get_info)     (HiveClient *, HiveClientInfo *);
     int (*get_drive)    (HiveClient *, HiveDrive **);

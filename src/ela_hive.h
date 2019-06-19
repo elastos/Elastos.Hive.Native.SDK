@@ -71,8 +71,7 @@ enum HiveDriveType {
      * \~English
      * Drive type bottom(not a valid type).
      */
-    HiveDriveType_Bott      = 0x99
-
+    HiveDriveType_Butt      = 0x99
 };
 
 /**
@@ -317,7 +316,7 @@ int hive_client_close(HiveClient *client);
 /**
  * TODO
  */
-typedef int (*HiveRequestAuthenticationCallback)(const char *url, void *context);
+typedef int HiveRequestAuthenticationCallback(const char *url, void *context);
 
 /**
  * \~English
@@ -336,7 +335,7 @@ typedef int (*HiveRequestAuthenticationCallback)(const char *url, void *context)
  */
 HIVE_API
 int hive_client_login(HiveClient *client,
-                      HiveRequestAuthenticationCallback callback,
+                      HiveRequestAuthenticationCallback *callback,
                       void *context);
 
 /**

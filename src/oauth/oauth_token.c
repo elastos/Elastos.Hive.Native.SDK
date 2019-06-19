@@ -224,7 +224,7 @@ static bool load_stored_token(const oauth_options_t *opts, stored_token_t *token
 }
 
 static int oauth_token_request(token_base_t *base,
-                               HiveRequestAuthenticationCallback callback,
+                               HiveRequestAuthenticationCallback *callback,
                                void *context);
 static int oauth_token_reset(token_base_t *base);
 
@@ -367,7 +367,7 @@ static int handle_auth_redirect(sb_Event *e)
 
 static void *request_auth_entry(void *args)
 {
-    HiveRequestAuthenticationCallback cb = (HiveRequestAuthenticationCallback)ARGV(args, 0);
+    HiveRequestAuthenticationCallback *cb = (HiveRequestAuthenticationCallback *)ARGV(args, 0);
     void *user_data = (void *)ARGV(args, 1);
     char *url = (char *)ARGV(args, 2);
 
@@ -379,7 +379,7 @@ static void *request_auth_entry(void *args)
 }
 
 static char *get_authorize_code(oauth_token_t *token,
-                                HiveRequestAuthenticationCallback cb, void *user_data,
+                                HiveRequestAuthenticationCallback *cb, void *user_data,
                                 char *code_buf, size_t bufsz)
 {
     http_client_t *httpc;
@@ -683,7 +683,7 @@ error_exit:
 }
 
 static int oauth_token_request(token_base_t *base,
-                               HiveRequestAuthenticationCallback callback,
+                               HiveRequestAuthenticationCallback *callback,
                                void *context)
 {
     oauth_token_t *token = (oauth_token_t *)base;

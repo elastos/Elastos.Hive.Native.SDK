@@ -24,7 +24,7 @@ typedef struct OneDriveClient {
 } OneDriveClient;
 
 static int onedrive_client_login(HiveClient *base,
-                                 HiveRequestAuthenticationCallback callback,
+                                 HiveRequestAuthenticationCallback *callback,
                                  void *user_data)
 {
     OneDriveClient *client = (OneDriveClient *)base;

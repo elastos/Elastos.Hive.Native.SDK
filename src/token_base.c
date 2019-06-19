@@ -4,7 +4,7 @@
 #include "hive_error.h"
 
 int token_login(token_base_t *token,
-                HiveRequestAuthenticationCallback callback,
+                HiveRequestAuthenticationCallback *callback,
                 void *context)
 {
     int rc;
