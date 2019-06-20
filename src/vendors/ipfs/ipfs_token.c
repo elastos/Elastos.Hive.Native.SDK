@@ -11,7 +11,7 @@
 #include "ela_hive.h"
 #include "token_base.h"
 #include "ipfs_token.h"
-#include "ipfs_common_ops.h"
+#include "ipfs_utils.h"
 #include "ipfs_constants.h"
 #include "ipfs_drive.h"
 #include "http_client.h"
@@ -320,12 +320,6 @@ ipfs_token_t *ipfs_token_new(ipfs_token_options_t *options,
         }
     } else {
         rc = uid_new(tmp->current_node, tmp->uid, sizeof(tmp->uid));
-        if (rc < 0) {
-            deref(tmp);
-            return NULL;
-        }
-
-        rc = ipfs_publish(tmp, "/");
         if (rc < 0) {
             deref(tmp);
             return NULL;

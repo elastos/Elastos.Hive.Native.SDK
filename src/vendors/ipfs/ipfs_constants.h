@@ -5,6 +5,8 @@
 extern "C" {
 #endif
 
+#define MAX_URL_LEN         (1024)
+
 #define CLUSTER_API_PORT (9094)
 #define NODE_API_PORT (9095)
 
