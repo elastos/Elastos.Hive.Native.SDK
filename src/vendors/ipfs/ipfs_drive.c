@@ -1,24 +1,22 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include <stddef.h>
 #include <assert.h>
-#include <crystal.h>
-#include <stdlib.h>
-#include <crystal.h>
 
-#ifdef HAVE_SYS_PARAM_H
-#include <sys/param.h>
-#endif
+#include <crystal.h>
+#include <cjson/cJSON.h>
 
 #include "ipfs_drive.h"
 #include "ipfs_token.h"
 #include "ipfs_constants.h"
-#include "ipfs_common_ops.h"
+#include "ipfs_utils.h"
 #include "http_client.h"
 #include "hive_error.h"
 #include "hive_client.h"
 
-typedef struct ipfs_drive {
+typedef struct IPFSDrive {
     HiveDrive base;
-} ipfs_drive_t;
+} IPFSDrive;
 
 static int ipfs_drive_get_info(HiveDrive *base, HiveDriveInfo *info)
 {
@@ -37,13 +35,89 @@ static int ipfs_drive_get_info(HiveDrive *base, HiveDriveInfo *info)
     return 0;
 }
 
-static int ipfs_drive_stat_file(HiveDrive *base, const char *file_path,
+static int ipfs_drive_stat_file(HiveDrive *base, const char *path,
                                 HiveFileInfo *info)
 {
-    ipfs_drive_t *drive = (ipfs_drive_t *)base;
+    IPFSDrive *drive = (IPFSDrive *)base;
     ipfs_token_t *token = (ipfs_token_t *)drive->base.token;
+    char buf[MAX_URL_LEN] = {0};
+    http_client_t *httpc;
+    long resp_code = 0;
+    cJSON *json;
+    cJSON *item;
+    char *p;
+    int rc;
 
-    return ipfs_stat_file(token, file_path, info);
+    assert(token);
+    assert(path);
+    assert(info);
+
+    sprintf(buf, "http://%s:%d/api/v0/files/stat",
+            ipfs_token_get_current_node(token), NODE_API_PORT);
+
+    httpc = http_client_new();
+    if (!httpc)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
+
+    http_client_set_url(httpc, buf);
+    http_client_set_query(httpc, "uid", ipfs_token_get_uid(token));
+    http_client_set_query(httpc, "path", path);
+    http_client_set_method(httpc, HTTP_METHOD_POST);
+    http_client_set_request_body_instant(httpc, NULL, 0);
+    http_client_enable_response_body(httpc);
+
+    rc = http_client_request(httpc);
+    if (rc < 0) {
+        // TODO: rc;
+        rc = -1;
+        goto error_exit;
+    }
+
+    rc = http_client_get_response_code(httpc, &resp_code);
+    if (rc < 0) {
+        // TODO:
+        rc = -1;
+        goto error_exit;
+    }
+
+    if (resp_code != 200) {
+        // TODO;
+        goto error_exit;
+    }
+
+    p = http_client_move_response_body(httpc, NULL);
+    http_client_close(httpc);
+
+    if (!p)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
+
+    json = cJSON_Parse(p);
+    free(p);
+
+    if (!json)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
+
+    item = cJSON_GetObjectItem(json, "Hash");
+    if (!cJSON_IsString(item) ||
+        !item->valuestring ||
+        !*item->valuestring ||
+        strlen(item->valuestring) >= sizeof(info->fileid)) {
+        cJSON_Delete(json);
+        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
+    }
+
+    rc = snprintf(info->fileid, sizeof(info->fileid),
+                  "/ipfs/%s", item->valuestring);
+    cJSON_Delete(json);
+
+    if (rc < 0 || rc >= sizeof(info->fileid))
+        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
+
+    return 0;
+
+error_exit:
+    http_client_close(httpc);
+    return rc;
 }
 
 static cJSON *parse_list_files_response(const char *response)
@@ -113,21 +187,17 @@ static void notify_file_entries(cJSON *entries,
 static int ipfs_drive_list_files(HiveDrive *base, const char *path,
                                  HiveFilesIterateCallback *callback, void *context)
 {
-    ipfs_drive_t *drive = (ipfs_drive_t *)base;
+    IPFSDrive *drive = (IPFSDrive *)base;
     ipfs_token_t *token = (ipfs_token_t *)drive->base.token;
-    char url[MAXPATHLEN + 1] = {0};
+    char url[MAX_URL_LEN] = {0};
     http_client_t *httpc;
     long resp_code;
     cJSON *response;
     char *p;
     int rc;
 
-    rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/files/ls",
-                  ipfs_token_get_current_node(token), NODE_API_PORT);
-    if (rc < 0 || rc >= sizeof(url)) {
-        hive_set_error(-1);
-        return -1;
-    }
+    sprintf(url, "http://%s:%d/api/v0/files/ls",
+           ipfs_token_get_current_node(token), NODE_API_PORT);
 
     httpc = http_client_new();
     if (!httpc) {
@@ -184,19 +254,15 @@ error_exit:
 
 static int ipfs_drive_make_dir(HiveDrive *base, const char *path)
 {
-    ipfs_drive_t *drive = (ipfs_drive_t *)base;
+    IPFSDrive *drive = (IPFSDrive *)base;
     ipfs_token_t *token = (ipfs_token_t *)drive->base.token;
-    char url[MAXPATHLEN + 1] = {0};
+    char url[MAX_URL_LEN] = {0};
     http_client_t *httpc;
     long resp_code;
     int rc;
 
-    rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/files/mkdir",
-                  ipfs_token_get_current_node(token), NODE_API_PORT);
-    if (rc < 0 || rc >= sizeof(url)) {
-        hive_set_error(-1);
-        return -1;
-    }
+    sprintf(url, "http://%s:%d/api/v0/files/mkdir",
+            ipfs_token_get_current_node(token), NODE_API_PORT);
 
     httpc = http_client_new();
     if (!httpc) {
@@ -225,7 +291,7 @@ static int ipfs_drive_make_dir(HiveDrive *base, const char *path)
     if (resp_code != 200)
         return -1;
 
-    rc = ipfs_publish(token, "/");
+    rc = publish_root_hash(token, url, sizeof(url));
     if (rc < 0)
         return -1;
 
@@ -238,19 +304,15 @@ error_exit:
 
 static int ipfs_drive_move_file(HiveDrive *base, const char *old, const char *new)
 {
-    ipfs_drive_t *drive = (ipfs_drive_t *)base;
+    IPFSDrive *drive = (IPFSDrive *)base;
     ipfs_token_t *token = (ipfs_token_t *)drive->base.token;
-    char url[MAXPATHLEN + 1] = {0};
+    char url[MAX_URL_LEN] = {0};
     http_client_t *httpc;
     long resp_code;
     int rc;
 
-    rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/files/mv",
-                  ipfs_token_get_current_node(token), NODE_API_PORT);
-    if (rc < 0 || rc >= sizeof(url)) {
-        hive_set_error(-1);
-        return -1;
-    }
+    sprintf(url, "http://%s:%d/api/v0/files/mv",
+             ipfs_token_get_current_node(token), NODE_API_PORT);
 
     httpc = http_client_new();
     if (!httpc) {
@@ -279,7 +341,7 @@ static int ipfs_drive_move_file(HiveDrive *base, const char *old, const char *ne
     if (resp_code != 200)
         return -1;
 
-    rc = ipfs_publish(token, "/");
+    rc = publish_root_hash(token, url, sizeof(url));
     if (rc < 0)
         return -1;
 
@@ -292,11 +354,11 @@ error_exit:
 
 static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const char *dest_path)
 {
-    ipfs_drive_t *drive = (ipfs_drive_t *)base;
+    IPFSDrive *drive = (IPFSDrive *)base;
     ipfs_token_t *token = (ipfs_token_t *)drive->base.token;
-    char url[MAXPATHLEN + 1] = {0};
+    char url[MAX_URL_LEN] = {0};
     http_client_t *httpc;
-    long resp_code;
+    long resp_code = 0;
     HiveFileInfo src_info;
     int rc;
 
@@ -304,12 +366,8 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
     if (rc < 0)
         return -1;
 
-    rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/files/cp",
-                  ipfs_token_get_current_node(token), NODE_API_PORT);
-    if (rc < 0 || rc >= sizeof(url)) {
-        hive_set_error(-1);
-        return -1;
-    }
+    sprintf(url, "http://%s:%d/api/v0/files/cp",
+             ipfs_token_get_current_node(token), NODE_API_PORT);
 
     httpc = http_client_new();
     if (!httpc) {
@@ -338,7 +396,7 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
     if (resp_code != 200)
         return -1;
 
-    rc = ipfs_publish(token, "/");
+    rc = publish_root_hash(token, url, sizeof(url));
     if (rc < 0)
         return -1;
 
@@ -351,19 +409,15 @@ error_exit:
 
 static int ipfs_drive_delete_file(HiveDrive *base, const char *path)
 {
-    ipfs_drive_t *drive = (ipfs_drive_t *)base;
+    IPFSDrive *drive = (IPFSDrive *)base;
     ipfs_token_t *token = (ipfs_token_t *)drive->base.token;
-    char url[MAXPATHLEN + 1] = {0};
+    char url[MAX_URL_LEN] = {0};
     http_client_t *httpc;
     long resp_code;
     int rc;
 
-    rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/files/rm",
-                  ipfs_token_get_current_node(token), NODE_API_PORT);
-    if (rc < 0 || rc >= sizeof(url)) {
-        hive_set_error(-1);
-        return -1;
-    }
+    sprintf(url, "http://%s:%d/api/v0/files/rm",
+             ipfs_token_get_current_node(token), NODE_API_PORT);
 
     httpc = http_client_new();
     if (!httpc) {
@@ -392,7 +446,7 @@ static int ipfs_drive_delete_file(HiveDrive *base, const char *path)
     if (resp_code != 200)
         return -1;
 
-    rc = ipfs_publish(token, "/");
+    rc = publish_root_hash(token, url, sizeof(url));
     if (rc < 0)
         return -1;
 
@@ -410,7 +464,7 @@ static void ipfs_drive_close(HiveDrive *obj)
 
 static void ipfs_drive_destructor(void *obj)
 {
-    ipfs_drive_t *drive = (ipfs_drive_t *)obj;
+    IPFSDrive *drive = (IPFSDrive *)obj;
 
     if (drive->base.token)
         ipfs_token_close((ipfs_token_t *)drive->base.token);
@@ -418,11 +472,11 @@ static void ipfs_drive_destructor(void *obj)
 
 HiveDrive *ipfs_drive_open(ipfs_token_t *token)
 {
-    ipfs_drive_t *drive;
+    IPFSDrive *drive;
 
     assert(token);
 
-    drive = (ipfs_drive_t *)rc_zalloc(sizeof(ipfs_drive_t), ipfs_drive_destructor);
+    drive = (IPFSDrive *)rc_zalloc(sizeof(IPFSDrive), ipfs_drive_destructor);
     if (!drive)
         return NULL;
 
@@ -436,5 +490,5 @@ HiveDrive *ipfs_drive_open(ipfs_token_t *token)
     drive->base.delete_file = &ipfs_drive_delete_file;
     drive->base.close       = &ipfs_drive_close;
 
-    return (HiveDrive *)drive;
+    return &drive->base;
 }

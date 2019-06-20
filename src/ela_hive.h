@@ -108,7 +108,13 @@ enum HiveDriveType {
  * \~English
  * Drive ID max length.
  */
-#define HIVE_MAX_DRIVE_ID_LEN            255
+#define HIVE_MAX_DRIVE_ID_LEN           255
+
+/**
+ * \~English
+ * Drive File Id max length.
+ */
+#define HIVE_MAX_FILE_ID_LEN            127
 
 /******************************************************************************
  * Type definitions of all options.
@@ -263,7 +269,11 @@ typedef struct HiveDriveInfo {
  * A structure representing the hive file information.
  */
 typedef struct HiveFileInfo {
-    char fileid[128];
+    /**
+     * \~English
+     * File Id
+     */
+    char fileid[HIVE_MAX_FILE_ID_LEN + 1];
 } HiveFileInfo;
 
 /******************************************************************************

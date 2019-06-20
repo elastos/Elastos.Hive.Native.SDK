@@ -1,20 +1,17 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <crystal.h>
 #include <cjson/cJSON.h>
 
-#ifdef HAVE_SYS_PARAM_H
-#include <sys/param.h>
-#endif
-
-#include "ipfs_common_ops.h"
+#include "ipfs_utils.h"
 #include "ipfs_constants.h"
 #include "http_client.h"
 #include "hive_error.h"
 
 static int ipfs_resolve(ipfs_token_t *token, const char *peerid, char **result)
 {
-    char url[MAXPATHLEN + 1] = {0};
+    char url[MAX_URL_LEN] = {0};
     http_client_t *httpc;
     long resp_code = 0;
     char *p;
@@ -68,7 +65,7 @@ error_exit:
 
 static int ipfs_login(ipfs_token_t *token, const char *hash)
 {
-    char url[MAXPATHLEN + 1] = {0};
+    char url[MAX_URL_LEN] = {0};
     http_client_t *httpc;
     long resp_code = 0;
     int rc;
@@ -167,132 +164,157 @@ int ipfs_synchronize(ipfs_token_t *token)
     return 0;
 }
 
-int ipfs_stat_file(ipfs_token_t *token, const char *file_path, HiveFileInfo *info)
+static int get_last_root_hash(ipfs_token_t *token,
+                              char *buf,    // buf used for generating url.
+                              size_t bufsz,
+                              char *hash,   // to store hash value.
+                              size_t length)
 {
-    char url[MAXPATHLEN + 1] = {0};
     http_client_t *httpc;
-    cJSON *response;
-    cJSON *hash;
-    long resp_code;
+    long resp_code = 0;
+    cJSON *json;
+    cJSON *item;
     char *p;
     int rc;
 
-    rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/files/stat",
-                  ipfs_token_get_current_node(token), NODE_API_PORT);
-    if (rc < 0 || rc >= sizeof(url)) {
-        hive_set_error(-1);
-        return -1;
-    }
+    assert(token);
+    assert(buf);
+    assert(hash);
+    assert(bufsz >= MAX_URL_LEN);
+
+    sprintf(buf, "http://%s:%d/api/v0/files/stat",
+            ipfs_token_get_current_node(token), NODE_API_PORT);
 
     httpc = http_client_new();
-    if (!httpc) {
-        hive_set_error(-1);
-        return -1;
-    }
+    if (!httpc)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
-    http_client_set_url(httpc, url);
+    http_client_set_url(httpc, buf);
     http_client_set_query(httpc, "uid", ipfs_token_get_uid(token));
-    http_client_set_query(httpc, "path", file_path);
+    http_client_set_query(httpc, "path", "/");
     http_client_set_method(httpc, HTTP_METHOD_POST);
     http_client_set_request_body_instant(httpc, NULL, 0);
     http_client_enable_response_body(httpc);
 
     rc = http_client_request(httpc);
     if (rc < 0) {
-        hive_set_error(-1);
+        // TODO: rc;
+        rc = -1;
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc < 0) {
-        hive_set_error(-1);
+        // TODO:
+        rc = -1;
         goto error_exit;
     }
 
     if (resp_code != 200) {
-        hive_set_error(-1);
+        // TODO;
         goto error_exit;
     }
 
     p = http_client_move_response_body(httpc, NULL);
     http_client_close(httpc);
 
-    if (!p) {
-        hive_set_error(-1);
-        return -1;
-    }
+    if (!p)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
-    response = cJSON_Parse(p);
+    json = cJSON_Parse(p);
     free(p);
-    if (!response)
-        return -1;
 
-    hash = cJSON_GetObjectItemCaseSensitive(response, "Hash");
-    if (!hash || !cJSON_IsString(hash) || !hash->valuestring ||
-        !*hash->valuestring || strlen(hash->valuestring) >= sizeof(info->fileid)) {
-        cJSON_Delete(response);
-        return -1;
+    if (!json)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
+
+    item = cJSON_GetObjectItem(json, "Hash");
+    if (!cJSON_IsString(item) ||
+        !item->valuestring ||
+        !*item->valuestring ||
+        strlen(item->valuestring) >= length) {
+        cJSON_Delete(json);
+        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
     }
 
-    rc = snprintf(info->fileid, sizeof(info->fileid), "/ipfs/%s", hash->valuestring);
-    cJSON_Delete(response);
-    if (rc < 0 || rc >= sizeof(info->fileid))
-        return -1;
+    rc = snprintf(hash, length, "/ipfs/%s", item->valuestring);
+    cJSON_Delete(json);
+
+    if (rc < 0 || rc >= length)
+        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
+
     return 0;
 
 error_exit:
     http_client_close(httpc);
-    return -1;
+    return rc;
 }
 
-int ipfs_publish(ipfs_token_t *token, const char *path)
+static int pub_last_root_hash(ipfs_token_t *token,
+                              char *buf,    // buf used for generating url.
+                              size_t bufsz, // the length of 'buf'
+                              const char *hash)   // the root hash value.
 {
-    char url[MAXPATHLEN + 1] = {0};
     http_client_t *httpc;
-    HiveFileInfo info;
-    long resp_code;
+    long resp_code = 0;
     int rc;
 
-    rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/name/publish",
-                  ipfs_token_get_current_node(token), NODE_API_PORT);
-    if (rc < 0 || rc >= sizeof(url)) {
-        hive_set_error(-1);
-        return -1;
-    }
+    assert(token);
+    assert(buf);
+    assert(hash);
+    assert(bufsz >= MAX_URL_LEN);
 
-    rc = ipfs_stat_file(token, path, &info);
-    if (rc < 0)
-        return -1;
+    sprintf(buf, "http://%s:%d/api/v0/name/publish",
+            ipfs_token_get_current_node(token), NODE_API_PORT);
 
     httpc = http_client_new();
-    if (!httpc) {
-        hive_set_error(-1);
-        return -1;
-    }
+    if (!httpc)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
-    http_client_set_url(httpc, url);
+    http_client_set_url(httpc, buf);
     http_client_set_query(httpc, "uid", ipfs_token_get_uid(token));
-    http_client_set_query(httpc, "path", info.fileid);
+    http_client_set_query(httpc, "path", hash);
     http_client_set_method(httpc, HTTP_METHOD_POST);
     http_client_set_request_body_instant(httpc, NULL, 0);
 
     rc = http_client_request(httpc);
     if (rc < 0) {
-        hive_set_error(-1);
+        //TODO: rc;
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     http_client_close(httpc);
-    if (rc < 0)
-        return -1;
+    if (rc < 0) {
+        // TODO:
+        return rc;
+    }
 
-    if (resp_code != 200)
-        return -1;
+    if (resp_code != 200) {
+        // TODO:
+        return rc;
+    }
 
     return 0;
 
 error_exit:
     http_client_close(httpc);
-    return -1;
+    return rc;
+}
+
+int publish_root_hash(ipfs_token_t *token, char *buf, size_t length)
+{
+    char hash[128] = {0};
+    int rc;
+
+    assert(token);
+    assert(buf);
+    assert(length >= MAX_URL_LEN);
+
+    memset(buf, 0, length);
+    rc = get_last_root_hash(token, buf, length, hash, sizeof(hash));
+    if (rc < 0)
+        return rc;
+
+    memset(buf, 0, length);
+    return pub_last_root_hash(token, buf, length, hash);
 }

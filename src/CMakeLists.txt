@@ -50,7 +50,7 @@ set(SRC
     vendors/ipfs/ipfs_client.c
     vendors/ipfs/ipfs_drive.c
     vendors/ipfs/ipfs_token.c
-    vendors/ipfs/ipfs_common_ops.c
+    vendors/ipfs/ipfs_utils.c
     vendors/onedrive/onedrive_client.c
     vendors/onedrive/onedrive_drive.c
     vendors/native/native_client.c

@@ -22,7 +22,7 @@
 #include "ipfs_client.h"
 #include "ipfs_drive.h"
 #include "ipfs_token.h"
-#include "ipfs_common_ops.h"
+#include "ipfs_utils.h"
 #include "ipfs_constants.h"
 #include "http_client.h"
 #include "hive_error.h"
