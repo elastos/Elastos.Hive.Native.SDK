@@ -1,6 +1,10 @@
 #ifndef __IPFS_TOKEN_H__
 #define __IPFS_TOKEN_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <cjson/cJSON.h>
 
 #include "ela_hive.h"
@@ -29,7 +33,10 @@ ipfs_token_t *ipfs_token_new(ipfs_token_options_t *options,
 int ipfs_token_close(ipfs_token_t *token);
 int ipfs_token_get_uid_info(ipfs_token_t *token, char **result);
 const char *ipfs_token_get_uid(ipfs_token_t *token);
-const char *ipfs_token_get_node_in_use(ipfs_token_t *token);
-void ipfs_token_reset(ipfs_token_t *token);
+const char *ipfs_token_get_current_node(ipfs_token_t *token);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __IPFS_TOKEN_H__

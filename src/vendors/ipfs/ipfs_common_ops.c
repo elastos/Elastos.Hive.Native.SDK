@@ -1,7 +1,8 @@
-#include <cjson/cJSON.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <crystal.h>
+#include <cjson/cJSON.h>
+
 #ifdef HAVE_SYS_PARAM_H
 #include <sys/param.h>
 #endif
@@ -20,7 +21,7 @@ static int ipfs_resolve(ipfs_token_t *token, const char *peerid, char **result)
     int rc;
 
     rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/name/resolve",
-                  ipfs_token_get_node_in_use(token), NODE_API_PORT);
+                  ipfs_token_get_current_node(token), NODE_API_PORT);
     if (rc < 0 || rc >= sizeof(url)) {
         hive_set_error(-1);
         return -1;
@@ -73,7 +74,7 @@ static int ipfs_login(ipfs_token_t *token, const char *hash)
     int rc;
 
     rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/uid/login",
-                  ipfs_token_get_node_in_use(token), NODE_API_PORT);
+                  ipfs_token_get_current_node(token), NODE_API_PORT);
     if (rc < 0 || rc >= sizeof(url)) {
         hive_set_error(-1);
         return -1;
@@ -89,6 +90,7 @@ static int ipfs_login(ipfs_token_t *token, const char *hash)
     http_client_set_query(httpc, "uid", ipfs_token_get_uid(token));
     http_client_set_query(httpc, "hash", hash);
     http_client_set_method(httpc, HTTP_METHOD_POST);
+    http_client_set_request_body_instant(httpc, NULL, 0);
 
     rc = http_client_request(httpc);
     if (rc < 0) {
@@ -165,15 +167,18 @@ int ipfs_synchronize(ipfs_token_t *token)
     return 0;
 }
 
-int ipfs_publish(ipfs_token_t *token, const char *path)
+int ipfs_stat_file(ipfs_token_t *token, const char *file_path, HiveFileInfo *info)
 {
     char url[MAXPATHLEN + 1] = {0};
     http_client_t *httpc;
+    cJSON *response;
+    cJSON *hash;
     long resp_code;
+    char *p;
     int rc;
 
-    rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/name/publish",
-                  ipfs_token_get_node_in_use(token), NODE_API_PORT);
+    rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/files/stat",
+                  ipfs_token_get_current_node(token), NODE_API_PORT);
     if (rc < 0 || rc >= sizeof(url)) {
         hive_set_error(-1);
         return -1;
@@ -187,8 +192,89 @@ int ipfs_publish(ipfs_token_t *token, const char *path)
 
     http_client_set_url(httpc, url);
     http_client_set_query(httpc, "uid", ipfs_token_get_uid(token));
-    http_client_set_query(httpc, "path", path);
+    http_client_set_query(httpc, "path", file_path);
     http_client_set_method(httpc, HTTP_METHOD_POST);
+    http_client_set_request_body_instant(httpc, NULL, 0);
+    http_client_enable_response_body(httpc);
+
+    rc = http_client_request(httpc);
+    if (rc < 0) {
+        hive_set_error(-1);
+        goto error_exit;
+    }
+
+    rc = http_client_get_response_code(httpc, &resp_code);
+    if (rc < 0) {
+        hive_set_error(-1);
+        goto error_exit;
+    }
+
+    if (resp_code != 200) {
+        hive_set_error(-1);
+        goto error_exit;
+    }
+
+    p = http_client_move_response_body(httpc, NULL);
+    http_client_close(httpc);
+
+    if (!p) {
+        hive_set_error(-1);
+        return -1;
+    }
+
+    response = cJSON_Parse(p);
+    free(p);
+    if (!response)
+        return -1;
+
+    hash = cJSON_GetObjectItemCaseSensitive(response, "Hash");
+    if (!hash || !cJSON_IsString(hash) || !hash->valuestring ||
+        !*hash->valuestring || strlen(hash->valuestring) >= sizeof(info->fileid)) {
+        cJSON_Delete(response);
+        return -1;
+    }
+
+    rc = snprintf(info->fileid, sizeof(info->fileid), "/ipfs/%s", hash->valuestring);
+    cJSON_Delete(response);
+    if (rc < 0 || rc >= sizeof(info->fileid))
+        return -1;
+    return 0;
+
+error_exit:
+    http_client_close(httpc);
+    return -1;
+}
+
+int ipfs_publish(ipfs_token_t *token, const char *path)
+{
+    char url[MAXPATHLEN + 1] = {0};
+    http_client_t *httpc;
+    HiveFileInfo info;
+    long resp_code;
+    int rc;
+
+    rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/name/publish",
+                  ipfs_token_get_current_node(token), NODE_API_PORT);
+    if (rc < 0 || rc >= sizeof(url)) {
+        hive_set_error(-1);
+        return -1;
+    }
+
+    rc = ipfs_stat_file(token, path, &info);
+    if (rc < 0)
+        return -1;
+
+    httpc = http_client_new();
+    if (!httpc) {
+        hive_set_error(-1);
+        return -1;
+    }
+
+    http_client_set_url(httpc, url);
+    http_client_set_query(httpc, "uid", ipfs_token_get_uid(token));
+    http_client_set_query(httpc, "path", info.fileid);
+    http_client_set_method(httpc, HTTP_METHOD_POST);
+    http_client_set_request_body_instant(httpc, NULL, 0);
 
     rc = http_client_request(httpc);
     if (rc < 0) {

@@ -447,7 +447,6 @@ int http_client_set_header(http_client_t *client,
     assert(name);
     assert(value);
     assert(*name);
-    assert(*value);
 
     header = alloca(strlen(name) + strlen(value) + 3);
     sprintf(header, "%s: %s", name, value);
@@ -489,8 +488,6 @@ int http_client_set_request_body_instant(http_client_t *client,
                                          void *data, size_t len)
 {
     assert(client);
-    assert(data);
-    assert(len);
 
     curl_easy_setopt(client->curl, CURLOPT_POSTFIELDS, data);
     curl_easy_setopt(client->curl, CURLOPT_POSTFIELDSIZE, len);

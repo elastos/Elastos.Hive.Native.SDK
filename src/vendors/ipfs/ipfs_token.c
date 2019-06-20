@@ -1,20 +1,29 @@
 #include <stddef.h>
+#include <string.h>
+#include <stdlib.h>
 #include <crystal.h>
+#include <cjson/cJSON.h>
+
 #ifdef HAVE_SYS_PARAM_H
 #include <sys/param.h>
 #endif
-#include <string.h>
-#include <cjson/cJSON.h>
-#include <stdlib.h>
 
 #include "ela_hive.h"
+#include "token_base.h"
 #include "ipfs_token.h"
+#include "ipfs_common_ops.h"
 #include "ipfs_constants.h"
+#include "ipfs_drive.h"
 #include "http_client.h"
 
 struct ipfs_token {
-    size_t bootstrap_in_use;
-    ipfs_token_options_t options;
+    token_base_t base;
+    char uid[HIVE_MAX_IPFS_UID_LEN + 1];
+    char current_node[HIVE_MAX_IPV6_ADDRESS_LEN  + 1];
+    ipfs_token_writeback_func_t *writeback_cb;
+    void *user_data;
+    size_t rpc_nodes_count;
+    rpc_node_t rpc_nodes[0];
 };
 
 static int test_reachable(const char *ipaddr)
@@ -34,6 +43,7 @@ static int test_reachable(const char *ipaddr)
 
     http_client_set_url(httpc, url);
     http_client_set_method(httpc, HTTP_METHOD_POST);
+    http_client_set_request_body_instant(httpc, NULL, 0);
 
     rc = http_client_request(httpc);
     if (rc < 0)
@@ -45,8 +55,8 @@ static int test_reachable(const char *ipaddr)
     if (rc < 0)
         return -1;
 
-    if (resp_code != 200)
-        return -1;
+    // if (resp_code != 200)
+    //     return -1;
 
     return 0;
 
@@ -76,6 +86,7 @@ static int _ipfs_token_get_uid_info(const char *node_ip,
     http_client_set_url(httpc, url);
     http_client_set_query(httpc, "uid", uid);
     http_client_set_method(httpc, HTTP_METHOD_POST);
+    http_client_set_request_body_instant(httpc, NULL, 0);
     if (result)
         http_client_enable_response_body(httpc);
 
@@ -107,29 +118,43 @@ error_exit:
 
 int ipfs_token_get_uid_info(ipfs_token_t *token, char **result)
 {
-    return -1;
-    /* assert(token);
+    assert(token);
 
-    return _ipfs_token_get_uid_info(token->options.bootstraps_ip[token->bootstrap_in_use],
-                                    token->options.uid, result); */
+    return _ipfs_token_get_uid_info(token->current_node, token->uid, result);
 }
 
-/* static int get_usable_bootstrap(size_t bootstraps_size,
-                                char bootstraps_ip[][HIVE_MAX_IP_STRING_LEN+1],
-                                size_t *usable_bootstrap_idx)
+static int select_bootstrap(ipfs_token_options_t *options, char *selected)
 {
     size_t i;
+    size_t base;
     int rc;
 
-    for (i = 0; i < bootstraps_size; ++i) {
-        rc = test_reachable(bootstraps_ip[i]);
-        if (!rc) {
-            *usable_bootstrap_idx = i;
-            return 0;
+    srand((unsigned)time(NULL));
+    base = (size_t)rand() % options->rpc_nodes_count;
+    i = base;
+
+    do {
+        if (options->rpc_nodes[i].ipv4[0]) {
+            rc = test_reachable(options->rpc_nodes[i].ipv4);
+            if (!rc) {
+                strcpy(selected, options->rpc_nodes[i].ipv4);
+                return 0;
+            }
         }
-    }
+
+        if (options->rpc_nodes[i].ipv6[0]) {
+            rc = test_reachable(options->rpc_nodes[i].ipv6);
+            if (!rc) {
+                strcpy(selected, options->rpc_nodes[i].ipv6);
+                return 0;
+            }
+        }
+
+        i = (i + 1) % options->rpc_nodes_count;
+    } while (i != base);
+
     return -1;
-} */
+}
 
 static int uid_new(const char *node_ip, char *uid, size_t uid_len)
 {
@@ -152,6 +177,7 @@ static int uid_new(const char *node_ip, char *uid, size_t uid_len)
 
     http_client_set_url(httpc, url);
     http_client_set_method(httpc, HTTP_METHOD_POST);
+    http_client_set_request_body_instant(httpc, NULL, 0);
     http_client_enable_response_body(httpc);
 
     rc = http_client_request(httpc);
@@ -192,74 +218,123 @@ error_exit:
 
 const char *ipfs_token_get_uid(ipfs_token_t *token)
 {
-    return NULL;
-    /* int rc;
-
-    assert(token);
-    assert(uid);
-    assert(uid_len);
-
-    rc = snprintf(uid, uid_len, "%s", token->options.uid);
-    assert(rc > 0 && rc < uid_len); */
+    return token->uid;
 }
 
-const char *ipfs_token_get_node_in_use(ipfs_token_t *token)
+const char *ipfs_token_get_current_node(ipfs_token_t *token)
 {
-    return NULL;
-    /* int rc;
+    return token->current_node;
+}
 
-    assert(token);
-    assert(node_ip);
-    assert(node_ip_len);
+static int load_store(const cJSON *store, char *uid, size_t len)
+{
+    cJSON *uid_json;
 
-    rc = snprintf(node_ip, node_ip_len, "%s",
-                  token->options.bootstraps_ip[token->bootstrap_in_use]);
-    assert(rc > 0 && rc < node_ip_len); */
+    uid_json = cJSON_GetObjectItemCaseSensitive(store, "uid");
+    if (!uid_json || !cJSON_IsString(uid_json) || !uid_json->valuestring ||
+        !*uid_json->valuestring || strlen(uid_json->valuestring) >= len)
+        return -1;
+
+    strcpy(uid, uid_json->valuestring);
+    return 0;
+}
+
+static int writeback_tokens(ipfs_token_t *token)
+{
+    cJSON *json;
+    int rc;
+
+    json = cJSON_CreateObject();
+    if (!json)
+        return -1;
+
+    if (!cJSON_AddStringToObject(json, "uid", token->uid)) {
+        cJSON_Delete(json);
+        return -1;
+    }
+
+    rc = token->writeback_cb(json, token->user_data);
+    cJSON_Delete(json);
+    return rc;
+}
+
+static int ipfs_token_reset(token_base_t *base)
+{
+    return 0;
+}
+
+static int synchronize(token_base_t *base,
+                       HiveRequestAuthenticationCallback *cb,
+                       void *context)
+{
+    (void)cb;
+    (void)context;
+
+    return ipfs_synchronize((ipfs_token_t *)base);
 }
 
 ipfs_token_t *ipfs_token_new(ipfs_token_options_t *options,
                              ipfs_token_writeback_func_t cb,
                              void *user_data)
 {
-    return NULL;
-    /* size_t candidate_bootstrap;
     ipfs_token_t *tmp;
     size_t bootstraps_nbytes;
     int rc;
 
-    rc = get_usable_bootstrap(bootstraps_size, bootstraps_ip, &candidate_bootstrap);
-    if (rc < 0)
-        return -1;
-
-    if (uid) {
-        rc = _ipfs_token_get_uid_info(bootstraps_ip[candidate_bootstrap], uid, NULL);
-        if (rc < 0)
-            return -1;
-    } else {
-        size_t uid_max_len = HIVE_MAX_USER_ID_LEN + 1;
-        uid = alloca(uid_max_len);
-
-        rc = uid_new(bootstraps_ip[candidate_bootstrap], (char *)uid, uid_max_len);
-        if (rc < 0)
-            return -1;
-    }
-
-    bootstraps_nbytes = sizeof(bootstraps_ip[0]) * bootstraps_size;
+    bootstraps_nbytes = sizeof(options->rpc_nodes[0]) * options->rpc_nodes_count;
     tmp = rc_zalloc(sizeof(ipfs_token_t) + bootstraps_nbytes, NULL);
     if (!tmp)
-        return -1;
+        return NULL;
 
-    tmp->bootstrap_in_use = candidate_bootstrap;
-    strcpy(tmp->options.uid, uid);
-    tmp->options.bootstraps_size = bootstraps_size;
-    memcpy(tmp->options.bootstraps_ip, bootstraps_ip, bootstraps_nbytes);
+    memcpy(tmp->rpc_nodes, options->rpc_nodes, bootstraps_nbytes);
+    tmp->base.login      = synchronize;
+    tmp->base.logout     = ipfs_token_reset;
+    tmp->rpc_nodes_count = options->rpc_nodes_count;
+    tmp->writeback_cb    = cb;
+    tmp->user_data       = user_data;
 
-    *token = tmp;
-    return 0; */
-}
+    rc = select_bootstrap(options, tmp->current_node);
+    if (rc < 0) {
+        deref(tmp);
+        return NULL;
+    }
 
-void ipfs_token_reset(ipfs_token_t *token)
-{
+    if (options->uid[0]) {
+        rc = _ipfs_token_get_uid_info(tmp->current_node, options->uid, NULL);
+        if (rc < 0) {
+            deref(tmp);
+            return NULL;
+        }
+        strcpy(tmp->uid, options->uid);
+    } else if (options->store) {
+        rc = load_store(options->store, tmp->uid, sizeof(tmp->uid));
+        if (rc < 0) {
+            deref(tmp);
+            return NULL;
+        }
+
+        rc = _ipfs_token_get_uid_info(tmp->current_node, tmp->uid, NULL);
+        if (rc < 0) {
+            deref(tmp);
+            return NULL;
+        }
+    } else {
+        rc = uid_new(tmp->current_node, tmp->uid, sizeof(tmp->uid));
+        if (rc < 0) {
+            deref(tmp);
+            return NULL;
+        }
+
+        rc = ipfs_publish(tmp, "/");
+        if (rc < 0) {
+            deref(tmp);
+            return NULL;
+        }
+    }
+
+    writeback_tokens(tmp);
+
+    return tmp;
 }
 
 int ipfs_token_close(ipfs_token_t *token)

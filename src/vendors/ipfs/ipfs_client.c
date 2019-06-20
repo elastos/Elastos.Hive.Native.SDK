@@ -8,12 +8,12 @@
 #endif
 #include <arpa/inet.h>
 #include <stdbool.h>
-#include <cjson/cJSON.h>
-#include <http_client.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <cjson/cJSON.h>
+
 #if defined(_WIN32) || defined(_WIN64)
 #include <winnt.h>
 #endif
@@ -30,49 +30,17 @@
 
 typedef struct IPFSClient {
     HiveClient base;
-    HiveDrive *drive;
     char token_cookie[MAXPATHLEN + 1];
-    ipfs_token_t *token;
 } IPFSClient;
-
-static inline void *_test_and_swap_ptr(void **ptr, void *oldval, void *newval)
-{
-#if defined(_WIN32) || defined(_WIN64)
-    return InterlockedCompareExchangePointer(ptr, newval, oldval);
-#else
-    void *tmp = oldval;
-    __atomic_compare_exchange(ptr, &tmp, &newval, false,
-                              __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
-    return tmp;
-#endif
-}
-
-static inline void *_exchange_ptr(void **ptr, void *val)
-{
-#if defined(_WIN32) || defined(_WIN64)
-    return _InterlockedExchangePointer(ptr, val);
-#else
-    void *old;
-    __atomic_exchange(ptr, &val, &old, __ATOMIC_SEQ_CST);
-    return old;
-#endif
-}
 
 static int ipfs_client_login(HiveClient *base,
                              HiveRequestAuthenticationCallback *cb,
                              void *user_data)
 {
-    IPFSClient *client = (IPFSClient *)base;
     int rc;
 
-    assert(client);
-
-    (void)cb;
-    (void)user_data;
-
-    rc = ipfs_synchronize(client->token);
+    rc = token_login(base->token, cb, user_data);
     if (rc < 0) {
-        // recover back to 'RAW' state.
         hive_set_error(-1);
         return -1;
     }
@@ -83,28 +51,20 @@ static int ipfs_client_login(HiveClient *base,
 
 static int ipfs_client_logout(HiveClient *base)
 {
-    IPFSClient *client = (IPFSClient *)base;
-    HiveDrive *drive;
-    int rc;
-
-    drive = _exchange_ptr((void **)&client->drive, NULL);
-    if (drive)
-        deref(drive);
-
-    ipfs_token_reset(client->token);
-    return 0;
+    return token_logout(base->token);
 }
 
 static int ipfs_client_get_info(HiveClient *base, HiveClientInfo *result)
 {
     IPFSClient *client = (IPFSClient *)base;
+    ipfs_token_t *token = (ipfs_token_t *)client->base.token;
     int rc;
 
     assert(client);
     assert(result);
 
     rc = snprintf(result->user_id, sizeof(result->user_id), "%s",
-                  ipfs_token_get_uid(client->token));
+                  ipfs_token_get_uid(token));
     if (rc < 0 || rc >= sizeof(result->user_id))
         return -1;
 
@@ -127,71 +87,6 @@ static int ipfs_client_get_info(HiveClient *base, HiveClientInfo *result)
     return 0;
 }
 
-static int ipfs_client_list_drives(HiveClient *base, char **result)
-{
-    IPFSClient *client = (IPFSClient *)base;
-    char url[MAXPATHLEN + 1] = {0};
-    http_client_t *httpc;
-    long resp_code = 0;
-    char *p;
-    int rc;
-
-    rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/files/stat",
-                  ipfs_token_get_node_in_use(client->token), NODE_API_PORT);
-    if (rc < 0 || rc >= sizeof(url)) {
-        hive_set_error(-1);
-        return -1;
-    }
-
-    httpc = http_client_new();
-    if (!httpc) {
-        hive_set_error(-1);
-        return -1;
-    }
-
-    rc = ipfs_synchronize(client->token);
-    if (rc)
-        return -1;
-
-    http_client_set_url(httpc, url);
-    http_client_set_query(httpc, "uid", ipfs_token_get_uid(client->token));
-    http_client_set_query(httpc, "path", "/");
-    http_client_set_method(httpc, HTTP_METHOD_POST);
-    http_client_enable_response_body(httpc);
-
-    rc = http_client_request(httpc);
-    if (rc < 0) {
-        hive_set_error(-1);
-        goto error_exit;
-    }
-
-    rc = http_client_get_response_code(httpc, &resp_code);
-    if (rc < 0) {
-        hive_set_error(-1);
-        goto error_exit;
-    }
-
-    if (resp_code != 200) {
-        hive_set_error(-1);
-        goto error_exit;
-    }
-
-    p = http_client_move_response_body(httpc, NULL);
-    http_client_close(httpc);
-
-    if (!p) {
-        hive_set_error(-1);
-        return -1;
-    }
-
-    *result = p;
-    return 0;
-
-error_exit:
-    http_client_close(httpc);
-    return -1;
-}
-
 static int ipfs_client_drive_open(HiveClient *base, HiveDrive **drive)
 {
     IPFSClient *client = (IPFSClient *)base;
@@ -199,17 +94,9 @@ static int ipfs_client_drive_open(HiveClient *base, HiveDrive **drive)
 
     assert(base);
 
-    if (client->drive)
-        return -1;
-
-    tmp = ipfs_drive_open(client->token);
+    tmp = ipfs_drive_open((ipfs_token_t *)client->base.token);
     if (!tmp) {
         // TODO
-        return -1;
-    }
-
-    if (_test_and_swap_ptr((void **)&client->drive, NULL, tmp)) {
-        deref(tmp);
         return -1;
     }
 
@@ -230,67 +117,56 @@ static void ipfs_client_destructor(void *p)
 {
     IPFSClient *client = (IPFSClient *)p;
 
-    if (client->drive)
-        deref(client->drive);
-
-    if (client->token)
-        ipfs_token_close(client->token);
+    if (client->base.token)
+        ipfs_token_close((ipfs_token_t *)client->base.token);
 }
 
 static inline bool is_valid_ip(const char *ip)
 {
-    return inet_pton(AF_INET, ip, NULL) > 0 ? true : false;
+    struct sockaddr_in addr;
+    return inet_pton(AF_INET, ip, &addr) > 0 ? true : false;
 }
 
 static inline bool is_valid_ipv6(const char *ip)
 {
-    return inet_pton(AF_INET6, ip, NULL) > 0 ? true : false;
+    struct sockaddr_in6 addr;
+    return inet_pton(AF_INET6, ip, &addr) > 0 ? true : false;
 }
 
-static cJSON *load_ipfs_token_cookie(const char *token_cookie)
+static cJSON *load_ipfs_token_cookie(const char *path)
 {
     struct stat st;
-    size_t n2read;
-    ssize_t nread;
+    char buf[4096] = {0};
     cJSON *json;
-    char *buf;
-    char *cur;
     int rc;
     int fd;
 
-    assert(token_cookie);
+    assert(path);
 
-    rc = stat(token_cookie, &st);
+    rc = stat(path, &st);
     if (rc < 0)
         return NULL;
 
-    if (!st.st_size)
+    if (!st.st_size || st.st_size > sizeof(buf)) {
+        errno = ERANGE;
         return NULL;
+    }
 
-    fd = open(token_cookie, O_RDONLY);
+    fd = open(path, O_RDONLY);
     if (fd < 0)
         return NULL;
 
-    buf = malloc(st.st_size);
-    if (!buf) {
-        close(fd);
-        return NULL;
-    }
-
-    for (n2read = st.st_size, cur = buf; n2read; n2read -= nread, cur += nread) {
-        nread = read(fd, cur, n2read);
-        if (!nread || (nread < 0 && errno != EINTR)) {
-            close(fd);
-            free(buf);
-            return NULL;
-        }
-        if (nread < 0)
-            nread = 0;
-    }
+    rc = (int)read(fd, buf, st.st_size);
     close(fd);
 
+    if (rc < 0 || rc != st.st_size)
+        return NULL;
+
     json = cJSON_Parse(buf);
-    free(buf);
+    if (!json) {
+        errno = ENOMEM;
+        return NULL;
+    }
 
     return json;
 }
@@ -298,15 +174,15 @@ static cJSON *load_ipfs_token_cookie(const char *token_cookie)
 static int writeback_token(const cJSON *json, void *user_data)
 {
     IPFSClient *client = (IPFSClient *)user_data;
-    int fd;
-    size_t n2write;
-    ssize_t nwrite;
     char *json_str;
-    char *tmp;
+    int fd;
+    int bytes;
 
     json_str = cJSON_PrintUnformatted(json);
-    if (!json_str || !*json_str)
+    if (!json_str || !*json_str) {
+        errno = ENOMEM;
         return -1;
+    }
 
     fd = open(client->token_cookie, O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
     if (fd < 0) {
@@ -314,19 +190,12 @@ static int writeback_token(const cJSON *json, void *user_data)
         return -1;
     }
 
-    for (n2write = strlen(json_str), tmp = json_str;
-         n2write; n2write -= nwrite, tmp += nwrite) {
-        nwrite = write(fd, tmp, n2write);
-        if (!nwrite || (nwrite < 0 && errno != EINTR)) {
-            free(json_str);
-            close(fd);
-            return -1;
-        }
-        if (nwrite < 0)
-            nwrite = 0;
-    }
+    bytes = (int)write(fd, json_str, strlen(json_str) + 1);
     free(json_str);
     close(fd);
+
+    if (bytes != (int)strlen(json_str) + 1)
+        return -1;
 
     return 0;
 }
@@ -357,6 +226,9 @@ HiveClient *ipfs_client_new(const HiveOptions *options)
         strcpy(token_options->uid, opts->uid);
 
     // check bootstraps configuration
+    if (!opts->rpc_node_count)
+        return NULL;
+
     token_options->rpc_nodes_count = opts->rpc_node_count;
     for (i = 0; i < opts->rpc_node_count; ++i) {
         HiveRpcNode *node = &opts->rpcNodes[i];
@@ -419,22 +291,10 @@ HiveClient *ipfs_client_new(const HiveOptions *options)
 
     token_options->store = token_cookie_json;
 
-    if (!token_options->store && (!*token_options->uid ||
-                                  !token_options->rpc_nodes_count))
-        return NULL;
-
     client = (IPFSClient *)rc_zalloc(sizeof(IPFSClient), &ipfs_client_destructor);
     if (!client) {
         if (token_options->store)
             cJSON_Delete(token_options->store);
-        return NULL;
-    }
-
-    client->token = ipfs_token_new(token_options, &writeback_token, client);
-    if (token_options->store)
-        cJSON_Delete(token_options->store);
-    if (!client->token) {
-        deref(client);
         return NULL;
     }
 
@@ -445,6 +305,15 @@ HiveClient *ipfs_client_new(const HiveOptions *options)
     client->base.get_info    = &ipfs_client_get_info;
     client->base.get_drive   = &ipfs_client_drive_open;
     client->base.close       = &ipfs_client_close;
+
+    client->base.token = (token_base_t *)ipfs_token_new(token_options, &writeback_token,
+                                                        client);
+    if (token_options->store)
+        cJSON_Delete(token_options->store);
+    if (!client->base.token) {
+        deref(client);
+        return NULL;
+    }
 
     return &client->base;
 }

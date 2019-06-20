@@ -74,7 +74,7 @@ int hive_client_login(HiveClient *client,
 {
     int rc;
 
-    if (!client || !callback) {
+    if (!client) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
     }

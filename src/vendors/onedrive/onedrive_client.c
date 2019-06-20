@@ -30,9 +30,11 @@ static int onedrive_client_login(HiveClient *base,
     OneDriveClient *client = (OneDriveClient *)base;
     int rc;
 
+    if (!callback)
+        return -1;
+
     assert(client);
     assert(client->base.token);
-    assert(callback);
 
     rc = token_login(client->base.token, callback, user_data);
     if (rc < 0) {
@@ -246,8 +248,10 @@ static int oauth_writeback(const cJSON *json, void *user_data)
     }
 
     fd = open(client->keystore_path, O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
-    if (fd < 0)
+    if (fd < 0) {
+        free(json_str);
         return -1;
+    }
 
     bytes = (int)write(fd, json_str, strlen(json_str) + 1);
     free(json_str);
