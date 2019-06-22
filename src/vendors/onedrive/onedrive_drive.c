@@ -22,7 +22,8 @@
 
 typedef struct OneDriveDrive {
     HiveDrive base;
-} OneDriveDrive ;
+    char tmp_template[PATH_MAX];
+} OneDriveDrive;
 
 #define DECODE_INFO_FIELD(json, name, field) do { \
         int rc; \
@@ -198,7 +199,7 @@ int onedrive_drive_stat_file(HiveDrive *base, const char *path, HiveFileInfo *in
     }
 
     if (resp_code != 200) {
-        // TODO: rc;
+        rc = HIVE_HTTP_STATUS_ERROR(resp_code);
         goto error_exit;
     }
 
@@ -794,6 +795,18 @@ error_exit:
     return rc;
 }
 
+static int onedrive_drive_open_file(HiveDrive *base, const char *path,
+                                    int flags, HiveFile **file)
+{
+    OneDriveDrive *drive = (OneDriveDrive *)base;
+
+    if (strlen(path) >= MAX_URL_PARAM_LEN)
+        return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
+
+    return onedrive_file_open((oauth_token_t *)base->token, path, flags,
+                              drive->tmp_template, file);
+}
+
 static void onedrive_drive_close(HiveDrive *base)
 {
     assert(base);
@@ -810,11 +823,9 @@ static void onedrive_drive_destructor(void *obj)
 }
 
 int onedrive_drive_open(oauth_token_t *token, const char *driveid,
-                        HiveDrive **drive)
+                        const char *tmp_template, HiveDrive **drive)
 {
     OneDriveDrive *tmp;
-    char path[128] = {0};
-    size_t url_len;
 
     assert(token);
     assert(driveid);
@@ -839,7 +850,10 @@ int onedrive_drive_open(oauth_token_t *token, const char *driveid,
     tmp->base.move_file   = onedrive_drive_move_file;
     tmp->base.copy_file   = onedrive_drive_copy_file;
     tmp->base.delete_file = onedrive_drive_delete_file;
+    tmp->base.open_file   = onedrive_drive_open_file;
     tmp->base.close       = onedrive_drive_close;
+
+    sprintf(tmp->tmp_template, "%s", tmp_template);
 
     *drive = &tmp->base;
 

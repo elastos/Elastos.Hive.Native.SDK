@@ -31,7 +31,11 @@ int decode_info_field(cJSON *json, const char *name, char *buf, size_t len)
     return 0;
 }
 
-int onedrive_drive_open(oauth_token_t *token, const char *driveid, HiveDrive **);
+int onedrive_drive_open(oauth_token_t *token, const char *driveid,
+                        const char *tmp_template, HiveDrive **);
+
+int onedrive_file_open(oauth_token_t *token, const char *path,
+                       int flags, const char *tmp_template, HiveFile **file);
 
 #ifdef __cplusplus
 }

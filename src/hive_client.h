@@ -5,8 +5,13 @@
 extern "C" {
 #endif
 
+#include <limits.h>
+
 #include "ela_hive.h"
 #include "token_base.h"
+
+#define HIVE_F_IS_SET(flags1, flags2) (((flags1) &  (flags2)) == (flags2))
+#define HIVE_F_IS_EQ(flags1, flags2)  ((flags1) == (flags2))
 
 struct HiveClient {
     token_base_t *token;
@@ -28,7 +33,20 @@ struct HiveDrive {
     int (*move_file)    (HiveDrive *, const char *from, const char *to);
     int (*copy_file)    (HiveDrive *, const char *from, const char *to);
     int (*delete_file)  (HiveDrive *, const char *path);
+    int (*open_file)    (HiveDrive *, const char *path, int flags, HiveFile **);
     void (*close)       (HiveDrive *);
+};
+
+struct HiveFile {
+    token_base_t *token;
+
+    char path[PATH_MAX];
+    int flags;
+
+    ssize_t (*lseek)    (HiveFile *, uint64_t offset, int whence);
+    ssize_t (*read)     (HiveFile *, char *buf, size_t bufsz);
+    ssize_t (*write)    (HiveFile *, const char *buf, size_t bufsz);
+    int     (*close)    (HiveFile *);
 };
 
 inline static bool is_absolute_path(const char *path)

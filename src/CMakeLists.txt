@@ -41,6 +41,7 @@ endif()
 
 set(SRC
     hive_error.c
+    hive_file.c
     hive_drive.c
     hive_client.c
     token_base.c
@@ -53,6 +54,7 @@ set(SRC
     vendors/ipfs/ipfs_utils.c
     vendors/onedrive/onedrive_client.c
     vendors/onedrive/onedrive_drive.c
+    vendors/onedrive/onedrive_file.c
     vendors/native/native_client.c
     vendors/owncloud/owncloud.c)
 
