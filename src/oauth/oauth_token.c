@@ -76,10 +76,14 @@ static void writeback_tokens(oauth_token_t *token)
         return;
 
     cJSON_AddStringToObject(json, "client_id", token->client_id);
-    cJSON_AddStringToObject(json, "token_type", token->token_type);
-    cJSON_AddStringToObject(json, "access_token", token->access_token);
-    cJSON_AddStringToObject(json, "refresh_token", token->refresh_token);
-    cJSON_AddNumberToObject(json, "expires_at", token->expires_at.tv_sec);
+    if (token->token_type) {
+        assert(token->access_token);
+        assert(token->refresh_token);
+        cJSON_AddStringToObject(json, "token_type", token->token_type);
+        cJSON_AddStringToObject(json, "access_token", token->access_token);
+        cJSON_AddStringToObject(json, "refresh_token", token->refresh_token);
+        cJSON_AddNumberToObject(json, "expires_at", token->expires_at.tv_sec);
+    }
 
     rc = token->writeback_cb(json, token->user_data);
     if (rc < 0)
@@ -248,6 +252,10 @@ static int oauth_token_clean(token_base_t *base)
 
     free(token->token_type);
     token->token_type = NULL;
+    token->access_token = NULL;
+    token->refresh_token = NULL;
+
+    writeback_tokens(token);
 
     return 0;
 }
@@ -502,8 +510,6 @@ static int decode_access_token(oauth_token_t *token, const char *json_str)
     }
 
     FREE(token->token_type);
-    FREE(token->access_token);
-    FREE(token->refresh_token);
 
     token->token_type    = token_type;
     token->access_token  = access_token;
