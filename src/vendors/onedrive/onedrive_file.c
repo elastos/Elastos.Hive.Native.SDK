@@ -6,6 +6,7 @@
 
 #include "ela_hive.h"
 #include "hive_client.h"
+#include "onedrive_misc.h"
 #include "oauth_token.h"
 #include "onedrive_constants.h"
 #include "http_client.h"
@@ -20,7 +21,7 @@ typedef struct OneDriveFile {
     char dl_url[MAX_URL_LEN];
 } OneDriveFile;
 
-static ssize_t onedrive_file_lseek(HiveFile *base, uint64_t offset, int whence)
+static int onedrive_file_lseek(HiveFile *base, uint64_t offset, int whence)
 {
     OneDriveFile *file = (OneDriveFile *)base;
 
@@ -466,7 +467,7 @@ int onedrive_file_open(oauth_token_t *token, const char *path,
 
     strcpy(tmp->base.path, path);
     tmp->base.token   = (token_base_t *)token;
-    tmp->base.flags   = flags;
+    //tmp->base.flags   = flags;
     tmp->base.lseek   = onedrive_file_lseek;
     tmp->base.read    = onedrive_file_read;
     tmp->base.write   = onedrive_file_write;
