@@ -8,13 +8,12 @@ extern "C" {
 #include <limits.h>
 
 #include "ela_hive.h"
-#include "token_base.h"
 
 #define HIVE_F_IS_SET(flags1, flags2) (((flags1) &  (flags2)) == (flags2))
 #define HIVE_F_IS_EQ(flags1, flags2)  ((flags1) == (flags2))
 
 struct HiveClient {
-    token_base_t *token;
+    int state;  // login state.
 
     int (*login)        (HiveClient *, HiveRequestAuthenticationCallback *, void *);
     int (*logout)       (HiveClient *);
@@ -24,8 +23,6 @@ struct HiveClient {
 };
 
 struct HiveDrive {
-    token_base_t *token;
-
     int (*get_info)     (HiveDrive *, HiveDriveInfo *);
     int (*stat_file)    (HiveDrive *, const char *path, HiveFileInfo *);
     int (*list_files)   (HiveDrive *, const char *path, HiveFilesIterateCallback *, void *);
@@ -38,8 +35,6 @@ struct HiveDrive {
 };
 
 struct HiveFile {
-    token_base_t *token;
-
     char path[PATH_MAX];
     int flags;
 
@@ -50,6 +45,83 @@ struct HiveFile {
     int     (*discard)  (HiveFile *);
     int     (*close)    (HiveFile *);
 };
+
+/*
+ * convinient internal APIs to check for getting athorization or not.
+ */
+enum {
+    RAW          = (uint32_t)0,    // The primitive state.
+    LOGINING     = (uint32_t)1,    // Being in the middle of logining.
+    LOGINED      = (uint32_t)2,    // Already being logined.
+    LOGOUTING    = (uint32_t)3,    // Being in the middle of logout.
+};
+
+#if defined(_WIN32) || defined(_WIN64)
+#include <winnt.h>
+
+inline static
+int __sync_val_compare_and_swap(int *ptr, int oldval, int newval)
+{
+    return (int)InterlockedCompareExchange((LONG *)ptr,
+                                           (LONG)newval, (LONG)oldval);
+}
+#endif
+
+#define _test_and_swap __sync_val_compare_and_swap
+
+inline static int check_and_login(HiveClient *client)
+{
+    int rc;
+
+    rc = _test_and_swap(&client->state, RAW, LOGINING);
+    switch(rc) {
+    case RAW:
+        rc = 0; // need to proceed the login routine.
+        break;
+
+    case LOGINING:
+    case LOGOUTING:
+    default:
+        rc = -1;
+        break;
+
+    case LOGINED:
+        rc = 1;
+        break;
+    }
+
+    return rc;
+}
+
+inline static int check_and_logout(HiveClient *client)
+{
+    int rc;
+
+    rc = _test_and_swap(&client->state, LOGINED, LOGOUTING);
+    switch(rc) {
+    case RAW:
+        rc = 1;
+        break;
+
+    case LOGINING:
+    case LOGOUTING:
+    default:
+        rc = -1;
+        break;
+
+    case LOGINED:
+        rc = 0;
+        break;
+    }
+
+    return rc;
+}
+
+inline static bool has_valid_token(HiveClient *client)
+{
+    return LOGINED == _test_and_swap(&client->state, LOGINED, LOGINED);
+}
+
 
 inline static bool is_absolute_path(const char *path)
 {

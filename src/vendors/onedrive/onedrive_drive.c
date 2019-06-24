@@ -22,6 +22,7 @@
 
 typedef struct OneDriveDrive {
     HiveDrive base;
+    oauth_token_t *token;
     char tmp_template[PATH_MAX];
 } OneDriveDrive;
 
@@ -55,17 +56,16 @@ static
 int onedrive_drive_get_info(HiveDrive *base, HiveDriveInfo *info)
 {
     OneDriveDrive *drive = (OneDriveDrive *)base;
-    oauth_token_t *token = (oauth_token_t *)drive->base.token;
     http_client_t *httpc;
     char *p = NULL;
     long resp_code = 0;
     int rc;
 
     assert(drive);
-    assert(token);
+    assert(drive->token);
     assert(info);
 
-    rc = oauth_token_check_expire(token);
+    rc = oauth_token_check_expire(drive->token);
     if (rc < 0) {
         vlogE("Hive: Checking access token expired error.");
         return rc;
@@ -77,7 +77,7 @@ int onedrive_drive_get_info(HiveDrive *base, HiveDriveInfo *info)
 
     http_client_set_url(httpc, MY_DRIVE);
     http_client_set_method(httpc, HTTP_METHOD_GET);
-    http_client_set_header(httpc, "Authorization", get_bearer_token(token));
+    http_client_set_header(httpc, "Authorization", get_bearer_token(drive->token));
     http_client_enable_response_body(httpc);
 
     rc = http_client_request(httpc);
@@ -93,7 +93,7 @@ int onedrive_drive_get_info(HiveDrive *base, HiveDriveInfo *info)
     }
 
     if (resp_code == 401) {
-        oauth_token_set_expired(token);
+        oauth_token_set_expired(drive->token);
         rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
         goto error_exit;
     }
@@ -144,7 +144,6 @@ static
 int onedrive_drive_stat_file(HiveDrive *base, const char *path, HiveFileInfo *info)
 {
     OneDriveDrive *drive = (OneDriveDrive *)base;
-    oauth_token_t *token = (oauth_token_t *)drive->base.token;
     http_client_t *httpc;
     char url[MAX_URL_LEN] = {0};
     char *p;
@@ -152,12 +151,12 @@ int onedrive_drive_stat_file(HiveDrive *base, const char *path, HiveFileInfo *in
     int rc;
 
     assert(drive);
-    assert(token);
+    assert(drive->token);
     assert(path);
     assert(*path == '/');
     assert(info);
 
-    rc = oauth_token_check_expire(token);
+    rc = oauth_token_check_expire(drive->token);
     if (rc < 0) {
         vlogE("Hive: Checking access token expired error.");
         return rc;
@@ -177,7 +176,7 @@ int onedrive_drive_stat_file(HiveDrive *base, const char *path, HiveFileInfo *in
 
     http_client_set_url(httpc, url);
     http_client_set_method(httpc, HTTP_METHOD_GET);
-    http_client_set_header(httpc, "Authorization", get_bearer_token(token));
+    http_client_set_header(httpc, "Authorization", get_bearer_token(drive->token));
     http_client_enable_response_body(httpc);
 
     rc = http_client_request(httpc);
@@ -193,7 +192,7 @@ int onedrive_drive_stat_file(HiveDrive *base, const char *path, HiveFileInfo *in
     }
 
     if (resp_code == 401) {
-        oauth_token_set_expired(token);
+        oauth_token_set_expired(drive->token);
         rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
         goto error_exit;
     }
@@ -309,7 +308,6 @@ int onedrive_drive_list_files(HiveDrive *base, const char *path,
                               HiveFilesIterateCallback *callback, void *context)
 {
     OneDriveDrive *drive = (OneDriveDrive *)base;
-    oauth_token_t *token = (oauth_token_t *)drive->base.token;
     http_client_t *httpc;
     char url[MAX_URL_LEN] = {0};
     char *next_url = NULL;
@@ -319,12 +317,12 @@ int onedrive_drive_list_files(HiveDrive *base, const char *path,
     int rc;
 
     assert(drive);
-    assert(token);
+    assert(drive->token);
     assert(path);
     assert(*path == '/');
     assert(callback);
 
-    rc = oauth_token_check_expire(token);
+    rc = oauth_token_check_expire(drive->token);
     if (rc < 0) {
         vlogE("Hive: Checking access token expired error.");
         return rc;
@@ -357,7 +355,7 @@ int onedrive_drive_list_files(HiveDrive *base, const char *path,
         http_client_reset(httpc);
         http_client_set_url(httpc, next_url);
         http_client_set_method(httpc, HTTP_METHOD_GET);
-        http_client_set_header(httpc, "Authorization", get_bearer_token(token));
+        http_client_set_header(httpc, "Authorization", get_bearer_token(drive->token));
         http_client_enable_response_body(httpc);
 
         rc = http_client_request(httpc);
@@ -372,7 +370,7 @@ int onedrive_drive_list_files(HiveDrive *base, const char *path,
             break;
 
         if (resp_code == 401) {
-            oauth_token_set_expired(token);
+            oauth_token_set_expired(drive->token);
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             break;
         }
@@ -467,7 +465,6 @@ static
 int onedrive_drive_mkdir(HiveDrive *base, const char *path)
 {
     OneDriveDrive *drive = (OneDriveDrive *)base;
-    oauth_token_t *token = (oauth_token_t *)drive->base.token;
     http_client_t *httpc;
     char url[MAX_URL_LEN] = {0};
     char *body;
@@ -476,11 +473,11 @@ int onedrive_drive_mkdir(HiveDrive *base, const char *path)
     int rc;
 
     assert(drive);
-    assert(token);
+    assert(drive->token);
     assert(path);
     assert(*path);
 
-    rc = oauth_token_check_expire(token);
+    rc = oauth_token_check_expire(drive->token);
     if (rc < 0) {
         vlogE("Hive: Checking access token expired error.");
         return rc;
@@ -508,7 +505,7 @@ int onedrive_drive_mkdir(HiveDrive *base, const char *path)
     http_client_set_url(httpc, url);
     http_client_set_method(httpc, HTTP_METHOD_POST);
     http_client_set_header(httpc, "Content-Type", "application/json");
-    http_client_set_header(httpc, "Authorization", get_bearer_token(token));
+    http_client_set_header(httpc, "Authorization", get_bearer_token(drive->token));
     http_client_set_request_body_instant(httpc, body, strlen(body));
 
     rc = http_client_request(httpc);
@@ -528,7 +525,7 @@ int onedrive_drive_mkdir(HiveDrive *base, const char *path)
     }
 
     if (resp_code == 401) {
-        oauth_token_set_expired(token);
+        oauth_token_set_expired(drive->token);
         return HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
     }
 
@@ -583,7 +580,6 @@ static
 int onedrive_drive_move_file(HiveDrive *base, const char *old, const char *new)
 {
     OneDriveDrive *drive = (OneDriveDrive *)base;
-    oauth_token_t *token = (oauth_token_t *)drive->base.token;
     http_client_t *httpc;
     char url[MAX_URL_LEN] = {0};
     char *body;
@@ -591,13 +587,13 @@ int onedrive_drive_move_file(HiveDrive *base, const char *old, const char *new)
     int rc;
 
     assert(drive);
-    assert(token);
+    assert(drive->token);
     assert(old);
     assert(*old);
     assert(new);
     assert(*new);
 
-    rc = oauth_token_check_expire(token);
+    rc = oauth_token_check_expire(drive->token);
     if (rc < 0) {
         vlogE("Hive: Checking access token expired error.");
         return rc;
@@ -622,7 +618,7 @@ int onedrive_drive_move_file(HiveDrive *base, const char *old, const char *new)
     http_client_set_url(httpc, url);
     http_client_set_method(httpc, HTTP_METHOD_PATCH);
     http_client_set_header(httpc, "Content-Type", "application/json");
-    http_client_set_header(httpc, "Authorization", get_bearer_token(token));
+    http_client_set_header(httpc, "Authorization", get_bearer_token(drive->token));
     http_client_set_request_body_instant(httpc, body, strlen(body));
 
     rc = http_client_request(httpc);
@@ -642,7 +638,7 @@ int onedrive_drive_move_file(HiveDrive *base, const char *old, const char *new)
     }
 
     if (resp_code == 401) {
-        oauth_token_set_expired(token);
+        oauth_token_set_expired(drive->token);
         return HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
     }
 
@@ -662,14 +658,13 @@ static
 int onedrive_drive_copy_file(HiveDrive *base, const char *src, const char *dest)
 {
     OneDriveDrive *drive = (OneDriveDrive *)base;
-    oauth_token_t *token = (oauth_token_t *)drive->base.token;
     http_client_t *httpc;
     char url[MAX_URL_LEN] = {0};
     long resp_code;
     char *body;
     int rc;
 
-    rc = oauth_token_check_expire(token);
+    rc = oauth_token_check_expire(drive->token);
     if (rc < 0) {
         vlogE("Hive: Checking access token expired error.");
         return rc;
@@ -693,7 +688,7 @@ int onedrive_drive_copy_file(HiveDrive *base, const char *src, const char *dest)
     http_client_set_url(httpc, url);
     http_client_set_method(httpc, HTTP_METHOD_POST);
     http_client_set_header(httpc, "Content-Type", "application/json");
-    http_client_set_header(httpc, "Authorization", get_bearer_token(token));
+    http_client_set_header(httpc, "Authorization", get_bearer_token(drive->token));
     http_client_set_request_body_instant(httpc, body, strlen(body));
 
     rc = http_client_request(httpc);
@@ -713,7 +708,7 @@ int onedrive_drive_copy_file(HiveDrive *base, const char *src, const char *dest)
     }
 
     if (resp_code == 401) {
-        oauth_token_set_expired(token);
+        oauth_token_set_expired(drive->token);
         return HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
     }
 
@@ -734,17 +729,16 @@ static
 int onedrive_drive_delete_file(HiveDrive *base, const char *path)
 {
     OneDriveDrive *drive = (OneDriveDrive *)base;
-    oauth_token_t *token = (oauth_token_t *)drive->base.token;
     http_client_t *httpc;
     char url[MAX_URL_LEN] = {0};
     long resp_code = 0;
     int rc;
 
     assert(drive);
+    assert(drive->token);
     assert(path);
-    assert(token);
 
-    rc = oauth_token_check_expire(token);
+    rc = oauth_token_check_expire(drive->token);
     if (rc < 0) {
         vlogE("Hive: Checking access token expired error.");
         return rc;
@@ -762,7 +756,7 @@ int onedrive_drive_delete_file(HiveDrive *base, const char *path)
     sprintf(url, "%s/root:%s:", MY_DRIVE, path);
     http_client_set_url(httpc, url);
     http_client_set_method(httpc, HTTP_METHOD_DELETE);
-    http_client_set_header(httpc, "Authorization", get_bearer_token(token));
+    http_client_set_header(httpc, "Authorization", get_bearer_token(drive->token));
 
     rc = http_client_request(httpc);
     if (rc < 0) {
@@ -779,7 +773,7 @@ int onedrive_drive_delete_file(HiveDrive *base, const char *path)
     }
 
     if (resp_code == 401) {
-        oauth_token_set_expired(token);
+        oauth_token_set_expired(drive->token);
         return HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
     }
 
@@ -803,7 +797,7 @@ static int onedrive_drive_open_file(HiveDrive *base, const char *path,
     if (strlen(path) >= MAX_URL_PARAM_LEN)
         return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
 
-    return onedrive_file_open((oauth_token_t *)base->token, path, flags,
+    return onedrive_file_open(drive->token, path, flags,
                               drive->tmp_template, file);
 }
 
@@ -818,8 +812,8 @@ static void onedrive_drive_destructor(void *obj)
 {
     OneDriveDrive *drive = (OneDriveDrive *)obj;
 
-    if (drive->base.token)
-        oauth_token_delete((oauth_token_t *)drive->base.token);
+    if (drive->token)
+        oauth_token_delete(drive->token);
 }
 
 int onedrive_drive_open(oauth_token_t *token, const char *driveid,
@@ -841,7 +835,7 @@ int onedrive_drive_open(oauth_token_t *token, const char *driveid,
         return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
 
     // Add reference of token to drive.
-    tmp->base.token = ref(token);
+    tmp->token = ref(token);
 
     tmp->base.get_info    = onedrive_drive_get_info;
     tmp->base.stat_file   = onedrive_drive_stat_file;

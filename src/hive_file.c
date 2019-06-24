@@ -11,9 +11,6 @@ ssize_t hive_file_seek(HiveFile *file, uint64_t offset, int whence)
                   whence != HiveSeek_End))
         return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
 
-    if (!has_valid_token(file->token))
-        return HIVE_GENERAL_ERROR(HIVEERR_NOT_READY);
-
     if (!file->lseek)
         return HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED);
 
@@ -29,9 +26,6 @@ ssize_t hive_file_read(HiveFile *file, char *buf, size_t bufsz)
     if (!file || !buf || !bufsz || HIVE_F_IS_SET(file->flags, HIVE_F_WRONLY))
         return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
 
-    if (!has_valid_token(file->token))
-        return HIVE_GENERAL_ERROR(HIVEERR_NOT_READY);
-
     if (!file->read)
         return HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED);
 
@@ -46,9 +40,6 @@ ssize_t hive_file_write(HiveFile *file, const char *buf, size_t bufsz)
 
     if (!file || !buf || !bufsz || HIVE_F_IS_SET(file->flags, HIVE_F_RDONLY))
         return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
-
-    if (!has_valid_token(file->token))
-        return HIVE_GENERAL_ERROR(HIVEERR_NOT_READY);
 
     if (!file->write)
         return HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED);
@@ -76,9 +67,6 @@ int hive_file_commit(HiveFile *file)
     if (!file || HIVE_F_IS_SET(file->flags, HIVE_F_RDONLY))
         return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
 
-    if (!has_valid_token(file->token))
-        return HIVE_GENERAL_ERROR(HIVEERR_NOT_READY);
-
     if (!file->commit)
         return HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED);
 
@@ -93,9 +81,6 @@ int hive_file_discard(HiveFile *file)
 
     if (!file || HIVE_F_IS_SET(file->flags, HIVE_F_RDONLY))
         return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
-
-    if (!has_valid_token(file->token))
-        return HIVE_GENERAL_ERROR(HIVEERR_NOT_READY);
 
     if (!file->discard)
         return HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED);

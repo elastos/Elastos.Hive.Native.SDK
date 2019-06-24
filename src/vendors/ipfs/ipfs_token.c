@@ -9,7 +9,6 @@
 #endif
 
 #include "ela_hive.h"
-#include "token_base.h"
 #include "ipfs_token.h"
 #include "ipfs_utils.h"
 #include "ipfs_constants.h"
@@ -17,7 +16,6 @@
 #include "http_client.h"
 
 struct ipfs_token {
-    token_base_t base;
     char uid[HIVE_MAX_IPFS_UID_LEN + 1];
     char current_node[HIVE_MAX_IPV6_ADDRESS_LEN  + 1];
     ipfs_token_writeback_func_t *writeback_cb;
@@ -258,19 +256,14 @@ static int writeback_tokens(ipfs_token_t *token)
     return rc;
 }
 
-static int ipfs_token_reset(token_base_t *base)
+int ipfs_token_reset(ipfs_token_t *token)
 {
     return 0;
 }
 
-static int synchronize(token_base_t *base,
-                       HiveRequestAuthenticationCallback *cb,
-                       void *context)
+int ipfs_token_synchronize(ipfs_token_t *token)
 {
-    (void)cb;
-    (void)context;
-
-    return ipfs_synchronize((ipfs_token_t *)base);
+    return ipfs_synchronize(token);
 }
 
 ipfs_token_t *ipfs_token_new(ipfs_token_options_t *options,
@@ -287,8 +280,6 @@ ipfs_token_t *ipfs_token_new(ipfs_token_options_t *options,
         return NULL;
 
     memcpy(tmp->rpc_nodes, options->rpc_nodes, bootstraps_nbytes);
-    tmp->base.login      = synchronize;
-    tmp->base.logout     = ipfs_token_reset;
     tmp->rpc_nodes_count = options->rpc_nodes_count;
     tmp->writeback_cb    = cb;
     tmp->user_data       = user_data;

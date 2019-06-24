@@ -30,6 +30,7 @@
 
 typedef struct IPFSClient {
     HiveClient base;
+    ipfs_token_t *token;
     char token_cookie[MAXPATHLEN + 1];
 } IPFSClient;
 
@@ -37,9 +38,11 @@ static int ipfs_client_login(HiveClient *base,
                              HiveRequestAuthenticationCallback *cb,
                              void *user_data)
 {
+    IPFSClient *client = (IPFSClient *)base;
+    ipfs_token_t *token = client->token;
     int rc;
 
-    rc = token_login(base->token, cb, user_data);
+    rc = ipfs_token_synchronize(token);
     if (rc < 0) {
         hive_set_error(-1);
         return -1;
@@ -51,13 +54,16 @@ static int ipfs_client_login(HiveClient *base,
 
 static int ipfs_client_logout(HiveClient *base)
 {
-    return token_logout(base->token);
+    IPFSClient *client = (IPFSClient *)base;
+    ipfs_token_t *token = client->token;
+
+    return ipfs_token_reset(token);
 }
 
 static int ipfs_client_get_info(HiveClient *base, HiveClientInfo *result)
 {
     IPFSClient *client = (IPFSClient *)base;
-    ipfs_token_t *token = (ipfs_token_t *)client->base.token;
+    ipfs_token_t *token = (ipfs_token_t *)client->token;
     int rc;
 
     assert(client);
@@ -94,7 +100,7 @@ static int ipfs_client_drive_open(HiveClient *base, HiveDrive **drive)
 
     assert(base);
 
-    tmp = ipfs_drive_open((ipfs_token_t *)client->base.token);
+    tmp = ipfs_drive_open(client->token);
     if (!tmp) {
         // TODO
         return -1;
@@ -117,8 +123,8 @@ static void ipfs_client_destructor(void *p)
 {
     IPFSClient *client = (IPFSClient *)p;
 
-    if (client->base.token)
-        ipfs_token_close((ipfs_token_t *)client->base.token);
+    if (client->token)
+        ipfs_token_close((ipfs_token_t *)client->token);
 }
 
 static inline bool is_valid_ip(const char *ip)
@@ -306,11 +312,10 @@ HiveClient *ipfs_client_new(const HiveOptions *options)
     client->base.get_drive   = &ipfs_client_drive_open;
     client->base.close       = &ipfs_client_close;
 
-    client->base.token = (token_base_t *)ipfs_token_new(token_options, &writeback_token,
-                                                        client);
+    client->token = ipfs_token_new(token_options, &writeback_token, client);
     if (token_options->store)
         cJSON_Delete(token_options->store);
-    if (!client->base.token) {
+    if (!client->token) {
         deref(client);
         return NULL;
     }
