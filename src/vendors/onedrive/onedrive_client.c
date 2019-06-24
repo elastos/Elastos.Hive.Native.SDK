@@ -9,6 +9,9 @@
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
+#ifdef HAVE_LIBGEN_H
+#include <libgen.h>
+#endif
 
 #include <crystal.h>
 #include <cjson/cJSON.h>
@@ -302,6 +305,7 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
         deref(client);
         return NULL;
     }
+    mkdir(dirname(client->keystore_path), S_IRUSR | S_IWUSR | S_IXUSR);
 
     rc = snprintf(client->tmp_template, sizeof(client->tmp_template),
                   "%s/.tmp/onedrive/XXXXXX", options->persistent_location);
@@ -310,6 +314,8 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
         deref(client);
         return NULL;
     }
+    mkdir(dirname(dirname(client->tmp_template)), S_IRUSR | S_IWUSR | S_IXUSR);
+    mkdir(dirname(client->tmp_template), S_IRUSR | S_IWUSR | S_IXUSR);
 
     if (!access(client->keystore_path, F_OK)) {
         keystore = load_keystore_in_json(client->keystore_path);

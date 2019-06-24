@@ -502,6 +502,7 @@ int http_client_set_request_body(http_client_t *client,
     assert(client);
     assert(callback);
 
+    curl_easy_setopt(client->curl, CURLOPT_UPLOAD, 1L);
     curl_easy_setopt(client->curl, CURLOPT_READFUNCTION, callback);
     curl_easy_setopt(client->curl, CURLOPT_READDATA, userdata);
 

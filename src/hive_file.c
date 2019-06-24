@@ -38,7 +38,9 @@ ssize_t hive_file_write(HiveFile *file, const char *buf, size_t bufsz)
 {
     ssize_t rc;
 
-    if (!file || !buf || !bufsz || HIVE_F_IS_SET(file->flags, HIVE_F_RDONLY))
+    if (!file || !buf || !bufsz ||
+        (!HIVE_F_IS_SET(file->flags, HIVE_F_WRONLY) &&
+         !HIVE_F_IS_SET(file->flags, HIVE_F_RDWR)))
         return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
 
     if (!file->write)
@@ -64,7 +66,8 @@ int hive_file_commit(HiveFile *file)
 {
     int rc;
 
-    if (!file || HIVE_F_IS_SET(file->flags, HIVE_F_RDONLY))
+    if (!file || (!HIVE_F_IS_SET(file->flags, HIVE_F_WRONLY) &&
+                  !HIVE_F_IS_SET(file->flags, HIVE_F_RDWR)))
         return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
 
     if (!file->commit)
@@ -79,7 +82,8 @@ int hive_file_discard(HiveFile *file)
 {
     int rc;
 
-    if (!file || HIVE_F_IS_SET(file->flags, HIVE_F_RDONLY))
+    if (!file || (!HIVE_F_IS_SET(file->flags, HIVE_F_WRONLY) &&
+                  !HIVE_F_IS_SET(file->flags, HIVE_F_RDWR)))
         return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
 
     if (!file->discard)

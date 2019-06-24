@@ -64,17 +64,18 @@ static int create_upload_session(OneDriveFile *file,
     http_client_set_url(httpc, url);
     http_client_set_method(httpc, HTTP_METHOD_POST);
     http_client_set_header(httpc, "Authorization", get_bearer_token(file->token));
+    http_client_set_request_body_instant(httpc, NULL, 0);
     if (file->ctag[0])
         http_client_set_header(httpc, "if-match", file->ctag);
     http_client_enable_response_body(httpc);
 
     rc = http_client_request(httpc);
-    if (rc < 0)
-        return rc;
+    if (rc)
+        return -1;
 
     rc = http_client_get_response_code(httpc, &resp_code);
-    if (rc < 0)
-        return rc;
+    if (rc)
+        return -1;
 
     if (resp_code == 401) {
         oauth_token_set_expired(file->token);
@@ -85,9 +86,8 @@ static int create_upload_session(OneDriveFile *file,
         return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     p = http_client_move_response_body(httpc, NULL);
-
     if (!p)
-        return rc;
+        return -1;
 
     session = cJSON_Parse(p);
     free(p);
@@ -139,40 +139,46 @@ static int upload_to_session(OneDriveFile *file, http_client_t *httpc,
 {
     long resp_code = 0;
     size_t fsize = lseek(file->fd, 0, SEEK_END);
-    size_t ul_off = 0;
-    size_t ul_sz = fsize % HTTP_PUT_MAX_CHUNK_SIZE;
+    size_t ul_off;
+    size_t ul_sz;
     int rc;
 
     lseek(file->fd, 0, SEEK_SET);
-    do {
+    ul_off = 0;
+    ul_sz = fsize % HTTP_PUT_MAX_CHUNK_SIZE;
+    while (ul_sz) {
         char header[128];
         size_t uled_sz = 0;
         void *userdata[] = {&ul_sz, &uled_sz, &file->fd};
 
         http_client_set_url(httpc, upload_url);
         http_client_set_method(httpc, HTTP_METHOD_PUT);
-        sprintf(header, "%zu", fsize);
+        sprintf(header, "%zu", ul_sz);
         http_client_set_header(httpc, "Content-Length", header);
-        sprintf(header, "bytes %zu-%zu/%zu", ul_off, ul_off + ul_sz, fsize);
+        sprintf(header, "bytes %zu-%zu/%zu", ul_off, ul_off + ul_sz - 1, fsize);
         http_client_set_header(httpc, "Content-Range", header);
+        http_client_set_header(httpc, "Transfer-Encoding", "");
+        http_client_set_header(httpc, "Expect", "");
         http_client_set_request_body(httpc,
                                      upload_to_session_request_body_cb,
                                      userdata);
 
         rc = http_client_request(httpc);
-        if (rc < 0)
-            return rc;
+        if (rc)
+            return -1;
 
         ul_off += ul_sz;
         ul_sz = (fsize - ul_off) % HTTP_PUT_MAX_CHUNK_SIZE;
 
         rc = http_client_get_response_code(httpc, &resp_code);
-        if (rc < 0)
-            return rc;
+        if (rc)
+            return -1;
 
-        if ((ul_sz && resp_code != 202) || (!ul_sz && resp_code != 201))
+        if ((ul_sz && resp_code != 202) ||
+            (!ul_sz && ((!file->ctag[0] && resp_code != 201) ||
+                        (file->ctag[0] && resp_code != 200))))
             return HIVE_HTTP_STATUS_ERROR(resp_code);
-    } while (ul_sz);
+    }
 
     return 0;
 }
@@ -344,7 +350,7 @@ static size_t response_body_callback(char *buffer, size_t size,
     size_t total_sz = size * nitems;
     ssize_t nwr;
 
-    nwr = write(fd, buffer,total_sz);
+    nwr = write(fd, buffer, total_sz);
     if (nwr < 0)
         return -1;
 
@@ -470,7 +476,7 @@ int onedrive_file_open(oauth_token_t *token, const char *path,
     tmp->base.discard = onedrive_file_discard;
     tmp->base.close   = onedrive_file_close;
 
-    tmp->token        = token;
+    tmp->token        = ref(token);
     if (file_exists) {
         strcpy(tmp->ctag, ctag);
         strcpy(tmp->dl_url, download_url);

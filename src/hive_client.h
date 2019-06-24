@@ -9,7 +9,7 @@ extern "C" {
 
 #include "ela_hive.h"
 
-#define HIVE_F_IS_SET(flags1, flags2) (((flags1) &  (flags2)) == (flags2))
+#define HIVE_F_IS_SET(flags1, flags2) (((flags1) & (flags2)) == (flags2))
 #define HIVE_F_IS_EQ(flags1, flags2)  ((flags1) == (flags2))
 
 struct HiveClient {

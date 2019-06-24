@@ -66,7 +66,6 @@ static void writeback_tokens(oauth_token_t *token)
     int rc;
 
     assert(token);
-    assert(token->token_type);
 
     json = cJSON_CreateObject();
     if (!json)
@@ -112,12 +111,12 @@ static int restore_access_token(const cJSON *json, oauth_token_t *token)
     assert(token->client_id);
 
     if (!json)
-        return 0;
+        return -1;
 
     client_id = cJSON_GetObjectItem(json, "client_id");
-    if (cJSON_IsString(client_id) ||
+    if (!cJSON_IsString(client_id) ||
         strcmp(token->client_id, client_id->valuestring) != 0)
-        return 0;
+        return -1;
 
     token_type    = cJSON_GetObjectItem(json, "token_type");
     access_token  = cJSON_GetObjectItem(json, "access_token");
@@ -128,7 +127,7 @@ static int restore_access_token(const cJSON *json, oauth_token_t *token)
         !cJSON_IsString(access_token) ||
         !cJSON_IsString(refresh_token) ||
         !cJSON_IsNumber(expires_at))
-        return 0;
+        return -1;
 
     mem_len += strlen(token_type->valuestring) + 1;
     mem_len += strlen(access_token->valuestring) + 1;
@@ -137,7 +136,7 @@ static int restore_access_token(const cJSON *json, oauth_token_t *token)
     token->expires_at.tv_sec = expires_at->valueint; // TODO:
     p = (char *)calloc(1, mem_len);
     if (!p)
-        return 0;
+        return -1;
 
     token->token_type = p;
     strcpy(p, token_type->valuestring);
@@ -150,7 +149,7 @@ static int restore_access_token(const cJSON *json, oauth_token_t *token)
     token->refresh_token = p;
     strcpy(p, refresh_token->valuestring);
 
-    return 1;
+    return 0;
 }
 
 oauth_token_t *oauth_token_new(const oauth_options_t *opts, oauth_writeback_func_t cb,
