@@ -14,3 +14,10 @@ _hive_drive_move_file
 _hive_drive_copy_file
 _hive_drive_delete_file
 _hive_drive_close
+_hive_file_open
+_hive_file_close
+_hive_file_seek
+_hive_file_read
+_hive_file_write
+_hive_file_commit
+_hive_file_discard
