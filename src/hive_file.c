@@ -69,3 +69,38 @@ int hive_file_close(HiveFile *file)
     return rc;
 }
 
+int hive_file_commit(HiveFile *file)
+{
+    int rc;
+
+    if (!file || HIVE_F_IS_SET(file->flags, HIVE_F_RDONLY))
+        return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
+
+    if (!has_valid_token(file->token))
+        return HIVE_GENERAL_ERROR(HIVEERR_NOT_READY);
+
+    if (!file->commit)
+        return HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED);
+
+    rc = file->commit(file);
+
+    return rc;
+}
+
+int hive_file_discard(HiveFile *file)
+{
+    int rc;
+
+    if (!file || HIVE_F_IS_SET(file->flags, HIVE_F_RDONLY))
+        return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
+
+    if (!has_valid_token(file->token))
+        return HIVE_GENERAL_ERROR(HIVEERR_NOT_READY);
+
+    if (!file->discard)
+        return HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED);
+
+    rc = file->discard(file);
+
+    return rc;
+}

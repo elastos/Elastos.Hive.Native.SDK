@@ -649,6 +649,12 @@ ssize_t hive_file_read(HiveFile *file, char *buf, size_t bufsz);
 HIVE_API
 ssize_t hive_file_write(HiveFile *file, const char *buf, size_t bufsz);
 
+HIVE_API
+int hive_file_commit(HiveFile *file);
+
+HIVE_API
+int hive_file_discard(HiveFile *file);
+
 /******************************************************************************
  * Error handling
  *****************************************************************************/
