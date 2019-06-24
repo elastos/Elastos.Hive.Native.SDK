@@ -234,6 +234,59 @@ int hive_drive_delete_file(HiveDrive *drive, const char *path)
     return 0;
 }
 
+#define HIVE_F_OP_FLAGS     (HIVE_F_RDONLY | HIVE_F_WRONLY | HIVE_F_RDWR)
+#define HIVE_F_WR_OPT_FLAGS (HIVE_F_APPEND | HIVE_F_CREAT  | HIVE_F_TRUNC | HIVE_F_EXCL)
+static bool is_valid_fopen_flags(int flags)
+{
+    int op_flags = flags & HIVE_F_OP_FLAGS;
+    int wr_opt_flags = flags & HIVE_F_WR_OPT_FLAGS;
+
+    if (!((op_flags == HIVE_F_RDONLY && !wr_opt_flags) ||
+          op_flags == HIVE_F_WRONLY || op_flags == HIVE_F_RDWR))
+        return false;
+
+    return true;
+}
+
+HiveFile *hive_file_open(HiveDrive *drive, const char *path, int flags)
+{
+    int rc;
+    HiveFile *file;
+
+    if (!drive) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
+        return NULL;
+    }
+
+    if (!is_absolute_path(path) || strcmp(path, "/") == 0) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
+        return NULL;
+    }
+
+    if (!is_valid_fopen_flags(flags)) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
+        return NULL;
+    }
+
+    if (!has_valid_token(drive->token))  {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_READY));
+        return NULL;
+    }
+
+    if (!drive->open_file) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED));
+        return NULL;
+    }
+
+    rc = drive->open_file(drive, path, flags, &file);
+    if (rc < 0) {
+        hive_set_error(rc);
+        return NULL;
+    }
+
+    return file;
+}
+
 int hive_drive_close(HiveDrive *drive)
 {
     if (!drive)

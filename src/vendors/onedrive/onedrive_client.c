@@ -21,6 +21,7 @@
 typedef struct OneDriveClient {
     HiveClient base;
     char keystore_path[PATH_MAX];
+    char tmp_template[PATH_MAX];
 } OneDriveClient;
 
 static int onedrive_client_login(HiveClient *base,
@@ -179,7 +180,7 @@ static int onedrive_client_drive_open(HiveClient *base, HiveDrive **drive)
     assert(token);
     assert(drive);
 
-    rc = onedrive_drive_open(token, "default", drive);
+    rc = onedrive_drive_open(token, "default", client->tmp_template, drive);
     if (rc < 0) {
         vlogE("Hive: Opening onedrive drive handle error (error: 0x%x)", rc);
         return rc;
@@ -296,8 +297,16 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
     }
 
     rc = snprintf(client->keystore_path, sizeof(client->keystore_path),
-                  "%s/onedrive.json", options->persistent_location);
+                  "%s/.data/onedrive.json", options->persistent_location);
     if (rc < 0 || rc >= (int)sizeof(client->keystore_path)) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
+        deref(client);
+        return NULL;
+    }
+
+    rc = snprintf(client->tmp_template, sizeof(client->tmp_template),
+                  "%s/.tmp/onedrive/XXXXXX", options->persistent_location);
+    if (rc < 0 || rc >= (int)sizeof(client->tmp_template)) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         deref(client);
         return NULL;

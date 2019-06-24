@@ -9,6 +9,8 @@
 #define MAX_URL_LEN         (1024)
 #define MAX_URL_PARAM_LEN   (1024 - strlen(URL_API) - 32)
 
+#define MAX_CTAG_LEN        (1024)
+
 #define MY_DRIVE    "https://graph.microsoft.com/v1.0/me/drive"
 
 #define METHOD_AUTHORIZE "authorize"
