@@ -9,6 +9,15 @@ extern "C" {
 #include "oauth_token.h"
 #include "hive_client.h"
 
+#include <fcntl.h>
+#define HIVE_F_RDONLY O_RDONLY
+#define HIVE_F_WRONLY O_WRONLY
+#define HIVE_F_RDWR   O_RDWR
+#define HIVE_F_APPEND O_APPEND
+#define HIVE_F_CREAT  O_CREAT
+#define HIVE_F_TRUNC  O_TRUNC
+#define HIVE_F_EXCL   O_EXCL
+
 static inline
 int decode_info_field(cJSON *json, const char *name, char *buf, size_t len)
 {
