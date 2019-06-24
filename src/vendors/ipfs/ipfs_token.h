@@ -31,6 +31,8 @@ ipfs_token_t *ipfs_token_new(ipfs_token_options_t *options,
                              ipfs_token_writeback_func_t cb,
                              void *user_data);
 int ipfs_token_close(ipfs_token_t *token);
+int ipfs_token_synchronize(ipfs_token_t *token);
+int ipfs_token_reset(ipfs_token_t *token);
 int ipfs_token_get_uid_info(ipfs_token_t *token, char **result);
 const char *ipfs_token_get_uid(ipfs_token_t *token);
 const char *ipfs_token_get_current_node(ipfs_token_t *token);

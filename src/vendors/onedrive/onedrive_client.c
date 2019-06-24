@@ -20,6 +20,7 @@
 
 typedef struct OneDriveClient {
     HiveClient base;
+    oauth_token_t *token;
     char keystore_path[PATH_MAX];
     char tmp_template[PATH_MAX];
 } OneDriveClient;
@@ -35,9 +36,10 @@ static int onedrive_client_login(HiveClient *base,
         return -1;
 
     assert(client);
-    assert(client->base.token);
+    assert(client->token);
 
-    rc = token_login(client->base.token, callback, user_data);
+    rc = oauth_token_request(client->token,
+                             (oauth_request_func_t *)callback, user_data);
     if (rc < 0) {
         vlogE("Hive: Try to login onto onedrive error (%d)", rc);
         return rc;
@@ -49,12 +51,11 @@ static int onedrive_client_login(HiveClient *base,
 static int onedrive_client_logout(HiveClient *base)
 {
     OneDriveClient *client = (OneDriveClient *)base;
-    HiveDrive *drive;
 
     assert(client);
-    assert(client->base.token);
+    assert(client->token);
 
-    token_logout(client->base.token);
+    oauth_token_reset(client->token);
     return 0;
 }
 
@@ -92,17 +93,16 @@ int onedrive_decode_client_info(const char *info_str, HiveClientInfo *info)
 static int onedrive_client_get_info(HiveClient *base, HiveClientInfo *info)
 {
     OneDriveClient *client = (OneDriveClient *)base;
-    oauth_token_t *token = (oauth_token_t *)client->base.token;
     http_client_t *httpc;
     long resp_code = 0;
     char *p = NULL;
     int rc;
 
     assert(client);
-    assert(token);
+    assert(client->token);
     assert(info);
 
-    rc = oauth_token_check_expire(token);
+    rc = oauth_token_check_expire(client->token);
     if (rc < 0) {
         vlogE("Hive: Checking access token expired error.");
         return rc;
@@ -114,7 +114,7 @@ static int onedrive_client_get_info(HiveClient *base, HiveClientInfo *info)
 
     http_client_set_url(httpc, URL_API);
     http_client_set_method(httpc, HTTP_METHOD_GET);
-    http_client_set_header(httpc, "Authorization", get_bearer_token(token));
+    http_client_set_header(httpc, "Authorization", get_bearer_token(client->token));
     http_client_enable_response_body(httpc);
 
     rc = http_client_request(httpc);
@@ -130,7 +130,7 @@ static int onedrive_client_get_info(HiveClient *base, HiveClientInfo *info)
     }
 
     if (resp_code == 401) {
-        oauth_token_set_expired(token);
+        oauth_token_set_expired(client->token);
         rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
         goto error_exit;
     }
@@ -173,14 +173,13 @@ error_exit:
 static int onedrive_client_drive_open(HiveClient *base, HiveDrive **drive)
 {
     OneDriveClient *client = (OneDriveClient *)base;
-    oauth_token_t *token = (oauth_token_t *)client->base.token;
     int rc;
 
     assert(client);
-    assert(token);
+    assert(client->token);
     assert(drive);
 
-    rc = onedrive_drive_open(token, "default", client->tmp_template, drive);
+    rc = onedrive_drive_open(client->token, "default", client->tmp_template, drive);
     if (rc < 0) {
         vlogE("Hive: Opening onedrive drive handle error (error: 0x%x)", rc);
         return rc;
@@ -268,8 +267,8 @@ static void onedrive_client_destructor(void *obj)
 {
     OneDriveClient *client = (OneDriveClient *)obj;
 
-    if (client->base.token)
-        oauth_token_delete((oauth_token_t *)client->base.token);
+    if (client->token)
+        oauth_token_delete(client->token);
 }
 
 HiveClient *onedrive_client_new(const HiveOptions *options)
@@ -328,12 +327,11 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
     oauth_opts.scope         = opts->scope;
     oauth_opts.redirect_url  = opts->redirect_url;
 
-    client->base.token = (token_base_t *)oauth_token_new(&oauth_opts, &oauth_writeback,
-                                                         client);
+    client->token = oauth_token_new(&oauth_opts, &oauth_writeback, client);
     if (keystore)
         cJSON_Delete(keystore);
 
-    if (!client->base.token) {
+    if (!client->token) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY));
         deref(client);
         return NULL;

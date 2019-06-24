@@ -21,7 +21,6 @@
 #include <crystal.h>
 #include <cjson/cJSON.h>
 
-#include "token_base.h"
 #include "http_client.h"
 #include "oauth_token.h"
 #include "sandbird.h"
@@ -29,8 +28,6 @@
 #define ARGV(args, index) (((void **)(args))[index])
 
 struct oauth_token {
-    token_base_t base;
-
     /*
      * main url part to get authorize code.
      */
@@ -156,11 +153,6 @@ static int restore_access_token(const cJSON *json, oauth_token_t *token)
     return 1;
 }
 
-static int oauth_token_request(token_base_t *base,
-                               HiveRequestAuthenticationCallback *callback,
-                               void *context);
-static int oauth_token_clean(token_base_t *base);
-
 oauth_token_t *oauth_token_new(const oauth_options_t *opts, oauth_writeback_func_t cb,
                                void *user_data)
 {
@@ -218,11 +210,6 @@ oauth_token_t *oauth_token_new(const oauth_options_t *opts, oauth_writeback_func
     strcpy(p, opts->redirect_url);
     p += strlen(p) + 1;
 
-    /*
-     * set callbacks.
-     */
-    token->base.login  = oauth_token_request;
-    token->base.logout = oauth_token_clean;
 
     token->writeback_cb = cb;
     token->user_data = user_data;
@@ -244,10 +231,8 @@ int oauth_token_delete(oauth_token_t *token)
     return 0;
 }
 
-static int oauth_token_clean(token_base_t *base)
+int oauth_token_reset(oauth_token_t *token)
 {
-    oauth_token_t *token = (oauth_token_t *)base;
-
     assert(token->token_type);
 
     free(token->token_type);
@@ -292,7 +277,7 @@ static int handle_auth_redirect(sb_Event *e)
 
 static void *request_auth_entry(void *args)
 {
-    HiveRequestAuthenticationCallback *cb = (HiveRequestAuthenticationCallback *)ARGV(args, 0);
+    oauth_request_func_t *cb = (oauth_request_func_t *)ARGV(args, 0);
     void *user_data = (void *)ARGV(args, 1);
     char *url = (char *)ARGV(args, 2);
 
@@ -304,7 +289,7 @@ static void *request_auth_entry(void *args)
 }
 
 static char *get_authorize_code(oauth_token_t *token,
-                                HiveRequestAuthenticationCallback *cb, void *user_data,
+                                oauth_request_func_t cb, void *user_data,
                                 char *code_buf, size_t bufsz)
 {
     http_client_t *httpc;
@@ -605,22 +590,20 @@ error_exit:
     return 0;
 }
 
-static int oauth_token_request(token_base_t *base,
-                               HiveRequestAuthenticationCallback *callback,
-                               void *context)
+int oauth_token_request(oauth_token_t *token,
+                        oauth_request_func_t cb, void *user_data)
 {
-    oauth_token_t *token = (oauth_token_t *)base;
     char authorize_code[512] = {0};
     char *code;
     int rc;
 
-    assert(base);
-    assert(callback);
+    assert(token);
+    assert(cb);
 
     if (token->access_token)
         return 0;
 
-    code = get_authorize_code(token, callback, context,
+    code = get_authorize_code(token, cb, user_data,
                               authorize_code, sizeof(authorize_code));
     if (!code)
         return -1;

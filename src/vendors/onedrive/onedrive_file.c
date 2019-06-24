@@ -12,6 +12,7 @@
 
 typedef struct OneDriveFile {
     HiveFile base;
+    oauth_token_t *token;
     bool dirty;
     int fd;
     char tmp_path[PATH_MAX];
@@ -51,7 +52,6 @@ static int create_upload_session(OneDriveFile *file,
                                  http_client_t *httpc,
                                  char *upload_url, size_t upload_url_len)
 {
-    oauth_token_t *token = (oauth_token_t *)file->base.token;
     char url[MAX_URL_LEN] = {0};
     long resp_code = 0;
     int rc;
@@ -63,7 +63,7 @@ static int create_upload_session(OneDriveFile *file,
 
     http_client_set_url(httpc, url);
     http_client_set_method(httpc, HTTP_METHOD_POST);
-    http_client_set_header(httpc, "Authorization", get_bearer_token(token));
+    http_client_set_header(httpc, "Authorization", get_bearer_token(file->token));
     if (file->ctag[0])
         http_client_set_header(httpc, "if-match", file->ctag);
     http_client_enable_response_body(httpc);
@@ -77,7 +77,7 @@ static int create_upload_session(OneDriveFile *file,
         return rc;
 
     if (resp_code == 401) {
-        oauth_token_set_expired(token);
+        oauth_token_set_expired(file->token);
         return HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
     }
 
@@ -179,14 +179,11 @@ static int upload_to_session(OneDriveFile *file, http_client_t *httpc,
 
 static int upload_file(OneDriveFile *file)
 {
-    oauth_token_t *token = (oauth_token_t *)file->base.token;
     http_client_t *httpc;
     char upload_url[MAX_URL_LEN] = {0};
     int rc;
 
-    assert(token);
-
-    rc = oauth_token_check_expire(token);
+    rc = oauth_token_check_expire(file->token);
     if (rc < 0) {
         vlogE("Hive: Checking access token expired error.");
         return rc;
@@ -231,8 +228,8 @@ static void onedrive_file_destructor(void *obj)
     if (file->fd >= 0)
         close(file->fd);
 
-    if (file->base.token)
-        oauth_token_delete((oauth_token_t *)file->base.token);
+    if (file->token)
+        oauth_token_delete(file->token);
 }
 
 static int get_file_stat(oauth_token_t *token, const char *path,
@@ -404,7 +401,7 @@ static int onedrive_file_commit(HiveFile *base)
 
     file->dirty = false;
 
-    rc = get_file_stat((oauth_token_t *)base->token, base->path,
+    rc = get_file_stat(file->token, base->path,
                        file->ctag, sizeof(file->ctag),
                        file->dl_url, sizeof(file->dl_url));
     if (rc < 0)
@@ -465,7 +462,6 @@ int onedrive_file_open(oauth_token_t *token, const char *path,
         return -1;
 
     strcpy(tmp->base.path, path);
-    tmp->base.token   = (token_base_t *)token;
     tmp->base.flags   = flags;
     tmp->base.lseek   = onedrive_file_lseek;
     tmp->base.read    = onedrive_file_read;
@@ -474,6 +470,7 @@ int onedrive_file_open(oauth_token_t *token, const char *path,
     tmp->base.discard = onedrive_file_discard;
     tmp->base.close   = onedrive_file_close;
 
+    tmp->token        = token;
     if (file_exists) {
         strcpy(tmp->ctag, ctag);
         strcpy(tmp->dl_url, download_url);
