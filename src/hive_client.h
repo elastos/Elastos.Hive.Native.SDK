@@ -6,8 +6,17 @@ extern "C" {
 #endif
 
 #include <limits.h>
+#include <fcntl.h>
 
 #include "ela_hive.h"
+
+#define HIVE_F_RDONLY O_RDONLY
+#define HIVE_F_WRONLY O_WRONLY
+#define HIVE_F_RDWR   O_RDWR
+#define HIVE_F_APPEND O_APPEND
+#define HIVE_F_CREAT  O_CREAT
+#define HIVE_F_TRUNC  O_TRUNC
+#define HIVE_F_EXCL   O_EXCL
 
 #define HIVE_F_IS_SET(flags1, flags2) (((flags1) & (flags2)) == (flags2))
 #define HIVE_F_IS_EQ(flags1, flags2)  ((flags1) == (flags2))

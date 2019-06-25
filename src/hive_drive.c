@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include "hive_error.h"
 #include "hive_client.h"
@@ -199,24 +200,40 @@ int hive_drive_delete_file(HiveDrive *drive, const char *path)
     return 0;
 }
 
-#define HIVE_F_OP_FLAGS     (HIVE_F_RDONLY | HIVE_F_WRONLY | HIVE_F_RDWR)
-#define HIVE_F_WR_OPT_FLAGS (HIVE_F_APPEND | HIVE_F_CREAT  | HIVE_F_TRUNC | HIVE_F_EXCL)
-static bool is_valid_fopen_flags(int flags)
+static int mode_to_flags(const char *mode, int *flags)
 {
-    int op_flags = flags & HIVE_F_OP_FLAGS;
-    int wr_opt_flags = flags & HIVE_F_WR_OPT_FLAGS;
+    if (!mode)
+        return -1;
 
-    if (!((op_flags == HIVE_F_RDONLY && !wr_opt_flags) ||
-          op_flags == HIVE_F_WRONLY || op_flags == HIVE_F_RDWR))
-        return false;
+    assert(flags);
 
-    return true;
+    if (!strcmp(mode, "r") || !strcmp(mode, "rb")) {
+        *flags = HIVE_F_RDONLY;
+        return 0;
+    } else if (!strcmp(mode, "w") || !strcmp(mode, "wb")) {
+        *flags = HIVE_F_WRONLY | HIVE_F_CREAT | HIVE_F_TRUNC;
+        return 0;
+    } else if (!strcmp(mode, "a") || !strcmp(mode, "ab")) {
+        *flags = HIVE_F_WRONLY | HIVE_F_CREAT | HIVE_F_APPEND;
+        return 0;
+    } else if (!strcmp(mode, "r+") || !strcmp(mode, "r+b") || !strcmp(mode, "rb+")) {
+        *flags = HIVE_F_RDWR;
+        return 0;
+    } else if (!strcmp(mode, "w+") || !strcmp(mode, "w+b") || !strcmp(mode, "wb+")) {
+        *flags = HIVE_F_RDWR | HIVE_F_CREAT | HIVE_F_TRUNC;
+        return 0;
+    } else if (!strcmp(mode, "a+") || !strcmp(mode, "a+b") || !strcmp(mode, "ab+")) {
+        *flags = HIVE_F_RDWR | HIVE_F_CREAT | HIVE_F_APPEND;
+        return 0;
+    } else
+        return -1;
 }
 
-HiveFile *hive_file_open(HiveDrive *drive, const char *path, int flags)
+HiveFile *hive_file_open(HiveDrive *drive, const char *path, const char *mode)
 {
     int rc;
     HiveFile *file;
+    int flags;
 
     if (!drive) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
@@ -228,7 +245,7 @@ HiveFile *hive_file_open(HiveDrive *drive, const char *path, int flags)
         return NULL;
     }
 
-    if (!is_valid_fopen_flags(flags)) {
+    if (mode_to_flags(mode, &flags) < 0) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return NULL;
     }

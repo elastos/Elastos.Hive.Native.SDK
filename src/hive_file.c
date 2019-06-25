@@ -6,9 +6,7 @@ ssize_t hive_file_seek(HiveFile *file, uint64_t offset, int whence)
 {
     ssize_t rc;
 
-    if (!file || (whence != HiveSeek_Set &&
-                  whence != HiveSeek_Cur &&
-                  whence != HiveSeek_End))
+    if (!file || (whence < HiveSeek_Set || whence > HiveSeek_End))
         return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
 
     if (!file->lseek)
