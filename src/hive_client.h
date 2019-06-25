@@ -33,7 +33,7 @@ struct HiveDrive {
     int (*move_file)    (HiveDrive *, const char *from, const char *to);
     int (*copy_file)    (HiveDrive *, const char *from, const char *to);
     int (*delete_file)  (HiveDrive *, const char *path);
-    int (*open_file)    (HiveDrive *, const char *path, const char *mode, HiveFile **);
+    int (*open_file)    (HiveDrive *, const char *path, int flags, HiveFile **);
     void (*close)       (HiveDrive *);
 };
 
@@ -41,14 +41,14 @@ struct HiveFile {
     token_base_t *token;
 
     char path[PATH_MAX];
-    char *mode;
+    int flags;
 
-    int (*lseek)        (HiveFile *, uint64_t offset, int whence);
+    ssize_t (*lseek)    (HiveFile *, uint64_t offset, int whence);
     ssize_t (*read)     (HiveFile *, char *buf, size_t bufsz);
     ssize_t (*write)    (HiveFile *, const char *buf, size_t bufsz);
-    int (*commit)       (HiveFile *);
-    int (*discard)      (HiveFile *);
-    int (*close)        (HiveFile *);
+    int     (*commit)   (HiveFile *);
+    int     (*discard)  (HiveFile *);
+    int     (*close)    (HiveFile *);
 };
 
 inline static bool is_absolute_path(const char *path)
