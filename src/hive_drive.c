@@ -234,13 +234,21 @@ int hive_drive_delete_file(HiveDrive *drive, const char *path)
     return 0;
 }
 
-static bool is_valid_mode(const char *mode)
+#define HIVE_F_OP_FLAGS     (HIVE_F_RDONLY | HIVE_F_WRONLY | HIVE_F_RDWR)
+#define HIVE_F_WR_OPT_FLAGS (HIVE_F_APPEND | HIVE_F_CREAT  | HIVE_F_TRUNC | HIVE_F_EXCL)
+static bool is_valid_fopen_flags(int flags)
 {
-    // TODO;
-    return false;
+    int op_flags = flags & HIVE_F_OP_FLAGS;
+    int wr_opt_flags = flags & HIVE_F_WR_OPT_FLAGS;
+
+    if (!((op_flags == HIVE_F_RDONLY && !wr_opt_flags) ||
+          op_flags == HIVE_F_WRONLY || op_flags == HIVE_F_RDWR))
+        return false;
+
+    return true;
 }
 
-HiveFile *hive_file_open(HiveDrive *drive, const char *path, const char *mode)
+HiveFile *hive_file_open(HiveDrive *drive, const char *path, int flags)
 {
     int rc;
     HiveFile *file;
@@ -255,7 +263,7 @@ HiveFile *hive_file_open(HiveDrive *drive, const char *path, const char *mode)
         return NULL;
     }
 
-    if (!is_valid_mode(mode)) {
+    if (!is_valid_fopen_flags(flags)) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return NULL;
     }
@@ -270,7 +278,7 @@ HiveFile *hive_file_open(HiveDrive *drive, const char *path, const char *mode)
         return NULL;
     }
 
-    rc = drive->open_file(drive, path, mode, &file);
+    rc = drive->open_file(drive, path, flags, &file);
     if (rc < 0) {
         hive_set_error(rc);
         return NULL;
