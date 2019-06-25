@@ -24,8 +24,23 @@ typedef struct OneDriveFile {
 static ssize_t onedrive_file_lseek(HiveFile *base, uint64_t offset, int whence)
 {
     OneDriveFile *file = (OneDriveFile *)base;
+    int whence_sys;
 
-    return lseek(file->fd, offset, whence);
+    switch (whence) {
+    case HiveSeek_Cur:
+        whence_sys = SEEK_CUR;
+        break;
+    case HiveSeek_Set:
+        whence_sys = SEEK_SET;
+        break;
+    case HiveSeek_End:
+        whence_sys = SEEK_END;
+        break;
+    default:
+        assert(0);
+    }
+
+    return lseek(file->fd, offset, whence_sys);
 }
 
 static ssize_t onedrive_file_read(HiveFile *base, char *buf, size_t bufsz)

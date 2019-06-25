@@ -13,7 +13,6 @@ extern "C" {
 #include <sys/types.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <fcntl.h>
 
 #if defined(HIVE_STATIC)
     #define HIVE_API
@@ -622,23 +621,17 @@ HIVE_API
 int hive_drive_file_stat(HiveDrive *drive, const char *path,
                          HiveFileInfo *file_info);
 
-#define HIVE_F_RDONLY O_RDONLY
-#define HIVE_F_WRONLY O_WRONLY
-#define HIVE_F_RDWR   O_RDWR
-#define HIVE_F_APPEND O_APPEND
-#define HIVE_F_CREAT  O_CREAT
-#define HIVE_F_TRUNC  O_TRUNC
-#define HIVE_F_EXCL   O_EXCL
-
 HIVE_API
-HiveFile *hive_file_open(HiveDrive *drive, const char *path, int flags);
+HiveFile *hive_file_open(HiveDrive *drive, const char *path, const char *mode);
 
 HIVE_API
 int hive_file_close(HiveFile *file);
 
-#define HiveSeek_Set SEEK_SET
-#define HiveSeek_Cur SEEK_CUR
-#define HiveSeek_End SEEK_END
+enum {
+    HiveSeek_Set = (int)0,
+    HiveSeek_Cur = (int)1,
+    HiveSeek_End = (int)2,
+};
 
 HIVE_API
 ssize_t hive_file_seek(HiveFile *file, uint64_t offset, int whence);
