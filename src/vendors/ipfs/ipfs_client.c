@@ -42,8 +42,14 @@ static int ipfs_client_login(HiveClient *base,
     ipfs_token_t *token = client->token;
     int rc;
 
+    rc = ipfs_token_check_reachable(client->token);
+    if (rc < 0)
+        return rc;
+
     rc = ipfs_token_synchronize(token);
     if (rc < 0) {
+        if (RC_NODE_UNREACHABLE(rc))
+            ipfs_token_mark_node_unreachable(client->token);
         hive_set_error(-1);
         return -1;
     }

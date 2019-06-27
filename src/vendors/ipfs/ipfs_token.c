@@ -122,37 +122,61 @@ int ipfs_token_get_uid_info(ipfs_token_t *token, char **result)
     return _ipfs_token_get_uid_info(token->current_node, token->uid, result);
 }
 
-static int select_bootstrap(ipfs_token_options_t *options, char *selected)
+static int select_bootstrap(rpc_node_t *rpc_nodes, size_t nodes_cnt, char *selected)
 {
     size_t i;
     size_t base;
     int rc;
 
     srand((unsigned)time(NULL));
-    base = (size_t)rand() % options->rpc_nodes_count;
+    base = (size_t)rand() % nodes_cnt;
     i = base;
 
     do {
-        if (options->rpc_nodes[i].ipv4[0]) {
-            rc = test_reachable(options->rpc_nodes[i].ipv4);
+        if (rpc_nodes[i].ipv4[0]) {
+            rc = test_reachable(rpc_nodes[i].ipv4);
             if (!rc) {
-                strcpy(selected, options->rpc_nodes[i].ipv4);
+                strcpy(selected, rpc_nodes[i].ipv4);
                 return 0;
             }
         }
 
-        if (options->rpc_nodes[i].ipv6[0]) {
-            rc = test_reachable(options->rpc_nodes[i].ipv6);
+        if (rpc_nodes[i].ipv6[0]) {
+            rc = test_reachable(rpc_nodes[i].ipv6);
             if (!rc) {
-                strcpy(selected, options->rpc_nodes[i].ipv6);
+                strcpy(selected, rpc_nodes[i].ipv6);
                 return 0;
             }
         }
 
-        i = (i + 1) % options->rpc_nodes_count;
+        i = (i + 1) % nodes_cnt;
     } while (i != base);
 
     return -1;
+}
+
+int ipfs_token_check_reachable(ipfs_token_t *token)
+{
+    int rc;
+
+    if (token->current_node[0])
+        return 0;
+
+    rc = select_bootstrap(token->rpc_nodes, token->rpc_nodes_count,
+                          token->current_node);
+    if (rc < 0)
+        return -1;
+
+    rc = ipfs_synchronize(token);
+    if (rc < 0)
+        token->current_node[0] = '\0';
+
+    return rc;
+}
+
+void ipfs_token_mark_node_unreachable(ipfs_token_t *token)
+{
+    token->current_node[0] = '\0';
 }
 
 static int uid_new(const char *node_ip, char *uid, size_t uid_len)
@@ -286,7 +310,8 @@ ipfs_token_t *ipfs_token_new(ipfs_token_options_t *options,
     tmp->writeback_cb    = cb;
     tmp->user_data       = user_data;
 
-    rc = select_bootstrap(options, tmp->current_node);
+    rc = select_bootstrap(options->rpc_nodes, options->rpc_nodes_count,
+                          tmp->current_node);
     if (rc < 0) {
         deref(tmp);
         return NULL;

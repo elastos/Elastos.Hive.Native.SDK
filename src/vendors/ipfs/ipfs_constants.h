@@ -5,6 +5,10 @@
 extern "C" {
 #endif
 
+#include <curl/curl.h>
+
+#include "ela_hive.h"
+
 #define MAX_URL_LEN         (1024)
 
 #define CLUSTER_API_PORT (9094)
@@ -13,6 +17,11 @@ extern "C" {
 #define HIVE_MAX_IPV4_ADDRESS_LEN (15)
 #define HIVE_MAX_IPV6_ADDRESS_LEN (47)
 #define HIVE_MAX_IPFS_UID_LEN     (127)
+
+#define RC_NODE_UNREACHABLE(rc)                              \
+    ((rc) == HIVE_HTTPC_ERROR(CURLE_COULDNT_CONNECT)      || \
+     (rc) == HIVE_HTTPC_ERROR(CURLE_REMOTE_ACCESS_DENIED) || \
+     (rc) == HIVE_HTTPC_ERROR(CURLE_OPERATION_TIMEDOUT))
 
 #ifdef __cplusplus
 }
