@@ -49,6 +49,7 @@ set(SRC
     oauth/oauth_token.c
     vendors/ipfs/ipfs_client.c
     vendors/ipfs/ipfs_drive.c
+    vendors/ipfs/ipfs_file.c
     vendors/ipfs/ipfs_token.c
     vendors/ipfs/ipfs_utils.c
     vendors/onedrive/onedrive_client.c

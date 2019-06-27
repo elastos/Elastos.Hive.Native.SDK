@@ -7,6 +7,7 @@
 #include <cjson/cJSON.h>
 
 #include "ipfs_drive.h"
+#include "ipfs_file.h"
 #include "ipfs_token.h"
 #include "ipfs_constants.h"
 #include "ipfs_utils.h"
@@ -465,6 +466,13 @@ static void ipfs_drive_destructor(void *obj)
         ipfs_token_close(drive->token);
 }
 
+int ipfs_drive_open_file(HiveDrive *base, const char *path, int flags, HiveFile **file)
+{
+    IPFSDrive *drive = (IPFSDrive *)base;
+
+    return ipfs_file_open(drive->token, path, flags, file);
+}
+
 HiveDrive *ipfs_drive_open(ipfs_token_t *token)
 {
     IPFSDrive *drive;
@@ -482,6 +490,7 @@ HiveDrive *ipfs_drive_open(ipfs_token_t *token)
     drive->base.move_file   = &ipfs_drive_move_file;
     drive->base.copy_file   = &ipfs_drive_copy_file;
     drive->base.delete_file = &ipfs_drive_delete_file;
+    drive->base.open_file   = &ipfs_drive_open_file;
     drive->base.close       = &ipfs_drive_close;
 
     drive->token            = ref(token);

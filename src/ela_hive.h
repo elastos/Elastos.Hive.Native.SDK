@@ -634,7 +634,7 @@ enum {
 };
 
 HIVE_API
-ssize_t hive_file_seek(HiveFile *file, uint64_t offset, int whence);
+ssize_t hive_file_seek(HiveFile *file, ssize_t offset, int whence);
 
 HIVE_API
 ssize_t hive_file_read(HiveFile *file, char *buf, size_t bufsz);

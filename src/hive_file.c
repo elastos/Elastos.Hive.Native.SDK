@@ -2,7 +2,7 @@
 #include "hive_client.h"
 #include "hive_error.h"
 
-ssize_t hive_file_seek(HiveFile *file, uint64_t offset, int whence)
+ssize_t hive_file_seek(HiveFile *file, ssize_t offset, int whence)
 {
     ssize_t rc;
 

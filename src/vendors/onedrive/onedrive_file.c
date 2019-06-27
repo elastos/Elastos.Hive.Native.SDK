@@ -21,7 +21,7 @@ typedef struct OneDriveFile {
     char dl_url[MAX_URL_LEN];
 } OneDriveFile;
 
-static ssize_t onedrive_file_lseek(HiveFile *base, uint64_t offset, int whence)
+static ssize_t onedrive_file_lseek(HiveFile *base, ssize_t offset, int whence)
 {
     OneDriveFile *file = (OneDriveFile *)base;
     int whence_sys;
@@ -38,6 +38,7 @@ static ssize_t onedrive_file_lseek(HiveFile *base, uint64_t offset, int whence)
         break;
     default:
         assert(0);
+        return -1;
     }
 
     return lseek(file->fd, offset, whence_sys);
