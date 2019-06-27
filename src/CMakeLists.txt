@@ -137,8 +137,8 @@ if(ENABLE_SHARED)
     target_compile_definitions(elahive-shared PRIVATE HIVE_DYNAMIC CRYSTAL_DYNAMIC)
     set_target_properties(elahive-shared PROPERTIES
         OUTPUT_NAME elahive
-        VERSION ${ELASTOS_HIVE_VERSION}
-        SOVERSION ${ELASTOS_HIVE_VERSION_MAJOR})
+        VERSION ${elastos_hive_VERSION}
+        SOVERSION ${elastos_hive_VERSION_MAJOR})
     if(WIN32)
         set_target_properties(elahive-shared PROPERTIES LINK_FLAGS /FORCE:MULTIPLE)
     endif()
