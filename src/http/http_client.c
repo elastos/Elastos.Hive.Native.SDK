@@ -28,6 +28,7 @@ struct http_client {
     CURL *curl;
     CURLU *url;
     struct curl_slist *hdr;
+    curl_mime *mime;
     http_response_body_t response_body;
 };
 
@@ -174,7 +175,8 @@ static void http_client_destroy(void *obj)
         curl_url_cleanup(client->url);
     if (client->hdr)
         curl_slist_free_all(client->hdr);
-
+    if (client->mime)
+        curl_mime_free(client->mime);
 }
 
 static size_t eat_output(char *ptr, size_t size,
@@ -241,6 +243,11 @@ void http_client_reset(http_client_t *client)
     if (client->hdr) {
         curl_slist_free_all(client->hdr);
         client->hdr = NULL;
+    }
+
+    if (client->mime) {
+        curl_mime_free(client->mime);
+        client->mime = NULL;
     }
 
     client->response_body.used = 0;
@@ -623,6 +630,9 @@ int http_client_request(http_client_t *client)
     if (client->hdr)
         curl_easy_setopt(client->curl, CURLOPT_HTTPHEADER, client->hdr);
 
+    if (client->mime)
+        curl_easy_setopt(client->curl, CURLOPT_MIMEPOST, client->mime);
+
     code = curl_easy_perform(client->curl);
     if (code != CURLE_OK) {
         vlogE("HttpClient: Perform http request error (%d)", code);
@@ -684,4 +694,22 @@ char *http_client_unescape(http_client_t *client, const char *data, size_t len,
 void http_client_memory_free(void *ptr)
 {
     curl_free(ptr);
+}
+
+int http_client_set_mime_instant(http_client_t *client, const char *name,
+                                 const char *filename, const char *type,
+                                 const char *buffer, size_t bufsz)
+{
+    curl_mimepart *part;
+
+    if (!client->mime)
+        client->mime = curl_mime_init(client->curl);
+
+    part = curl_mime_addpart(client->mime);
+    curl_mime_name(part, name);
+    curl_mime_filename(part, filename);
+    curl_mime_type(part,type);
+    curl_mime_data(part, buffer, bufsz);
+
+    return 0;
 }

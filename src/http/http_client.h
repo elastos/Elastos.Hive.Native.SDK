@@ -78,6 +78,9 @@ const char *http_client_get_response_body(http_client_t *);
 size_t http_client_get_response_body_length(http_client_t *);
 char *http_client_move_response_body(http_client_t *, size_t *len);
 int http_client_get_response_code(http_client_t *, long *response_code);
+int http_client_set_mime_instant(http_client_t *, const char *name,
+                                 const char *filename, const char *type,
+                                 const char *buffer, size_t bufsz);
 
 
 /*

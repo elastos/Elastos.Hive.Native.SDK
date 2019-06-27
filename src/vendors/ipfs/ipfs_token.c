@@ -42,19 +42,20 @@ static int test_reachable(const char *ipaddr)
     http_client_set_url(httpc, url);
     http_client_set_method(httpc, HTTP_METHOD_POST);
     http_client_set_request_body_instant(httpc, NULL, 0);
+    http_client_set_timeout(httpc, 5);
 
     rc = http_client_request(httpc);
-    if (rc < 0)
+    if (rc)
         goto error_exit;
 
     rc = http_client_get_response_code(httpc, &resp_code);
     http_client_close(httpc);
 
-    if (rc < 0)
+    if (rc)
         return -1;
 
-    // if (resp_code != 200)
-    //     return -1;
+    if (resp_code != 405)
+        return -1;
 
     return 0;
 
@@ -272,6 +273,7 @@ ipfs_token_t *ipfs_token_new(ipfs_token_options_t *options,
 {
     ipfs_token_t *tmp;
     size_t bootstraps_nbytes;
+    char url[MAX_URL_LEN] = {0};
     int rc;
 
     bootstraps_nbytes = sizeof(options->rpc_nodes[0]) * options->rpc_nodes_count;
@@ -311,6 +313,12 @@ ipfs_token_t *ipfs_token_new(ipfs_token_options_t *options,
         }
     } else {
         rc = uid_new(tmp->current_node, tmp->uid, sizeof(tmp->uid));
+        if (rc < 0) {
+            deref(tmp);
+            return NULL;
+        }
+
+        rc = publish_root_hash(tmp, url, sizeof(url));
         if (rc < 0) {
             deref(tmp);
             return NULL;
