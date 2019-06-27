@@ -30,9 +30,10 @@ typedef struct OneDriveDrive {
 #define DECODE_INFO_FIELD(json, name, field) do { \
         int rc; \
         rc = decode_info_field(json, name, field, sizeof(field)); \
-        if (rc < 0) \
+        if (rc < 0) { \
             cJSON_Delete(json); \
-        return rc; \
+            return rc; \
+        } \
     } while(0)
 
 static
@@ -149,7 +150,7 @@ int onedrive_decode_file_info(const char *info_str, HiveFileInfo *info)
     else
         strcpy(info->type, "directory");
 
-    size = cJSON_GetObjectItemCaseSensitive(json, "file");
+    size = cJSON_GetObjectItemCaseSensitive(json, "size");
     if (!size || !cJSON_IsNumber(size)) {
         cJSON_Delete(json);
         return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
@@ -552,7 +553,6 @@ static char *create_cp_mv_request_body(const char *path)
     cJSON *item;
     cJSON *parent_ref;
     char *body_str;
-    int rc;
 
     body = cJSON_CreateObject();
     if (!body)

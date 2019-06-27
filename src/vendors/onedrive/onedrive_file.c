@@ -2,6 +2,7 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <unistd.h>
+
 #include <crystal.h>
 #include <cjson/cJSON.h>
 
@@ -154,10 +155,10 @@ static size_t upload_to_session_request_body_cb(char *buffer,
     sz2ul = MIN(*ul_sz - *uled_sz, size * nitems);
     nrd = read(fd, buffer, sz2ul);
     if (nrd < 0)
-        return -1;
+        return HTTP_CLIENT_REQBODY_ABORT;
 
     *uled_sz += nrd;
-    return nrd;
+    return (size_t)nrd;
 }
 
 #define HTTP_PUT_MAX_CHUNK_SIZE (60U * 1024 * 1024)
@@ -377,9 +378,9 @@ static size_t response_body_callback(char *buffer, size_t size,
 
     nwr = write(fd, buffer, total_sz);
     if (nwr < 0)
-        return -1;
+        return 0;
 
-    return nwr;
+    return (size_t)nwr;
 }
 
 static int download_file(int fd, const char *download_url)

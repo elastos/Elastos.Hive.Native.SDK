@@ -1,12 +1,13 @@
 #include <stddef.h>
 #include <string.h>
 #include <stdlib.h>
-#include <crystal.h>
-#include <cjson/cJSON.h>
 
 #ifdef HAVE_SYS_PARAM_H
 #include <sys/param.h>
 #endif
+
+#include <crystal.h>
+#include <cjson/cJSON.h>
 
 #include "ela_hive.h"
 #include "hive_error.h"
@@ -306,6 +307,7 @@ static int writeback_tokens(ipfs_token_t *token)
 
 int ipfs_token_reset(ipfs_token_t *token)
 {
+    (void)token;
     return 0;
 }
 

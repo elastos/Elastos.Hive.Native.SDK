@@ -461,7 +461,7 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(drive->token);
         }
-        return -1;
+        return rc;
     }
 
     return 0;
