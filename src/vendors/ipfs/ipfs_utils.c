@@ -43,7 +43,7 @@ static int ipfs_resolve(ipfs_token_t *token, const char *peerid, char **result)
         goto error_exit;
     }
 
-    if (resp_code != 200) {
+    if (resp_code != HttpStatus_OK) {
         rc = HIVE_HTTP_STATUS_ERROR(resp_code);
         goto error_exit;
     }
@@ -96,7 +96,7 @@ static int ipfs_login(ipfs_token_t *token, const char *hash)
     if (rc)
         return HIVE_HTTPC_ERROR(rc);
 
-    if (resp_code != 200)
+    if (resp_code != HttpStatus_OK)
         return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     return 0;
@@ -199,7 +199,7 @@ static int get_last_root_hash(ipfs_token_t *token,
         goto error_exit;
     }
 
-    if (resp_code != 200) {
+    if (resp_code != HttpStatus_OK) {
         rc = HIVE_HTTP_STATUS_ERROR(resp_code);
         goto error_exit;
     }
@@ -276,7 +276,7 @@ static int pub_last_root_hash(ipfs_token_t *token,
     if (rc)
         return HIVE_HTTPC_ERROR(rc);
 
-    if (resp_code != 200)
+    if (resp_code != HttpStatus_OK)
         return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     return 0;

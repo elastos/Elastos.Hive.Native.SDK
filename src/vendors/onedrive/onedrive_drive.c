@@ -93,13 +93,13 @@ int onedrive_drive_get_info(HiveDrive *base, HiveDriveInfo *info)
         goto error_exit;
     }
 
-    if (resp_code == 401) {
+    if (resp_code == HttpStatus_Unauthorized) {
         oauth_token_set_expired(drive->token);
         rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
         goto error_exit;
     }
 
-    if (resp_code != 200) {
+    if (resp_code != HttpStatus_OK) {
         rc = HIVE_HTTP_STATUS_ERROR(resp_code);
         goto error_exit;
     }
@@ -212,13 +212,13 @@ int onedrive_drive_stat_file(HiveDrive *base, const char *path, HiveFileInfo *in
         goto error_exit;
     }
 
-    if (resp_code == 401) {
+    if (resp_code == HttpStatus_Unauthorized) {
         oauth_token_set_expired(drive->token);
         rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
         goto error_exit;
     }
 
-    if (resp_code != 200) {
+    if (resp_code != HttpStatus_OK) {
         rc = HIVE_HTTP_STATUS_ERROR(resp_code);
         goto error_exit;
     }
@@ -378,13 +378,13 @@ int onedrive_drive_list_files(HiveDrive *base, const char *path,
             break;
         }
 
-        if (resp_code == 401) {
+        if (resp_code == HttpStatus_Unauthorized) {
             oauth_token_set_expired(drive->token);
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             break;
         }
 
-        if (resp_code != 200) {
+        if (resp_code != HttpStatus_OK) {
             rc = HIVE_HTTP_STATUS_ERROR(resp_code);
             break;
         }
@@ -530,12 +530,12 @@ int onedrive_drive_mkdir(HiveDrive *base, const char *path)
     if (rc)
         return HIVE_HTTPC_ERROR(rc);
 
-    if (resp_code == 401) {
+    if (resp_code == HttpStatus_Unauthorized) {
         oauth_token_set_expired(drive->token);
         return HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
     }
 
-    if (resp_code != 201)
+    if (resp_code != HttpStatus_Created)
         return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     return 0;
@@ -639,12 +639,12 @@ int onedrive_drive_move_file(HiveDrive *base, const char *old, const char *new)
     if (rc)
         return HIVE_HTTPC_ERROR(rc);
 
-    if (resp_code == 401) {
+    if (resp_code == HttpStatus_Unauthorized) {
         oauth_token_set_expired(drive->token);
         return HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
     }
 
-    if (resp_code != 200)
+    if (resp_code != HttpStatus_OK)
         return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     return 0;
@@ -705,12 +705,12 @@ int onedrive_drive_copy_file(HiveDrive *base, const char *src, const char *dest)
     if (rc)
         return HIVE_HTTPC_ERROR(rc);
 
-    if (resp_code == 401) {
+    if (resp_code == HttpStatus_Unauthorized) {
         oauth_token_set_expired(drive->token);
         return HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
     }
 
-    if (resp_code != 202)
+    if (resp_code != HttpStatus_Accepted)
         return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     // We will not wait for the completation of copy action.
@@ -766,12 +766,12 @@ int onedrive_drive_delete_file(HiveDrive *base, const char *path)
     if (rc)
         return HIVE_HTTPC_ERROR(rc);
 
-    if (resp_code == 401) {
+    if (resp_code == HttpStatus_Unauthorized) {
         oauth_token_set_expired(drive->token);
         return HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
     }
 
-    if (resp_code != 204)
+    if (resp_code != HttpStatus_NoContent)
         return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     return 0;

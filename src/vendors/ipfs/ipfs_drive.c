@@ -87,7 +87,7 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *path,
         goto error_exit;
     }
 
-    if (resp_code != 200) {
+    if (resp_code != HttpStatus_OK) {
         rc = HIVE_HTTP_STATUS_ERROR(resp_code);
         goto error_exit;
     }
@@ -260,7 +260,7 @@ static int ipfs_drive_list_files(HiveDrive *base, const char *path,
         goto error_exit;
     }
 
-    if (resp_code != 200) {
+    if (resp_code != HttpStatus_OK) {
         rc = HIVE_HTTP_STATUS_ERROR(resp_code);
         goto error_exit;
     }
@@ -327,7 +327,7 @@ static int ipfs_drive_make_dir(HiveDrive *base, const char *path)
     if (rc)
         return HIVE_HTTPC_ERROR(rc);
 
-    if (resp_code != 200)
+    if (resp_code != HttpStatus_OK)
         return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     rc = publish_root_hash(drive->token, url, sizeof(url));
@@ -387,7 +387,7 @@ static int ipfs_drive_move_file(HiveDrive *base, const char *old, const char *ne
     if (rc)
         return HIVE_HTTPC_ERROR(rc);
 
-    if (resp_code != 200)
+    if (resp_code != HttpStatus_OK)
         return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     rc = publish_root_hash(drive->token, url, sizeof(url));
@@ -452,7 +452,7 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
     if (rc)
         return HIVE_HTTPC_ERROR(rc);
 
-    if (resp_code != 200)
+    if (resp_code != HttpStatus_OK)
         return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     rc = publish_root_hash(drive->token, url, sizeof(url));
@@ -512,7 +512,7 @@ static int ipfs_drive_delete_file(HiveDrive *base, const char *path)
     if (rc)
         return HIVE_HTTPC_ERROR(rc);
 
-    if (resp_code != 200)
+    if (resp_code != HttpStatus_OK)
         return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     rc = publish_root_hash(drive->token, url, sizeof(url));

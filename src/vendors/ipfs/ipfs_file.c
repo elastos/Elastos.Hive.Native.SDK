@@ -55,7 +55,7 @@ static int get_file_stat(ipfs_token_t *token, const char *path, size_t *fsz)
         goto error_exit;
     }
 
-    if (resp_code != 200) {
+    if (resp_code != HttpStatus_OK) {
         rc = HIVE_HTTP_STATUS_ERROR(resp_code);
         goto error_exit;
     }
@@ -188,7 +188,7 @@ static ssize_t ipfs_file_read(HiveFile *base, char *buffer, size_t bufsz)
     if (rc)
         return HIVE_HTTPC_ERROR(rc);
 
-    if (resp_code != 200)
+    if (resp_code != HttpStatus_OK)
         return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     file->lpos += nrd;
@@ -248,7 +248,7 @@ static ssize_t ipfs_file_write(HiveFile *base, const char *buffer, size_t bufsz)
     if (rc)
         return HIVE_HTTPC_ERROR(rc);
 
-    if (resp_code != 200)
+    if (resp_code != HttpStatus_OK)
         return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     rc = publish_root_hash(file->token, buf, sizeof(buf));
@@ -292,7 +292,7 @@ int ipfs_file_open(ipfs_token_t *token, const char *path, int flags, HiveFile **
     bool file_exists;
 
     rc = get_file_stat(token, path, &fsz);
-    if (rc < 0 && rc != HIVE_HTTP_STATUS_ERROR(500))
+    if (rc < 0 && rc != HIVE_HTTP_STATUS_ERROR(HttpStatus_InternalServerError))
         return rc;
 
     file_exists = !rc ? true : false;
