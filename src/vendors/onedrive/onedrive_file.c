@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -25,6 +26,7 @@ static ssize_t onedrive_file_lseek(HiveFile *base, ssize_t offset, int whence)
 {
     OneDriveFile *file = (OneDriveFile *)base;
     int whence_sys;
+    ssize_t rc;
 
     switch (whence) {
     case HiveSeek_Cur:
@@ -38,17 +40,26 @@ static ssize_t onedrive_file_lseek(HiveFile *base, ssize_t offset, int whence)
         break;
     default:
         assert(0);
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED);
     }
 
-    return lseek(file->fd, offset, whence_sys);
+    rc = lseek(file->fd, offset, whence_sys);
+    if (rc < 0)
+        return HIVE_SYS_ERROR(errno);
+
+    return rc;
 }
 
 static ssize_t onedrive_file_read(HiveFile *base, char *buf, size_t bufsz)
 {
     OneDriveFile *file = (OneDriveFile *)base;
+    ssize_t rc;
 
-    return read(file->fd, buf, bufsz);
+    rc = read(file->fd, buf, bufsz);
+    if (rc < 0)
+        return HIVE_SYS_ERROR(errno);
+
+    return rc;
 }
 
 static ssize_t onedrive_file_write(HiveFile *base, const char *buf, size_t bufsz)
@@ -58,10 +69,10 @@ static ssize_t onedrive_file_write(HiveFile *base, const char *buf, size_t bufsz
 
     nwr = write(file->fd, buf, bufsz);
     if (nwr < 0)
-        return -1;
+        return HIVE_SYS_ERROR(errno);
 
     file->dirty = true;
-    return 0;
+    return nwr;
 }
 
 static int create_upload_session(OneDriveFile *file,
@@ -87,11 +98,11 @@ static int create_upload_session(OneDriveFile *file,
 
     rc = http_client_request(httpc);
     if (rc)
-        return -1;
+        return HIVE_HTTPC_ERROR(rc);
 
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc)
-        return -1;
+        return HIVE_HTTPC_ERROR(rc);
 
     if (resp_code == 401) {
         oauth_token_set_expired(file->token);
@@ -103,25 +114,25 @@ static int create_upload_session(OneDriveFile *file,
 
     p = http_client_move_response_body(httpc, NULL);
     if (!p)
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     session = cJSON_Parse(p);
     free(p);
 
     if (!session)
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     upload_url_json = cJSON_GetObjectItemCaseSensitive(session, "uploadUrl");
     if (!upload_url_json || !cJSON_IsString(upload_url_json) ||
         !upload_url_json->valuestring || !*upload_url_json->valuestring) {
         cJSON_Delete(session);
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
     }
 
     rc = snprintf(upload_url, upload_url_len, "%s", upload_url_json->valuestring);
     cJSON_Delete(session);
     if (rc < 0 || rc >= upload_url_len)
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
 
     return 0;
 }
@@ -181,14 +192,14 @@ static int upload_to_session(OneDriveFile *file, http_client_t *httpc,
 
         rc = http_client_request(httpc);
         if (rc)
-            return -1;
+            return HIVE_HTTPC_ERROR(rc);
 
         ul_off += ul_sz;
         ul_sz = (fsize - ul_off) % HTTP_PUT_MAX_CHUNK_SIZE;
 
         rc = http_client_get_response_code(httpc, &resp_code);
         if (rc)
-            return -1;
+            return HIVE_HTTPC_ERROR(rc);
 
         if ((ul_sz && resp_code != 202) ||
             (!ul_sz && ((!file->ctag[0] && resp_code != 201) ||
@@ -291,14 +302,14 @@ static int get_file_stat(oauth_token_t *token, const char *path,
     http_client_enable_response_body(httpc);
 
     rc = http_client_request(httpc);
-    if (rc < 0) {
-        // TODO: rc;
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
-    if (rc < 0) {
-        // TODO: rc;
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
@@ -316,20 +327,18 @@ static int get_file_stat(oauth_token_t *token, const char *path,
     p = http_client_move_response_body(httpc, NULL);
     http_client_close(httpc);
 
-    if (!p) {
-        // TODO: rc;
-        return rc;
-    }
+    if (!p)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     fstat = cJSON_Parse(p);
     free(p);
 
     if (!fstat)
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     if (!cJSON_GetObjectItemCaseSensitive(fstat, "file")) {
         cJSON_Delete(fstat);
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
     }
 
     download_url_json =
@@ -338,7 +347,7 @@ static int get_file_stat(oauth_token_t *token, const char *path,
         !*download_url_json->valuestring ||
         strlen(download_url_json->valuestring) >= dl_url_len) {
         cJSON_Delete(fstat);
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
     }
     strcpy(dl_url, download_url_json->valuestring);
 
@@ -346,7 +355,7 @@ static int get_file_stat(oauth_token_t *token, const char *path,
     if (!ctag_json || !ctag_json->string || !*ctag_json->valuestring ||
         strlen(ctag_json->valuestring) >= ctag_len) {
         cJSON_Delete(fstat);
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
     }
     strcpy(ctag, ctag_json->valuestring);
 
@@ -389,24 +398,24 @@ static int download_file(int fd, const char *download_url)
     http_client_set_response_body(httpc, response_body_callback, &fd);
 
     rc = http_client_request(httpc);
-    if (rc < 0) {
-        // TODO:
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     http_client_close(httpc);
-    if (rc < 0)
-        return rc;
+    if (rc)
+        return HIVE_HTTPC_ERROR(rc);
 
     if (resp_code != 200)
-        return -1;
+        return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     return 0;
 
 error_exit:
     http_client_close(httpc);
-    return -1;
+    return rc;
 }
 
 static int onedrive_file_commit(HiveFile *base)
@@ -467,21 +476,21 @@ int onedrive_file_open(oauth_token_t *token, const char *path,
     rc = get_file_stat(token, path, ctag, sizeof(ctag),
                        download_url, sizeof(download_url));
     if (rc < 0 && rc != HIVE_HTTP_STATUS_ERROR(404))
-        return -1;
+        return rc;
 
     file_exists = !rc ? true : false;
 
     if (HIVE_F_IS_EQ(flags, HIVE_F_RDONLY)) {
         if (!file_exists)
-            return -1;
+            return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
     } else if (HIVE_F_IS_SET(flags, HIVE_F_CREAT | HIVE_F_EXCL) && file_exists)
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
     else if (!HIVE_F_IS_SET(flags, HIVE_F_CREAT) && !file_exists)
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
 
     tmp = rc_zalloc(sizeof(OneDriveFile), onedrive_file_destructor);
     if (!tmp)
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     strcpy(tmp->base.path, path);
     tmp->base.flags   = flags;
@@ -502,7 +511,7 @@ int onedrive_file_open(oauth_token_t *token, const char *path,
     tmp->fd = mkstemp(tmp->tmp_path);
     if (tmp->fd < 0) {
         deref(tmp);
-        return -1;
+        return HIVE_SYS_ERROR(errno);
     }
 
     if (file_exists && !HIVE_F_IS_SET(flags, HIVE_F_TRUNC)) {
@@ -510,7 +519,7 @@ int onedrive_file_open(oauth_token_t *token, const char *path,
         if (rc < 0) {
             unlink(tmp->tmp_path);
             deref(tmp);
-            return -1;
+            return rc;
         }
     } else
         tmp->dirty = true;

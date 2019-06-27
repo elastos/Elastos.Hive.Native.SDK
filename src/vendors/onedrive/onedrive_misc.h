@@ -17,7 +17,7 @@ int decode_info_field(cJSON *json, const char *name, char *buf, size_t len)
     item = cJSON_GetObjectItemCaseSensitive(json, name);
     if (!item || (!cJSON_IsNull(item) &&
                   !(cJSON_IsString(item) && item->valuestring && *item->valuestring)))
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
 
     if (cJSON_IsNull(item)) {
         buf[0] = '\0';
@@ -25,7 +25,7 @@ int decode_info_field(cJSON *json, const char *name, char *buf, size_t len)
     }
 
     if (strlen(item->valuestring) >= len)
-        return -2;
+        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
 
     strcpy(buf, item->valuestring);
     return 0;

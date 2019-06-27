@@ -31,8 +31,10 @@ HiveClient *hive_client_new(const HiveOptions *options)
     int rc;
 
     if (!options || !options->persistent_location ||
-        !*options->persistent_location)
+        !*options->persistent_location) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return NULL;
+    }
 
     rc = stat(options->persistent_location, &st);
     if (rc < 0|| !S_ISDIR(st.st_mode)) {
@@ -48,7 +50,7 @@ HiveClient *hive_client_new(const HiveOptions *options)
     }
 
     if (!method->create_client) {
-        hive_set_error(-1);
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED));
         return NULL;
     }
 
@@ -59,8 +61,6 @@ int hive_client_close(HiveClient *client)
 {
     if (!client)
         return 0;
-
-    // TODO: token;
 
     if (client->close)
         client->close(client);
@@ -168,7 +168,7 @@ int hive_client_get_info(HiveClient *client, HiveClientInfo *info)
 
     rc = client->get_info(client, info);
     if (rc < 0) {
-        hive_set_error(-1);
+        hive_set_error(rc);
         return -1;
     }
 

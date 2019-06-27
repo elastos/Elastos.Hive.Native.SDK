@@ -19,16 +19,12 @@ static int ipfs_resolve(ipfs_token_t *token, const char *peerid, char **result)
 
     rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/name/resolve",
                   ipfs_token_get_current_node(token), NODE_API_PORT);
-    if (rc < 0 || rc >= sizeof(url)) {
-        hive_set_error(-1);
-        return -1;
-    }
+    if (rc < 0 || rc >= sizeof(url))
+        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
 
     httpc = http_client_new();
-    if (!httpc) {
-        hive_set_error(-1);
-        return -1;
-    }
+    if (!httpc)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     http_client_set_url(httpc, url);
     http_client_set_query(httpc, "arg", peerid);
@@ -36,31 +32,34 @@ static int ipfs_resolve(ipfs_token_t *token, const char *peerid, char **result)
     http_client_enable_response_body(httpc);
 
     rc = http_client_request(httpc);
-    if (rc < 0) {
-        hive_set_error(-1);
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
-    if (rc < 0 || resp_code != 200) {
-        hive_set_error(-1);
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
+        goto error_exit;
+    }
+
+    if (resp_code != 200) {
+        rc = HIVE_HTTP_STATUS_ERROR(resp_code);
         goto error_exit;
     }
 
     p = http_client_move_response_body(httpc, NULL);
     http_client_close(httpc);
 
-    if (!p) {
-        hive_set_error(-1);
-        return -1;
-    }
+    if (!p)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     *result = p;
     return 0;
 
 error_exit:
     http_client_close(httpc);
-    return -1;
+    return rc;
 }
 
 static int ipfs_login(ipfs_token_t *token, const char *hash)
@@ -72,16 +71,12 @@ static int ipfs_login(ipfs_token_t *token, const char *hash)
 
     rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/uid/login",
                   ipfs_token_get_current_node(token), NODE_API_PORT);
-    if (rc < 0 || rc >= sizeof(url)) {
-        hive_set_error(-1);
-        return -1;
-    }
+    if (rc < 0 || rc >= sizeof(url))
+        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
 
     httpc = http_client_new();
-    if (!httpc) {
-        hive_set_error(-1);
-        return -1;
-    }
+    if (!httpc)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     http_client_set_url(httpc, url);
     http_client_set_query(httpc, "uid", ipfs_token_get_uid(token));
@@ -90,29 +85,25 @@ static int ipfs_login(ipfs_token_t *token, const char *hash)
     http_client_set_request_body_instant(httpc, NULL, 0);
 
     rc = http_client_request(httpc);
-    if (rc < 0) {
-        hive_set_error(-1);
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     http_client_close(httpc);
 
-    if (rc < 0) {
-        hive_set_error(-1);
-        return -1;
-    }
+    if (rc)
+        return HIVE_HTTPC_ERROR(rc);
 
-    if (resp_code != 200) {
-        hive_set_error(-1);
-        return -1;
-    }
+    if (resp_code != 200)
+        return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     return 0;
 
 error_exit:
     http_client_close(httpc);
-    return -1;
+    return rc;
 }
 
 int ipfs_synchronize(ipfs_token_t *token)
@@ -126,40 +117,40 @@ int ipfs_synchronize(ipfs_token_t *token)
     assert(token);
 
     rc = ipfs_token_get_uid_info(token, &resp);
-    if (rc)
-        return -1;
+    if (rc < 0)
+        return rc;
 
     json = cJSON_Parse(resp);
     free(resp);
     if (!json)
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     peer_id = cJSON_GetObjectItemCaseSensitive(json, "PeerID");
     if (!cJSON_IsString(peer_id) || !peer_id->valuestring || !*peer_id->valuestring) {
         cJSON_Delete(json);
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
     }
 
     rc = ipfs_resolve(token, peer_id->valuestring, &resp);
     cJSON_Delete(json);
-    if (rc)
-        return -1;
+    if (rc < 0)
+        return rc;
 
     json = cJSON_Parse(resp);
     free(resp);
     if (!json)
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     hash = cJSON_GetObjectItemCaseSensitive(json, "Path");
     if (!cJSON_IsString(hash) || !hash->valuestring || !*hash->valuestring) {
         cJSON_Delete(json);
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
     }
 
     rc = ipfs_login(token, hash->valuestring);
     cJSON_Delete(json);
     if (rc < 0)
-        return -1;
+        return rc;
 
     return 0;
 }
@@ -197,21 +188,19 @@ static int get_last_root_hash(ipfs_token_t *token,
     http_client_enable_response_body(httpc);
 
     rc = http_client_request(httpc);
-    if (rc < 0) {
-        // TODO: rc;
-        rc = -1;
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
-    if (rc < 0) {
-        // TODO:
-        rc = -1;
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
     if (resp_code != 200) {
-        // TODO;
+        rc = HIVE_HTTP_STATUS_ERROR(resp_code);
         goto error_exit;
     }
 
@@ -233,7 +222,7 @@ static int get_last_root_hash(ipfs_token_t *token,
         !*item->valuestring ||
         strlen(item->valuestring) >= length) {
         cJSON_Delete(json);
-        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
+        return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
     }
 
     rc = snprintf(hash, length, "/ipfs/%s", item->valuestring);
@@ -277,22 +266,18 @@ static int pub_last_root_hash(ipfs_token_t *token,
     http_client_set_request_body_instant(httpc, NULL, 0);
 
     rc = http_client_request(httpc);
-    if (rc < 0) {
-        //TODO: rc;
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     http_client_close(httpc);
-    if (rc < 0) {
-        // TODO:
-        return rc;
-    }
+    if (rc)
+        return HIVE_HTTPC_ERROR(rc);
 
-    if (resp_code != 200) {
-        // TODO:
-        return rc;
-    }
+    if (resp_code != 200)
+        return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     return 0;
 

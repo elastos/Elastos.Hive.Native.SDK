@@ -48,10 +48,11 @@ static int ipfs_client_login(HiveClient *base,
 
     rc = ipfs_token_synchronize(token);
     if (rc < 0) {
-        if (RC_NODE_UNREACHABLE(rc))
+        if (RC_NODE_UNREACHABLE(rc)) {
+            rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(client->token);
-        hive_set_error(-1);
-        return -1;
+        }
+        return rc;
     }
 
     vlogI("Hive: This client logined onto Hive IPFS in success");
@@ -78,23 +79,23 @@ static int ipfs_client_get_info(HiveClient *base, HiveClientInfo *result)
     rc = snprintf(result->user_id, sizeof(result->user_id), "%s",
                   ipfs_token_get_uid(token));
     if (rc < 0 || rc >= sizeof(result->user_id))
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
 
     rc = snprintf(result->display_name, sizeof(result->display_name), "");
     if (rc < 0 || rc >= sizeof(result->display_name))
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
 
     rc = snprintf(result->email, sizeof(result->email), "");
     if (rc < 0 || rc >= sizeof(result->email))
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
 
     rc = snprintf(result->phone_number, sizeof(result->phone_number), "");
     if (rc < 0 || rc >= sizeof(result->phone_number))
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
 
     rc = snprintf(result->region, sizeof(result->region), "");
     if (rc < 0 || rc >= sizeof(result->region))
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
 
     return 0;
 }
@@ -107,10 +108,8 @@ static int ipfs_client_drive_open(HiveClient *base, HiveDrive **drive)
     assert(base);
 
     tmp = ipfs_drive_open(client->token);
-    if (!tmp) {
-        // TODO
-        return -1;
-    }
+    if (!tmp)
+        return hive_get_error();
 
     *drive = tmp;
 
@@ -297,8 +296,10 @@ HiveClient *ipfs_client_new(const HiveOptions *options)
 
     if (!access(token_cookie, F_OK)) {
         token_cookie_json = load_ipfs_token_cookie(token_cookie);
-        if (!token_cookie_json)
+        if (!token_cookie_json) {
+            hive_set_error(HIVE_SYS_ERROR(errno));
             return NULL;
+        }
     }
 
     token_options->store = token_cookie_json;
@@ -307,6 +308,7 @@ HiveClient *ipfs_client_new(const HiveOptions *options)
     if (!client) {
         if (token_options->store)
             cJSON_Delete(token_options->store);
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY));
         return NULL;
     }
 

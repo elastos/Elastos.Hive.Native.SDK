@@ -44,16 +44,14 @@ static int get_file_stat(ipfs_token_t *token, const char *path, size_t *fsz)
     http_client_enable_response_body(httpc);
 
     rc = http_client_request(httpc);
-    if (rc < 0) {
-        // TODO: rc;
-        rc = -1;
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
-    if (rc < 0) {
-        // TODO:
-        rc = -1;
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
@@ -77,7 +75,7 @@ static int get_file_stat(ipfs_token_t *token, const char *path, size_t *fsz)
     item = cJSON_GetObjectItem(json, "Size");
     if (!cJSON_IsNumber(item)) {
         cJSON_Delete(json);
-        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
+        return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
     }
 
     *fsz = item->valuedouble;
@@ -110,16 +108,18 @@ static ssize_t ipfs_file_lseek(HiveFile *base, ssize_t offset, int whence)
 
         rc = get_file_stat(file->token, file->base.path, &fsz);
         if (rc < 0) {
-            if (RC_NODE_UNREACHABLE(rc))
+            if (RC_NODE_UNREACHABLE(rc)) {
+                rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
                 ipfs_token_mark_node_unreachable(file->token);
-            return -1;
+            }
+            return rc;
         }
 
         file->lpos = offset + fsz < 0 ? 0 : offset + fsz;
         return 0;
     default:
         assert(0);
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED);
     }
 }
 
@@ -174,21 +174,22 @@ static ssize_t ipfs_file_read(HiveFile *base, char *buffer, size_t bufsz)
     http_client_set_response_body(httpc, read_response_body_cb, user_data);
 
     rc = http_client_request(httpc);
-    if (rc < 0) {
-        if (RC_NODE_UNREACHABLE(rc))
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
+        if (RC_NODE_UNREACHABLE(rc)) {
+            rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(file->token);
-        // TODO: rc;
-        rc = -1;
+        }
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     http_client_close(httpc);
-    if (rc < 0)
-        return -1;
+    if (rc)
+        return HIVE_HTTPC_ERROR(rc);
 
     if (resp_code != 200)
-        return -1;
+        return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     file->lpos += nrd;
     return nrd;
@@ -233,27 +234,30 @@ static ssize_t ipfs_file_write(HiveFile *base, const char *buffer, size_t bufsz)
     http_client_set_method(httpc, HTTP_METHOD_POST);
 
     rc = http_client_request(httpc);
-    if (rc < 0) {
-        if (RC_NODE_UNREACHABLE(rc))
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
+        if (RC_NODE_UNREACHABLE(rc)) {
+            rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(file->token);
-        // TODO: rc;
-        rc = -1;
+        }
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     http_client_close(httpc);
-    if (rc < 0)
-        return -1;
+    if (rc)
+        return HIVE_HTTPC_ERROR(rc);
 
     if (resp_code != 200)
-        return -1;
+        return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     rc = publish_root_hash(file->token, buf, sizeof(buf));
     if (rc < 0) {
-        if (RC_NODE_UNREACHABLE(rc))
+        if (RC_NODE_UNREACHABLE(rc)) {
+            rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(file->token);
-        return -1;
+        }
+        return rc;
     }
 
     HIVE_F_UNSET(file->base.flags, HIVE_F_CREAT | HIVE_F_TRUNC);
@@ -289,21 +293,21 @@ int ipfs_file_open(ipfs_token_t *token, const char *path, int flags, HiveFile **
 
     rc = get_file_stat(token, path, &fsz);
     if (rc < 0 && rc != HIVE_HTTP_STATUS_ERROR(500))
-        return -1;
+        return rc;
 
     file_exists = !rc ? true : false;
 
     if (HIVE_F_IS_EQ(flags, HIVE_F_RDONLY)) {
         if (!file_exists)
-            return -1;
+            return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
     } else if (HIVE_F_IS_SET(flags, HIVE_F_CREAT | HIVE_F_EXCL) && file_exists)
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
     else if (!HIVE_F_IS_SET(flags, HIVE_F_CREAT) && !file_exists)
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
 
     tmp = rc_zalloc(sizeof(IPFSFile), ipfs_file_destructor);
     if (!tmp)
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     strcpy(tmp->base.path, path);
     tmp->base.flags   = flags;
