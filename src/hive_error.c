@@ -209,7 +209,7 @@ int hive_register_strerror(int facility, strerror_func_t *strerr)
 {
     FacilityDesc *faci_desc;
 
-    if (facility <= 0 || facility > HIVEF_HTTP_SERVER) {
+    if (facility <= 0 || facility > HIVEF_HTTP_STATUS) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
     }

@@ -14,6 +14,7 @@
 #include <crystal.h>
 #include <cjson/cJSON.h>
 
+#include "hive_error.h"
 #include "onedrive_misc.h"
 #include "onedrive_constants.h"
 #include "http_client.h"
@@ -44,7 +45,7 @@ int onedrive_decode_drive_info(const char *info_str, HiveDriveInfo *info)
 
     json = cJSON_Parse(info_str);
     if (!json)
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     DECODE_INFO_FIELD(json, "id", info->driveid);
 
@@ -82,13 +83,13 @@ int onedrive_drive_get_info(HiveDrive *base, HiveDriveInfo *info)
 
     rc = http_client_request(httpc);
     if (rc) {
-        // TODO: rc;
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
-    if (rc < 0) {
-        // TODO: rc;
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
@@ -99,7 +100,7 @@ int onedrive_drive_get_info(HiveDrive *base, HiveDriveInfo *info)
     }
 
     if (resp_code != 200) {
-        // TODO: rc;
+        rc = HIVE_HTTP_STATUS_ERROR(resp_code);
         goto error_exit;
     }
 
@@ -111,20 +112,6 @@ int onedrive_drive_get_info(HiveDrive *base, HiveDriveInfo *info)
 
     rc = onedrive_decode_drive_info(p, info);
     free(p);
-
-    switch(rc) {
-    case -1:
-        rc = HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
-        break;
-
-    case -2:
-        rc = HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
-        break;
-
-    default:
-        rc = 0;
-        break;
-    }
 
     return rc;
 
@@ -154,7 +141,7 @@ int onedrive_decode_file_info(const char *info_str, HiveFileInfo *info)
     dir  = cJSON_GetObjectItemCaseSensitive(json, "folder");
     if ((file && dir) || (!file && !dir)) {
         cJSON_Delete(json);
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
     }
 
     if (file)
@@ -165,7 +152,7 @@ int onedrive_decode_file_info(const char *info_str, HiveFileInfo *info)
     size = cJSON_GetObjectItemCaseSensitive(json, "file");
     if (!size || !cJSON_IsNumber(size)) {
         cJSON_Delete(json);
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
     }
 
     info->size = (size_t)size->valuedouble;
@@ -214,14 +201,14 @@ int onedrive_drive_stat_file(HiveDrive *base, const char *path, HiveFileInfo *in
     http_client_enable_response_body(httpc);
 
     rc = http_client_request(httpc);
-    if (rc < 0) {
-        // TODO: rc;
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
-    if (rc < 0) {
-        // TODO: rc;
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
@@ -239,27 +226,11 @@ int onedrive_drive_stat_file(HiveDrive *base, const char *path, HiveFileInfo *in
     p = http_client_move_response_body(httpc, NULL);
     http_client_close(httpc);
 
-    if (!p) {
-        // TODO: rc;
-        return rc;
-    }
+    if (!p)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     rc = onedrive_decode_file_info(p, info);
     free(p);
-
-    switch(rc) {
-    case -1:
-        rc = HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
-        break;
-
-    case -2:
-        rc = HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
-        break;
-
-    default:
-        rc = 0;
-        break;
-    }
 
     return rc;
 
@@ -284,18 +255,18 @@ int merge_array(cJSON *sub, cJSON *array)
 
         name = cJSON_GetObjectItemCaseSensitive(item, "name");
         if (!name || !cJSON_IsString(name) || !name->valuestring || !*name->valuestring)
-            return -1;
+            return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
 
         file = cJSON_GetObjectItemCaseSensitive(item, "file");
         folder = cJSON_GetObjectItemCaseSensitive(item, "folder");
         if ((file && folder) || (!file && !folder))
-            return -1;
+            return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
 
         if (file && !cJSON_IsObject(file))
-            return -1;
+            return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
 
         if (folder && !cJSON_IsObject(folder))
-            return -1;
+            return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
 
         cJSON_AddItemToArray(array, cJSON_DetachItemFromArray(sub, 0));
     }
@@ -367,7 +338,7 @@ int onedrive_drive_list_files(HiveDrive *base, const char *path,
 
     httpc = http_client_new();
     if (!httpc)
-        return rc;
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     if (!strcmp(path, "/"))
         sprintf(url, "%s/root/children", MY_DRIVE);
@@ -396,12 +367,16 @@ int onedrive_drive_list_files(HiveDrive *base, const char *path,
         if (json)
             cJSON_Delete(json);
 
-        if (rc < 0)
+        if (rc) {
+            rc = HIVE_HTTPC_ERROR(rc);
             break;
+        }
 
         rc = http_client_get_response_code(httpc, &resp_code);
-        if (rc < 0)
+        if (rc) {
+            rc = HIVE_HTTPC_ERROR(rc);
             break;
+        }
 
         if (resp_code == 401) {
             oauth_token_set_expired(drive->token);
@@ -410,27 +385,27 @@ int onedrive_drive_list_files(HiveDrive *base, const char *path,
         }
 
         if (resp_code != 200) {
-            rc = -1; // TODO;
+            rc = HIVE_HTTP_STATUS_ERROR(resp_code);
             break;
         }
 
         p = http_client_move_response_body(httpc, NULL);
         if (!p) {
-            rc = -1;
+            rc = HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
             break;
         }
 
         json = cJSON_Parse(p);
         free(p);
         if (!json) {
-            rc = -1;
+            rc = HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
             break;
         }
 
         sub_array = cJSON_GetObjectItemCaseSensitive(json, "value");
         if (!sub_array || !cJSON_IsArray(sub_array) || !cJSON_GetArraySize(sub_array)) {
             cJSON_Delete(json);
-            rc = -1;
+            rc = HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
             break;
         }
 
@@ -444,7 +419,7 @@ int onedrive_drive_list_files(HiveDrive *base, const char *path,
         if (next_link && (!cJSON_IsString(next_link) || !next_link->valuestring ||
                           !*next_link->valuestring)) {
             cJSON_Delete(json);
-            rc = -1;
+            rc = HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
             break;
         }
 
@@ -484,7 +459,6 @@ char *create_mkdir_request_body(const char *path)
     if (!cJSON_AddStringToObject(body, "name", p) ||
         !cJSON_AddObjectToObject(body, "folder") || // TODO
         !cJSON_AddStringToObject(body, "@microsoft.graph.conflictBehavior", "rename")) {
-
         cJSON_Delete(body);
         return NULL;
     }
@@ -545,28 +519,24 @@ int onedrive_drive_mkdir(HiveDrive *base, const char *path)
     rc = http_client_request(httpc);
     free(body);
 
-    if (rc < 0) {
-        // TODO: rc;
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     http_client_close(httpc);
 
-    if (rc < 0) {
-        // TODO: rc;
-        return rc;
-    }
+    if (rc)
+        return HIVE_HTTPC_ERROR(rc);
 
     if (resp_code == 401) {
         oauth_token_set_expired(drive->token);
         return HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
     }
 
-    if (resp_code != 201) {
-        // TODO: rc;
-        return rc;
-    }
+    if (resp_code != 201)
+        return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     return 0;
 
@@ -658,28 +628,24 @@ int onedrive_drive_move_file(HiveDrive *base, const char *old, const char *new)
     rc = http_client_request(httpc);
     free(body);
 
-    if (rc < 0) {
-        // TODO: rc;
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     http_client_close(httpc);
 
-    if (rc < 0) {
-        // TODO: rc;
-        return rc;
-    }
+    if (rc)
+        return HIVE_HTTPC_ERROR(rc);
 
     if (resp_code == 401) {
         oauth_token_set_expired(drive->token);
         return HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
     }
 
-    if (resp_code != 200) {
-        // TODO;
-        return rc;
-    }
+    if (resp_code != 200)
+        return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     return 0;
 
@@ -728,28 +694,24 @@ int onedrive_drive_copy_file(HiveDrive *base, const char *src, const char *dest)
     rc = http_client_request(httpc);
     free(body);
 
-    if (rc < 0) {
-        // TODO: rc;
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     http_client_close(httpc);
 
-    if (rc < 0) {
-        // TODO: rc;
-        return rc;
-    }
+    if (rc)
+        return HIVE_HTTPC_ERROR(rc);
 
     if (resp_code == 401) {
         oauth_token_set_expired(drive->token);
         return HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
     }
 
-    if (resp_code != 202) {
-        // TODO;
-        return rc;
-    }
+    if (resp_code != 202)
+        return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     // We will not wait for the completation of copy action.
     return 0;
@@ -793,28 +755,24 @@ int onedrive_drive_delete_file(HiveDrive *base, const char *path)
     http_client_set_header(httpc, "Authorization", get_bearer_token(drive->token));
 
     rc = http_client_request(httpc);
-    if (rc < 0) {
-        // TODO: rc;
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     http_client_close(httpc);
 
-    if (rc < 0) {
-        // TODO: rc;
-        return rc;
-    }
+    if (rc)
+        return HIVE_HTTPC_ERROR(rc);
 
     if (resp_code == 401) {
         oauth_token_set_expired(drive->token);
         return HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
     }
 
-    if (resp_code != 204) {
-        // TODO;
-        return rc;
-    }
+    if (resp_code != 204)
+        return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     return 0;
 
@@ -866,7 +824,7 @@ int onedrive_drive_open(oauth_token_t *token, const char *driveid,
 
     tmp = (OneDriveDrive *)rc_zalloc(sizeof(OneDriveDrive), onedrive_drive_destructor);
     if (!tmp)
-        return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     // Add reference of token to drive.
     tmp->token = ref(token);

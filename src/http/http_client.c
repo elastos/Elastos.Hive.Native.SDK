@@ -282,7 +282,7 @@ int http_client_set_method(http_client_t *client, http_method_t method)
         code = curl_easy_setopt(client->curl, CURLOPT_CUSTOMREQUEST, "DELETE");
         break;
     case HTTP_METHOD_PATCH:
-        curl_easy_setopt(client->curl, CURLOPT_CUSTOMREQUEST, "PATCH");
+        code = curl_easy_setopt(client->curl, CURLOPT_CUSTOMREQUEST, "PATCH");
         break;
     default:
         assert(0);
@@ -468,11 +468,14 @@ int http_client_set_header(http_client_t *client,
 
 int http_client_set_timeout(http_client_t *client, int timeout)
 {
+    CURLcode code;
+
     assert(client);
     assert(time > 0);
 
-    curl_easy_setopt(client->curl, CURLOPT_TIMEOUT, timeout);
-    return 0;
+    code = curl_easy_setopt(client->curl, CURLOPT_TIMEOUT, timeout);
+
+    return code;
 }
 
 int http_client_set_version(http_client_t *client, http_version_t version)
@@ -485,10 +488,8 @@ int http_client_set_version(http_client_t *client, http_version_t version)
 
     code = curl_easy_setopt(client->curl, CURLOPT_HTTP_VERSION,
                             curl_http_versions[version]);
-    if (code != CURLE_OK)
-        return CURLE_OUT_OF_MEMORY;
 
-    return 0;
+    return code;
 }
 
 int http_client_set_request_body_instant(http_client_t *client,

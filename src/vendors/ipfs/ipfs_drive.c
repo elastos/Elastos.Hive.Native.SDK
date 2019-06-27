@@ -32,7 +32,7 @@ static int ipfs_drive_get_info(HiveDrive *base, HiveDriveInfo *info)
     // TODO:
     rc = snprintf(info->driveid, sizeof(info->driveid), "");
     if (rc < 0 || rc >= sizeof(info->driveid))
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
 
     return 0;
 }
@@ -72,23 +72,23 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *path,
     http_client_enable_response_body(httpc);
 
     rc = http_client_request(httpc);
-    if (rc < 0) {
-        if (RC_NODE_UNREACHABLE(rc))
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
+        if (RC_NODE_UNREACHABLE(rc)) {
+            rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(drive->token);
-        // TODO: rc;
-        rc = -1;
+        }
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
-    if (rc < 0) {
-        // TODO:
-        rc = -1;
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
     if (resp_code != 200) {
-        // TODO;
+        rc = HIVE_HTTP_STATUS_ERROR(resp_code);
         goto error_exit;
     }
 
@@ -111,7 +111,7 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *path,
         !*item->valuestring ||
         strlen(item->valuestring) >= sizeof(info->fileid)) {
         cJSON_Delete(json);
-        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
+        return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
     }
 
     rc = snprintf(info->fileid, sizeof(info->fileid),
@@ -125,7 +125,7 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *path,
     if (!item || !cJSON_IsString(item) || !item->valuestring || !*item->valuestring ||
         (strcmp(item->valuestring, "file") && strcmp(item->valuestring, "directory"))) {
         cJSON_Delete(json);
-        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
+        return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
     }
 
     strcpy(info->type, item->valuestring);
@@ -133,7 +133,7 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *path,
     item = cJSON_GetObjectItem(json, "Size");
     if (!item || !cJSON_IsNumber(item)) {
         cJSON_Delete(json);
-        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
+        return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
     }
 
     info->size = (size_t)item->valuedouble;
@@ -155,11 +155,14 @@ static cJSON *parse_list_files_response(const char *response)
     assert(response);
 
     json = cJSON_Parse(response);
-    if (!json)
+    if (!json) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY));
         return NULL;
+    }
 
     entries = cJSON_GetObjectItemCaseSensitive(json, "Entries");
     if (!entries || !cJSON_IsArray(entries)) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT));
         cJSON_Delete(json);
         return NULL;
     }
@@ -168,6 +171,7 @@ static cJSON *parse_list_files_response(const char *response)
         cJSON *name;
 
         if (!cJSON_IsObject(entry)) {
+            hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT));
             cJSON_Delete(json);
             return NULL;
         }
@@ -175,6 +179,7 @@ static cJSON *parse_list_files_response(const char *response)
         name = cJSON_GetObjectItemCaseSensitive(entry, "Name");
         if (!name || !cJSON_IsString(name) || !name->valuestring ||
             !*name->valuestring) {
+            hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT));
             cJSON_Delete(json);
             return NULL;
         }
@@ -229,10 +234,8 @@ static int ipfs_drive_list_files(HiveDrive *base, const char *path,
            ipfs_token_get_current_node(drive->token), NODE_API_PORT);
 
     httpc = http_client_new();
-    if (!httpc) {
-        hive_set_error(-1);
-        return -1;
-    }
+    if (!httpc)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     http_client_set_url(httpc, url);
     http_client_set_query(httpc, "uid", ipfs_token_get_uid(drive->token));
@@ -242,36 +245,36 @@ static int ipfs_drive_list_files(HiveDrive *base, const char *path,
     http_client_enable_response_body(httpc);
 
     rc = http_client_request(httpc);
-    if (rc < 0) {
-        if (RC_NODE_UNREACHABLE(rc))
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
+        if (RC_NODE_UNREACHABLE(rc)) {
+            rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(drive->token);
-        hive_set_error(-1);
+        }
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
-    if (rc < 0) {
-        hive_set_error(-1);
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
     if (resp_code != 200) {
-        hive_set_error(-1);
+        rc = HIVE_HTTP_STATUS_ERROR(resp_code);
         goto error_exit;
     }
 
     p = http_client_move_response_body(httpc, NULL);
     http_client_close(httpc);
 
-    if (!p) {
-        hive_set_error(-1);
-        return -1;
-    }
+    if (!p)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     response = parse_list_files_response(p);
     free(p);
     if (!response)
-        return -1;
+        return hive_get_error();
 
     notify_file_entries(cJSON_GetObjectItemCaseSensitive(response, "Entries"),
                         callback, context);
@@ -280,7 +283,7 @@ static int ipfs_drive_list_files(HiveDrive *base, const char *path,
 
 error_exit:
     http_client_close(httpc);
-    return -1;
+    return rc;
 }
 
 static int ipfs_drive_make_dir(HiveDrive *base, const char *path)
@@ -299,10 +302,8 @@ static int ipfs_drive_make_dir(HiveDrive *base, const char *path)
             ipfs_token_get_current_node(drive->token), NODE_API_PORT);
 
     httpc = http_client_new();
-    if (!httpc) {
-        hive_set_error(-1);
-        return -1;
-    }
+    if (!httpc)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     http_client_set_url(httpc, url);
     http_client_set_query(httpc, "uid", ipfs_token_get_uid(drive->token));
@@ -312,33 +313,37 @@ static int ipfs_drive_make_dir(HiveDrive *base, const char *path)
     http_client_set_request_body_instant(httpc, NULL, 0);
 
     rc = http_client_request(httpc);
-    if (rc < 0) {
-        if (RC_NODE_UNREACHABLE(rc))
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
+        if (RC_NODE_UNREACHABLE(rc)) {
+            HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(drive->token);
-        hive_set_error(-1);
+        }
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     http_client_close(httpc);
-    if (rc < 0)
-        return -1;
+    if (rc)
+        return HIVE_HTTPC_ERROR(rc);
 
     if (resp_code != 200)
-        return -1;
+        return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     rc = publish_root_hash(drive->token, url, sizeof(url));
     if (rc < 0) {
-        if (RC_NODE_UNREACHABLE(rc))
+        if (RC_NODE_UNREACHABLE(rc)) {
+            rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(drive->token);
-        return -1;
+        }
+        return rc;
     }
 
     return 0;
 
 error_exit:
     http_client_close(httpc);
-    return -1;
+    return rc;
 }
 
 static int ipfs_drive_move_file(HiveDrive *base, const char *old, const char *new)
@@ -357,10 +362,8 @@ static int ipfs_drive_move_file(HiveDrive *base, const char *old, const char *ne
              ipfs_token_get_current_node(drive->token), NODE_API_PORT);
 
     httpc = http_client_new();
-    if (!httpc) {
-        hive_set_error(-1);
-        return -1;
-    }
+    if (!httpc)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     http_client_set_url(httpc, url);
     http_client_set_query(httpc, "uid", ipfs_token_get_uid(drive->token));
@@ -370,33 +373,37 @@ static int ipfs_drive_move_file(HiveDrive *base, const char *old, const char *ne
     http_client_set_request_body_instant(httpc, NULL, 0);
 
     rc = http_client_request(httpc);
-    if (rc < 0) {
-        if (RC_NODE_UNREACHABLE(rc))
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
+        if (RC_NODE_UNREACHABLE(rc)) {
+            rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(drive->token);
-        hive_set_error(-1);
+        }
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     http_client_close(httpc);
-    if (rc < 0)
-        return -1;
+    if (rc)
+        return HIVE_HTTPC_ERROR(rc);
 
     if (resp_code != 200)
-        return -1;
+        return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     rc = publish_root_hash(drive->token, url, sizeof(url));
     if (rc < 0) {
-        if (RC_NODE_UNREACHABLE(rc))
+        if (RC_NODE_UNREACHABLE(rc)) {
+            rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(drive->token);
-        return -1;
+        }
+        return rc;
     }
 
     return 0;
 
 error_exit:
     http_client_close(httpc);
-    return -1;
+    return rc;
 }
 
 static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const char *dest_path)
@@ -414,16 +421,14 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
 
     rc = ipfs_drive_stat_file(base, src_path, &src_info);
     if (rc < 0)
-        return -1;
+        return rc;
 
     sprintf(url, "http://%s:%d/api/v0/files/cp",
              ipfs_token_get_current_node(drive->token), NODE_API_PORT);
 
     httpc = http_client_new();
-    if (!httpc) {
-        hive_set_error(-1);
-        return -1;
-    }
+    if (!httpc)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     http_client_set_url(httpc, url);
     http_client_set_query(httpc, "uid", ipfs_token_get_uid(drive->token));
@@ -433,25 +438,29 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
     http_client_set_request_body_instant(httpc, NULL, 0);
 
     rc = http_client_request(httpc);
-    if (rc < 0) {
-        if (RC_NODE_UNREACHABLE(rc))
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
+        if (RC_NODE_UNREACHABLE(rc)) {
+            rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(drive->token);
-        hive_set_error(-1);
+        }
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     http_client_close(httpc);
-    if (rc < 0)
-        return -1;
+    if (rc)
+        return HIVE_HTTPC_ERROR(rc);
 
     if (resp_code != 200)
-        return -1;
+        return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     rc = publish_root_hash(drive->token, url, sizeof(url));
     if (rc < 0) {
-        if (RC_NODE_UNREACHABLE(rc))
+        if (RC_NODE_UNREACHABLE(rc)) {
+            rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(drive->token);
+        }
         return -1;
     }
 
@@ -459,7 +468,7 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
 
 error_exit:
     http_client_close(httpc);
-    return -1;
+    return rc;
 }
 
 static int ipfs_drive_delete_file(HiveDrive *base, const char *path)
@@ -478,10 +487,8 @@ static int ipfs_drive_delete_file(HiveDrive *base, const char *path)
              ipfs_token_get_current_node(drive->token), NODE_API_PORT);
 
     httpc = http_client_new();
-    if (!httpc) {
-        hive_set_error(-1);
-        return -1;
-    }
+    if (!httpc)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     http_client_set_url(httpc, url);
     http_client_set_query(httpc, "uid", ipfs_token_get_uid(drive->token));
@@ -491,33 +498,37 @@ static int ipfs_drive_delete_file(HiveDrive *base, const char *path)
     http_client_set_request_body_instant(httpc, NULL, 0);
 
     rc = http_client_request(httpc);
-    if (rc < 0) {
-        if (RC_NODE_UNREACHABLE(rc))
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
+        if (RC_NODE_UNREACHABLE(rc)) {
+            rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(drive->token);
-        hive_set_error(-1);
+        }
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     http_client_close(httpc);
-    if (rc < 0)
-        return -1;
+    if (rc)
+        return HIVE_HTTPC_ERROR(rc);
 
     if (resp_code != 200)
-        return -1;
+        return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     rc = publish_root_hash(drive->token, url, sizeof(url));
     if (rc < 0) {
-        if (RC_NODE_UNREACHABLE(rc))
+        if (RC_NODE_UNREACHABLE(rc)) {
+            rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(drive->token);
-        return -1;
+        }
+        return rc;
     }
 
     return 0;
 
 error_exit:
     http_client_close(httpc);
-    return -1;
+    return rc;
 }
 
 static void ipfs_drive_close(HiveDrive *obj)
@@ -547,8 +558,10 @@ HiveDrive *ipfs_drive_open(ipfs_token_t *token)
     assert(token);
 
     drive = (IPFSDrive *)rc_zalloc(sizeof(IPFSDrive), ipfs_drive_destructor);
-    if (!drive)
+    if (!drive) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY));
         return NULL;
+    }
 
     drive->base.get_info    = &ipfs_drive_get_info;
     drive->base.stat_file   = &ipfs_drive_stat_file;

@@ -9,6 +9,7 @@
 #endif
 
 #include "ela_hive.h"
+#include "hive_error.h"
 #include "ipfs_token.h"
 #include "ipfs_utils.h"
 #include "ipfs_constants.h"
@@ -33,11 +34,11 @@ static int test_reachable(const char *ipaddr)
 
     rc = snprintf(url, sizeof(url), "http://%s:%d/version", ipaddr, CLUSTER_API_PORT);
     if (rc < 0 || rc >= sizeof(url))
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
 
     httpc = http_client_new();
     if (!httpc)
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     http_client_set_url(httpc, url);
     http_client_set_method(httpc, HTTP_METHOD_POST);
@@ -45,23 +46,25 @@ static int test_reachable(const char *ipaddr)
     http_client_set_timeout(httpc, 5);
 
     rc = http_client_request(httpc);
-    if (rc)
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
+    }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     http_client_close(httpc);
 
     if (rc)
-        return -1;
+        return HIVE_HTTPC_ERROR(rc);
 
     if (resp_code != 405)
-        return -1;
+        return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     return 0;
 
 error_exit:
     http_client_close(httpc);
-    return -1;
+    return rc;
 }
 
 static int _ipfs_token_get_uid_info(const char *node_ip,
@@ -76,11 +79,11 @@ static int _ipfs_token_get_uid_info(const char *node_ip,
     rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/uid/info",
                   node_ip, NODE_API_PORT);
     if (rc < 0 || rc >= sizeof(url))
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     httpc = http_client_new();
     if (!httpc)
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     http_client_set_url(httpc, url);
     http_client_set_query(httpc, "uid", uid);
@@ -90,19 +93,30 @@ static int _ipfs_token_get_uid_info(const char *node_ip,
         http_client_enable_response_body(httpc);
 
     rc = http_client_request(httpc);
-    if (rc)
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
+    }
 
     rc = http_client_get_response_code(httpc, &resp_code);
-    if (rc || resp_code != 200)
+    if (rc)  {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
+    }
+
+    if (resp_code != 200) {
+        rc = HIVE_HTTP_STATUS_ERROR(resp_code);
+        goto error_exit;
+    }
 
     if (result) {
         char *p;
 
         p = http_client_move_response_body(httpc, NULL);
-        if (!p)
+        if (!p) {
+            rc = HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
             goto error_exit;
+        }
 
         *result = p;
     }
@@ -112,7 +126,7 @@ static int _ipfs_token_get_uid_info(const char *node_ip,
 
 error_exit:
     http_client_close(httpc);
-    return -1;
+    return rc;
 }
 
 int ipfs_token_get_uid_info(ipfs_token_t *token, char **result)
@@ -152,7 +166,7 @@ static int select_bootstrap(rpc_node_t *rpc_nodes, size_t nodes_cnt, char *selec
         i = (i + 1) % nodes_cnt;
     } while (i != base);
 
-    return -1;
+    return HIVE_GENERAL_ERROR(HIVEERR_BAD_BOOTSTRAP_HOST);
 }
 
 int ipfs_token_check_reachable(ipfs_token_t *token)
@@ -165,7 +179,7 @@ int ipfs_token_check_reachable(ipfs_token_t *token)
     rc = select_bootstrap(token->rpc_nodes, token->rpc_nodes_count,
                           token->current_node);
     if (rc < 0)
-        return -1;
+        return rc;
 
     rc = ipfs_synchronize(token);
     if (rc < 0)
@@ -192,11 +206,11 @@ static int uid_new(const char *node_ip, char *uid, size_t uid_len)
     rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/uid/new",
                   node_ip, NODE_API_PORT);
     if (rc < 0 || rc >= sizeof(url))
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
 
     httpc = http_client_new();
     if (!httpc)
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     http_client_set_url(httpc, url);
     http_client_set_method(httpc, HTTP_METHOD_POST);
@@ -204,39 +218,48 @@ static int uid_new(const char *node_ip, char *uid, size_t uid_len)
     http_client_enable_response_body(httpc);
 
     rc = http_client_request(httpc);
-    if (rc)
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
+    }
 
     rc = http_client_get_response_code(httpc, &resp_code);
-    if (rc || resp_code != 200)
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
+    }
+
+    if (resp_code != 200) {
+        rc = HIVE_HTTP_STATUS_ERROR(resp_code);
+        goto error_exit;
+    }
 
     p = http_client_move_response_body(httpc, NULL);
     http_client_close(httpc);
     if (!p)
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     json = cJSON_Parse(p);
     free(p);
     if (!json)
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     uid_json = cJSON_GetObjectItemCaseSensitive(json, "UID");
     if (!cJSON_IsString(uid_json) || !uid_json->valuestring || !*uid_json->valuestring) {
         cJSON_Delete(json);
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
     }
 
     rc = snprintf(uid, uid_len, "%s", uid_json->valuestring);
     cJSON_Delete(json);
     if (rc < 0 || rc >= uid_len)
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
 
     return 0;
 
 error_exit:
     http_client_close(httpc);
-    return -1;
+    return rc;
 }
 
 const char *ipfs_token_get_uid(ipfs_token_t *token)
@@ -256,7 +279,7 @@ static int load_store(const cJSON *store, char *uid, size_t len)
     uid_json = cJSON_GetObjectItemCaseSensitive(store, "uid");
     if (!uid_json || !cJSON_IsString(uid_json) || !uid_json->valuestring ||
         !*uid_json->valuestring || strlen(uid_json->valuestring) >= len)
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
 
     strcpy(uid, uid_json->valuestring);
     return 0;
@@ -269,11 +292,11 @@ static int writeback_tokens(ipfs_token_t *token)
 
     json = cJSON_CreateObject();
     if (!json)
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     if (!cJSON_AddStringToObject(json, "uid", token->uid)) {
         cJSON_Delete(json);
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
     rc = token->writeback_cb(json, token->user_data);
@@ -302,8 +325,10 @@ ipfs_token_t *ipfs_token_new(ipfs_token_options_t *options,
 
     bootstraps_nbytes = sizeof(options->rpc_nodes[0]) * options->rpc_nodes_count;
     tmp = rc_zalloc(sizeof(ipfs_token_t) + bootstraps_nbytes, NULL);
-    if (!tmp)
+    if (!tmp) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY));
         return NULL;
+    }
 
     memcpy(tmp->rpc_nodes, options->rpc_nodes, bootstraps_nbytes);
     tmp->rpc_nodes_count = options->rpc_nodes_count;
@@ -313,6 +338,7 @@ ipfs_token_t *ipfs_token_new(ipfs_token_options_t *options,
     rc = select_bootstrap(options->rpc_nodes, options->rpc_nodes_count,
                           tmp->current_node);
     if (rc < 0) {
+        hive_set_error(rc);
         deref(tmp);
         return NULL;
     }
@@ -320,6 +346,7 @@ ipfs_token_t *ipfs_token_new(ipfs_token_options_t *options,
     if (options->uid[0]) {
         rc = _ipfs_token_get_uid_info(tmp->current_node, options->uid, NULL);
         if (rc < 0) {
+            hive_set_error(rc);
             deref(tmp);
             return NULL;
         }
@@ -327,24 +354,28 @@ ipfs_token_t *ipfs_token_new(ipfs_token_options_t *options,
     } else if (options->store) {
         rc = load_store(options->store, tmp->uid, sizeof(tmp->uid));
         if (rc < 0) {
+            hive_set_error(rc);
             deref(tmp);
             return NULL;
         }
 
         rc = _ipfs_token_get_uid_info(tmp->current_node, tmp->uid, NULL);
         if (rc < 0) {
+            hive_set_error(rc);
             deref(tmp);
             return NULL;
         }
     } else {
         rc = uid_new(tmp->current_node, tmp->uid, sizeof(tmp->uid));
         if (rc < 0) {
+            hive_set_error(rc);
             deref(tmp);
             return NULL;
         }
 
         rc = publish_root_hash(tmp, url, sizeof(url));
         if (rc < 0) {
+            hive_set_error(rc);
             deref(tmp);
             return NULL;
         }

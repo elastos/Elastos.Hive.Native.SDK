@@ -81,7 +81,7 @@ int onedrive_decode_client_info(const char *info_str, HiveClientInfo *info)
 
     json = cJSON_Parse(info_str);
     if (!json)
-        return -1;
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     DECODE_INFO_FIELD(json, "id", info->user_id);
     DECODE_INFO_FIELD(json, "displayName", info->display_name);
@@ -121,14 +121,14 @@ static int onedrive_client_get_info(HiveClient *base, HiveClientInfo *info)
     http_client_enable_response_body(httpc);
 
     rc = http_client_request(httpc);
-    if (rc < 0) {
-        // TODO:
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
-    if (rc < 0) {
-        // TODO:
+    if (rc) {
+        rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
@@ -139,7 +139,7 @@ static int onedrive_client_get_info(HiveClient *base, HiveClientInfo *info)
     }
 
     if (resp_code != 200) {
-        // TODO:
+        rc = HIVE_HTTP_STATUS_ERROR(resp_code);
         goto error_exit;
     }
 
@@ -151,20 +151,6 @@ static int onedrive_client_get_info(HiveClient *base, HiveClientInfo *info)
 
     rc = onedrive_decode_client_info(p, info);
     free(p);
-
-    switch(rc) {
-    case -1:
-        rc = HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
-        break;
-
-    case -2:
-        rc = HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
-        break;
-
-    default:
-        rc = 0;
-        break;
-    }
 
     return rc;
 
@@ -245,15 +231,13 @@ static int oauth_writeback(const cJSON *json, void *user_data)
     int bytes;
 
     json_str = cJSON_PrintUnformatted(json);
-    if (!json_str || !*json_str) {
-        errno = ENOMEM;
-        return -1;
-    }
+    if (!json_str || !*json_str)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     fd = open(client->keystore_path, O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
     if (fd < 0) {
         free(json_str);
-        return -1;
+        return HIVE_SYS_ERROR(errno);
     }
 
     bytes = (int)write(fd, json_str, strlen(json_str) + 1);
@@ -261,7 +245,7 @@ static int oauth_writeback(const cJSON *json, void *user_data)
     close(fd);
 
     if (bytes != (int)strlen(json_str) + 1)
-        return -1;
+        return HIVE_SYS_ERROR(errno);
 
     return 0;
 }
@@ -338,7 +322,6 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
         cJSON_Delete(keystore);
 
     if (!client->token) {
-        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY));
         deref(client);
         return NULL;
     }
