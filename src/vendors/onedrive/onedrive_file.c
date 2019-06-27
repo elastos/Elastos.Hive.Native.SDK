@@ -104,12 +104,12 @@ static int create_upload_session(OneDriveFile *file,
     if (rc)
         return HIVE_HTTPC_ERROR(rc);
 
-    if (resp_code == 401) {
+    if (resp_code == HttpStatus_Unauthorized) {
         oauth_token_set_expired(file->token);
         return HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
     }
 
-    if (resp_code != 200)
+    if (resp_code != HttpStatus_OK)
         return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     p = http_client_move_response_body(httpc, NULL);
@@ -201,9 +201,9 @@ static int upload_to_session(OneDriveFile *file, http_client_t *httpc,
         if (rc)
             return HIVE_HTTPC_ERROR(rc);
 
-        if ((ul_sz && resp_code != 202) ||
-            (!ul_sz && ((!file->ctag[0] && resp_code != 201) ||
-                        (file->ctag[0] && resp_code != 200))))
+        if ((ul_sz && resp_code != HttpStatus_Accepted) ||
+            (!ul_sz && ((!file->ctag[0] && resp_code != HttpStatus_Created) ||
+                        (file->ctag[0] && resp_code != HttpStatus_OK))))
             return HIVE_HTTP_STATUS_ERROR(resp_code);
     }
 
@@ -313,13 +313,13 @@ static int get_file_stat(oauth_token_t *token, const char *path,
         goto error_exit;
     }
 
-    if (resp_code == 401) {
+    if (resp_code == HttpStatus_Unauthorized) {
         oauth_token_set_expired(token);
         rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
         goto error_exit;
     }
 
-    if (resp_code != 200) {
+    if (resp_code != HttpStatus_OK) {
         rc = HIVE_HTTP_STATUS_ERROR(resp_code);
         goto error_exit;
     }
@@ -408,7 +408,7 @@ static int download_file(int fd, const char *download_url)
     if (rc)
         return HIVE_HTTPC_ERROR(rc);
 
-    if (resp_code != 200)
+    if (resp_code != HttpStatus_OK)
         return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     return 0;
@@ -475,7 +475,7 @@ int onedrive_file_open(oauth_token_t *token, const char *path,
 
     rc = get_file_stat(token, path, ctag, sizeof(ctag),
                        download_url, sizeof(download_url));
-    if (rc < 0 && rc != HIVE_HTTP_STATUS_ERROR(404))
+    if (rc < 0 && rc != HIVE_HTTP_STATUS_ERROR(HttpStatus_NotFound))
         return rc;
 
     file_exists = !rc ? true : false;

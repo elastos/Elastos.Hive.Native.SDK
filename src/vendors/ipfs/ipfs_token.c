@@ -57,7 +57,7 @@ static int test_reachable(const char *ipaddr)
     if (rc)
         return HIVE_HTTPC_ERROR(rc);
 
-    if (resp_code != 405)
+    if (resp_code != HttpStatus_MethodNotAllowed)
         return HIVE_HTTP_STATUS_ERROR(resp_code);
 
     return 0;
@@ -104,7 +104,7 @@ static int _ipfs_token_get_uid_info(const char *node_ip,
         goto error_exit;
     }
 
-    if (resp_code != 200) {
+    if (resp_code != HttpStatus_OK) {
         rc = HIVE_HTTP_STATUS_ERROR(resp_code);
         goto error_exit;
     }
@@ -229,7 +229,7 @@ static int uid_new(const char *node_ip, char *uid, size_t uid_len)
         goto error_exit;
     }
 
-    if (resp_code != 200) {
+    if (resp_code != HttpStatus_OK) {
         rc = HIVE_HTTP_STATUS_ERROR(resp_code);
         goto error_exit;
     }

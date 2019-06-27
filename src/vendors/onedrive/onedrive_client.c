@@ -132,13 +132,13 @@ static int onedrive_client_get_info(HiveClient *base, HiveClientInfo *info)
         goto error_exit;
     }
 
-    if (resp_code == 401) {
+    if (resp_code == HttpStatus_Unauthorized) {
         oauth_token_set_expired(client->token);
         rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
         goto error_exit;
     }
 
-    if (resp_code != 200) {
+    if (resp_code != HttpStatus_OK) {
         rc = HIVE_HTTP_STATUS_ERROR(resp_code);
         goto error_exit;
     }

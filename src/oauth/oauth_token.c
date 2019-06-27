@@ -606,7 +606,7 @@ static int redeem_access_token(oauth_token_t *token, char *code)
         goto error_exit;
     }
 
-    if (resp_code != 200) {
+    if (resp_code != HttpStatus_OK) {
         rc = HIVE_HTTP_STATUS_ERROR(resp_code);
         goto error_exit;
     }
@@ -720,7 +720,7 @@ static int refresh_access_token(oauth_token_t *token)
         goto error_exit;
     }
 
-    if (resp_code != 200) {
+    if (resp_code != HttpStatus_OK) {
         rc = HIVE_HTTP_STATUS_ERROR(resp_code);
         goto error_exit;
     }
