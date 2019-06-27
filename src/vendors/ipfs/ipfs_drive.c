@@ -105,7 +105,8 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *path,
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
     item = cJSON_GetObjectItem(json, "Hash");
-    if (!cJSON_IsString(item) ||
+    if (!item ||
+        !cJSON_IsString(item) ||
         !item->valuestring ||
         !*item->valuestring ||
         strlen(item->valuestring) >= sizeof(info->fileid)) {
@@ -115,10 +116,28 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *path,
 
     rc = snprintf(info->fileid, sizeof(info->fileid),
                   "/ipfs/%s", item->valuestring);
-    cJSON_Delete(json);
-
-    if (rc < 0 || rc >= sizeof(info->fileid))
+    if (rc < 0 || rc >= sizeof(info->fileid)) {
+        cJSON_Delete(json);
         return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
+    }
+
+    item = cJSON_GetObjectItem(json, "Type");
+    if (!item || !cJSON_IsString(item) || !item->valuestring || !*item->valuestring ||
+        (strcmp(item->valuestring, "file") && strcmp(item->valuestring, "directory"))) {
+        cJSON_Delete(json);
+        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
+    }
+
+    strcpy(info->type, item->valuestring);
+
+    item = cJSON_GetObjectItem(json, "Size");
+    if (!item || !cJSON_IsNumber(item)) {
+        cJSON_Delete(json);
+        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
+    }
+
+    info->size = (size_t)item->valuedouble;
+    cJSON_Delete(json);
 
     return 0;
 

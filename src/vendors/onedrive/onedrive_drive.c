@@ -136,7 +136,41 @@ error_exit:
 static
 int onedrive_decode_file_info(const char *info_str, HiveFileInfo *info)
 {
-    // TODO;
+    cJSON *json;
+    cJSON *file;
+    cJSON *dir;
+    cJSON *size;
+
+    assert(info_str);
+    assert(info);
+
+    json = cJSON_Parse(info_str);
+    if (!json)
+        return -1;
+
+    DECODE_INFO_FIELD(json, "cTag", info->fileid);
+
+    file = cJSON_GetObjectItemCaseSensitive(json, "file");
+    dir  = cJSON_GetObjectItemCaseSensitive(json, "folder");
+    if ((file && dir) || (!file && !dir)) {
+        cJSON_Delete(json);
+        return -1;
+    }
+
+    if (file)
+        strcpy(info->type, "file");
+    else
+        strcpy(info->type, "directory");
+
+    size = cJSON_GetObjectItemCaseSensitive(json, "file");
+    if (!size || !cJSON_IsNumber(size)) {
+        cJSON_Delete(json);
+        return -1;
+    }
+
+    info->size = (size_t)size->valuedouble;
+
+    cJSON_Delete(json);
     return 0;
 }
 
