@@ -36,6 +36,8 @@ int ipfs_token_reset(ipfs_token_t *token);
 int ipfs_token_get_uid_info(ipfs_token_t *token, char **result);
 const char *ipfs_token_get_uid(ipfs_token_t *token);
 const char *ipfs_token_get_current_node(ipfs_token_t *token);
+int ipfs_token_check_reachable(ipfs_token_t *token);
+void ipfs_token_mark_node_unreachable(ipfs_token_t *token);
 
 #ifdef __cplusplus
 }

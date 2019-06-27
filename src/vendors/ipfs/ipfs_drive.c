@@ -53,6 +53,10 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *path,
     assert(path);
     assert(info);
 
+    rc = ipfs_token_check_reachable(drive->token);
+    if (rc < 0)
+        return rc;
+
     sprintf(buf, "http://%s:%d/api/v0/files/stat",
             ipfs_token_get_current_node(drive->token), NODE_API_PORT);
 
@@ -69,6 +73,8 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *path,
 
     rc = http_client_request(httpc);
     if (rc < 0) {
+        if (RC_NODE_UNREACHABLE(rc))
+            ipfs_token_mark_node_unreachable(drive->token);
         // TODO: rc;
         rc = -1;
         goto error_exit;
@@ -196,6 +202,10 @@ static int ipfs_drive_list_files(HiveDrive *base, const char *path,
     char *p;
     int rc;
 
+    rc = ipfs_token_check_reachable(drive->token);
+    if (rc < 0)
+        return rc;
+
     sprintf(url, "http://%s:%d/api/v0/files/ls",
            ipfs_token_get_current_node(drive->token), NODE_API_PORT);
 
@@ -214,6 +224,8 @@ static int ipfs_drive_list_files(HiveDrive *base, const char *path,
 
     rc = http_client_request(httpc);
     if (rc < 0) {
+        if (RC_NODE_UNREACHABLE(rc))
+            ipfs_token_mark_node_unreachable(drive->token);
         hive_set_error(-1);
         goto error_exit;
     }
@@ -260,6 +272,10 @@ static int ipfs_drive_make_dir(HiveDrive *base, const char *path)
     long resp_code;
     int rc;
 
+    rc = ipfs_token_check_reachable(drive->token);
+    if (rc < 0)
+        return rc;
+
     sprintf(url, "http://%s:%d/api/v0/files/mkdir",
             ipfs_token_get_current_node(drive->token), NODE_API_PORT);
 
@@ -278,6 +294,8 @@ static int ipfs_drive_make_dir(HiveDrive *base, const char *path)
 
     rc = http_client_request(httpc);
     if (rc < 0) {
+        if (RC_NODE_UNREACHABLE(rc))
+            ipfs_token_mark_node_unreachable(drive->token);
         hive_set_error(-1);
         goto error_exit;
     }
@@ -291,8 +309,11 @@ static int ipfs_drive_make_dir(HiveDrive *base, const char *path)
         return -1;
 
     rc = publish_root_hash(drive->token, url, sizeof(url));
-    if (rc < 0)
+    if (rc < 0) {
+        if (RC_NODE_UNREACHABLE(rc))
+            ipfs_token_mark_node_unreachable(drive->token);
         return -1;
+    }
 
     return 0;
 
@@ -308,6 +329,10 @@ static int ipfs_drive_move_file(HiveDrive *base, const char *old, const char *ne
     http_client_t *httpc;
     long resp_code;
     int rc;
+
+    rc = ipfs_token_check_reachable(drive->token);
+    if (rc < 0)
+        return rc;
 
     sprintf(url, "http://%s:%d/api/v0/files/mv",
              ipfs_token_get_current_node(drive->token), NODE_API_PORT);
@@ -327,6 +352,8 @@ static int ipfs_drive_move_file(HiveDrive *base, const char *old, const char *ne
 
     rc = http_client_request(httpc);
     if (rc < 0) {
+        if (RC_NODE_UNREACHABLE(rc))
+            ipfs_token_mark_node_unreachable(drive->token);
         hive_set_error(-1);
         goto error_exit;
     }
@@ -340,8 +367,11 @@ static int ipfs_drive_move_file(HiveDrive *base, const char *old, const char *ne
         return -1;
 
     rc = publish_root_hash(drive->token, url, sizeof(url));
-    if (rc < 0)
+    if (rc < 0) {
+        if (RC_NODE_UNREACHABLE(rc))
+            ipfs_token_mark_node_unreachable(drive->token);
         return -1;
+    }
 
     return 0;
 
@@ -358,6 +388,10 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
     long resp_code = 0;
     HiveFileInfo src_info;
     int rc;
+
+    rc = ipfs_token_check_reachable(drive->token);
+    if (rc < 0)
+        return rc;
 
     rc = ipfs_drive_stat_file(base, src_path, &src_info);
     if (rc < 0)
@@ -381,6 +415,8 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
 
     rc = http_client_request(httpc);
     if (rc < 0) {
+        if (RC_NODE_UNREACHABLE(rc))
+            ipfs_token_mark_node_unreachable(drive->token);
         hive_set_error(-1);
         goto error_exit;
     }
@@ -394,8 +430,11 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
         return -1;
 
     rc = publish_root_hash(drive->token, url, sizeof(url));
-    if (rc < 0)
+    if (rc < 0) {
+        if (RC_NODE_UNREACHABLE(rc))
+            ipfs_token_mark_node_unreachable(drive->token);
         return -1;
+    }
 
     return 0;
 
@@ -411,6 +450,10 @@ static int ipfs_drive_delete_file(HiveDrive *base, const char *path)
     http_client_t *httpc;
     long resp_code;
     int rc;
+
+    rc = ipfs_token_check_reachable(drive->token);
+    if (rc < 0)
+        return rc;
 
     sprintf(url, "http://%s:%d/api/v0/files/rm",
              ipfs_token_get_current_node(drive->token), NODE_API_PORT);
@@ -430,6 +473,8 @@ static int ipfs_drive_delete_file(HiveDrive *base, const char *path)
 
     rc = http_client_request(httpc);
     if (rc < 0) {
+        if (RC_NODE_UNREACHABLE(rc))
+            ipfs_token_mark_node_unreachable(drive->token);
         hive_set_error(-1);
         goto error_exit;
     }
@@ -443,8 +488,11 @@ static int ipfs_drive_delete_file(HiveDrive *base, const char *path)
         return -1;
 
     rc = publish_root_hash(drive->token, url, sizeof(url));
-    if (rc < 0)
+    if (rc < 0) {
+        if (RC_NODE_UNREACHABLE(rc))
+            ipfs_token_mark_node_unreachable(drive->token);
         return -1;
+    }
 
     return 0;
 

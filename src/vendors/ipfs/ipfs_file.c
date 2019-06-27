@@ -104,9 +104,17 @@ static ssize_t ipfs_file_lseek(HiveFile *base, ssize_t offset, int whence)
         file->lpos = offset > 0 ? offset : 0;
         return file->lpos;
     case HiveSeek_End:
-        rc = get_file_stat(file->token, file->base.path, &fsz);
+        rc = ipfs_token_check_reachable(file->token);
         if (rc < 0)
+            return rc;
+
+        rc = get_file_stat(file->token, file->base.path, &fsz);
+        if (rc < 0) {
+            if (RC_NODE_UNREACHABLE(rc))
+                ipfs_token_mark_node_unreachable(file->token);
             return -1;
+        }
+
         file->lpos = offset + fsz < 0 ? 0 : offset + fsz;
         return 0;
     default:
@@ -143,6 +151,10 @@ static ssize_t ipfs_file_read(HiveFile *base, char *buffer, size_t bufsz)
     void *user_data[] = {buffer, &bufsz, &nrd};
     int rc;
 
+    rc = ipfs_token_check_reachable(file->token);
+    if (rc < 0)
+        return rc;
+
     sprintf(buf, "http://%s:%d/api/v0/files/read",
             ipfs_token_get_current_node(file->token), NODE_API_PORT);
 
@@ -163,6 +175,8 @@ static ssize_t ipfs_file_read(HiveFile *base, char *buffer, size_t bufsz)
 
     rc = http_client_request(httpc);
     if (rc < 0) {
+        if (RC_NODE_UNREACHABLE(rc))
+            ipfs_token_mark_node_unreachable(file->token);
         // TODO: rc;
         rc = -1;
         goto error_exit;
@@ -193,6 +207,10 @@ static ssize_t ipfs_file_write(HiveFile *base, const char *buffer, size_t bufsz)
     long resp_code = 0;
     int rc;
 
+    rc = ipfs_token_check_reachable(file->token);
+    if (rc < 0)
+        return rc;
+
     sprintf(buf, "http://%s:%d/api/v0/files/write",
             ipfs_token_get_current_node(file->token), NODE_API_PORT);
 
@@ -216,6 +234,8 @@ static ssize_t ipfs_file_write(HiveFile *base, const char *buffer, size_t bufsz)
 
     rc = http_client_request(httpc);
     if (rc < 0) {
+        if (RC_NODE_UNREACHABLE(rc))
+            ipfs_token_mark_node_unreachable(file->token);
         // TODO: rc;
         rc = -1;
         goto error_exit;
@@ -230,8 +250,11 @@ static ssize_t ipfs_file_write(HiveFile *base, const char *buffer, size_t bufsz)
         return -1;
 
     rc = publish_root_hash(file->token, buf, sizeof(buf));
-    if (rc < 0)
+    if (rc < 0) {
+        if (RC_NODE_UNREACHABLE(rc))
+            ipfs_token_mark_node_unreachable(file->token);
         return -1;
+    }
 
     HIVE_F_UNSET(file->base.flags, HIVE_F_CREAT | HIVE_F_TRUNC);
 

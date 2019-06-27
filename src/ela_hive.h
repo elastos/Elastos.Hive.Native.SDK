@@ -660,7 +660,7 @@ int hive_file_discard(HiveFile *file);
 #define HIVEF_HTTP_CLIENT                            0x05
 #define HIVEF_HTTP_SERVER                            0x06
 
-#define  HIVE_HTTP_STATUS                            0x07
+#define HIVE_HTTP_STATUS                             0x07
 
 
 /**
