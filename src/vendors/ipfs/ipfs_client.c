@@ -2,17 +2,29 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <pthread.h>
-#include <arpa/inet.h>
 #include <stdbool.h>
-#include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <errno.h>
 
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#ifdef HAVE_ARPA_INET_H
+#include <arpa/inet.h>
+#endif
 #ifdef HAVE_SYS_PARAM_H
 #include <sys/param.h>
 #endif
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
+#ifdef HAVE_ALLOCA_H
+#include <alloca.h>
+#endif
 #if defined(_WIN32) || defined(_WIN64)
+#include <io.h>
+#include <winsock2.h>
 #include <winnt.h>
 #endif
 

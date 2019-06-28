@@ -23,7 +23,7 @@ typedef int oauth_writeback_func_t(const cJSON *json, void *user_data);
 /*
  * Create an oauth token instance.
  */
-oauth_token_t *oauth_token_new(const oauth_options_t *opts, oauth_writeback_func_t cb,
+oauth_token_t *oauth_token_new(const oauth_options_t *opts, oauth_writeback_func_t *cb,
                                void *user_data);
 
 /*
@@ -44,7 +44,7 @@ typedef int oauth_request_func_t(const char *reqeust_url, void *user_data);
 /*
  * Request and acquire the refresh and access tokens.
  */
-int oauth_token_request(oauth_token_t *token, oauth_request_func_t cb,
+int oauth_token_request(oauth_token_t *token, oauth_request_func_t *cb,
                         void *user_data);
 
 /*

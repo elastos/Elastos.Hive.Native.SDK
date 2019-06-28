@@ -6,9 +6,11 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/stat.h>
-#include <sys/time.h>
 #include <pthread.h>
 
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -155,7 +157,7 @@ static int restore_access_token(const cJSON *json, oauth_token_t *token)
     return 0;
 }
 
-oauth_token_t *oauth_token_new(const oauth_options_t *opts, oauth_writeback_func_t cb,
+oauth_token_t *oauth_token_new(const oauth_options_t *opts, oauth_writeback_func_t *cb,
                                void *user_data)
 {
     oauth_token_t *token;
@@ -628,7 +630,7 @@ error_exit:
 }
 
 int oauth_token_request(oauth_token_t *token,
-                        oauth_request_func_t cb, void *user_data)
+                        oauth_request_func_t *cb, void *user_data)
 {
     char authorize_code[512] = {0};
     char *code;

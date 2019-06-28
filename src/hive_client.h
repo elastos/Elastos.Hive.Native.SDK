@@ -8,6 +8,10 @@ extern "C" {
 #include <limits.h>
 #include <fcntl.h>
 
+#if defined(_WIN32) || defined(_WIN64)
+#include <crystal.h>
+#endif
+
 #include "ela_hive.h"
 
 #define HIVE_F_RDONLY O_RDONLY

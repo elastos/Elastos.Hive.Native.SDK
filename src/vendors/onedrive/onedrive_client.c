@@ -12,6 +12,9 @@
 #ifdef HAVE_LIBGEN_H
 #include <libgen.h>
 #endif
+#if defined(_WIN32) || defined(_WIN64)
+#include <io.h>
+#endif
 
 #include <crystal.h>
 #include <cjson/cJSON.h>

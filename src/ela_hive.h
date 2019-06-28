@@ -14,6 +14,10 @@ extern "C" {
 #include <stdbool.h>
 #include <stdint.h>
 
+#if defined(_WIN32) || defined(_WIN64)
+typedef ptrdiff_t ssize_t;
+#endif
+
 #if defined(HIVE_STATIC)
     #define HIVE_API
 #elif defined(HIVE_DYNAMIC)
