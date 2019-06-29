@@ -267,6 +267,7 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
     oauth_options_t oauth_opts;
     OneDriveClient *client;
     cJSON *keystore = NULL;
+    char path_tmp[PATH_MAX];
     int rc;
 
     assert(opts);
@@ -292,7 +293,8 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
         deref(client);
         return NULL;
     }
-    mkdir(dirname(client->keystore_path), S_IRUSR | S_IWUSR | S_IXUSR);
+    strcpy(path_tmp, client->keystore_path);
+    mkdir(dirname(path_tmp), S_IRUSR | S_IWUSR | S_IXUSR);
 
     rc = snprintf(client->tmp_template, sizeof(client->tmp_template),
                   "%s/.tmp/onedrive/XXXXXX", options->persistent_location);
@@ -301,8 +303,10 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
         deref(client);
         return NULL;
     }
-    mkdir(dirname(dirname(client->tmp_template)), S_IRUSR | S_IWUSR | S_IXUSR);
-    mkdir(dirname(client->tmp_template), S_IRUSR | S_IWUSR | S_IXUSR);
+    strcpy(path_tmp, client->tmp_template);
+    mkdir(dirname(dirname(path_tmp)), S_IRUSR | S_IWUSR | S_IXUSR);
+    strcpy(path_tmp, client->tmp_template);
+    mkdir(dirname(path_tmp), S_IRUSR | S_IWUSR | S_IXUSR);
 
     if (!access(client->keystore_path, F_OK)) {
         keystore = load_keystore_in_json(client->keystore_path);

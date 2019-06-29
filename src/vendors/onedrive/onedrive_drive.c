@@ -476,6 +476,7 @@ int onedrive_drive_mkdir(HiveDrive *base, const char *path)
     OneDriveDrive *drive = (OneDriveDrive *)base;
     http_client_t *httpc;
     char url[MAX_URL_LEN] = {0};
+    char path_tmp[PATH_MAX];
     char *body;
     char *dir;
     long resp_code = 0;
@@ -499,7 +500,8 @@ int onedrive_drive_mkdir(HiveDrive *base, const char *path)
     if (!httpc)
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
-    dir = dirname((char *)path);
+    strcpy(path_tmp, path);
+    dir = dirname(path_tmp);
     if (!strcmp(dir, "/"))
         sprintf(url, "%s/root/children", MY_DRIVE);
     else
@@ -549,6 +551,7 @@ error_exit:
 static char *create_cp_mv_request_body(const char *path)
 {
     char url[MAX_URL_LEN] = {0};
+    char path_tmp[PATH_MAX];
     cJSON *body;
     cJSON *item;
     cJSON *parent_ref;
@@ -562,7 +565,8 @@ static char *create_cp_mv_request_body(const char *path)
     if (!parent_ref)
         goto error_exit;
 
-    sprintf(url, "/drive/root:%s", dirname((char *)path));
+    strcpy(path_tmp, path);
+    sprintf(url, "/drive/root:%s", dirname(path_tmp));
     item = cJSON_AddStringToObject(parent_ref, "path", url);
     if (!item)
         goto error_exit;
