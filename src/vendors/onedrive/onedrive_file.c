@@ -1,7 +1,17 @@
 #include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <sys/stat.h>
+
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
+#if defined(_WIN32) || defined(_WIN64)
+#include <io.h>
+#include <crystal.h>
+#define ftruncate _chsize
+#endif
+
 #include <crystal.h>
 #include <cjson/cJSON.h>
 
@@ -154,10 +164,10 @@ static size_t upload_to_session_request_body_cb(char *buffer,
     sz2ul = MIN(*ul_sz - *uled_sz, size * nitems);
     nrd = read(fd, buffer, sz2ul);
     if (nrd < 0)
-        return -1;
+        return HTTP_CLIENT_REQBODY_ABORT;
 
     *uled_sz += nrd;
-    return nrd;
+    return (size_t)nrd;
 }
 
 #define HTTP_PUT_MAX_CHUNK_SIZE (60U * 1024 * 1024)
@@ -246,9 +256,6 @@ static int onedrive_file_close(HiveFile *base)
 {
     OneDriveFile *file = (OneDriveFile *)base;
 
-    if (!file->dirty)
-        unlink(file->tmp_path);
-
     deref(file);
 
     return 0;
@@ -260,6 +267,9 @@ static void onedrive_file_destructor(void *obj)
 
     if (file->fd >= 0)
         close(file->fd);
+
+    if (!file->dirty)
+        unlink(file->tmp_path);
 
     if (file->token)
         oauth_token_delete(file->token);
@@ -377,9 +387,9 @@ static size_t response_body_callback(char *buffer, size_t size,
 
     nwr = write(fd, buffer, total_sz);
     if (nwr < 0)
-        return -1;
+        return 0;
 
-    return nwr;
+    return (size_t)nwr;
 }
 
 static int download_file(int fd, const char *download_url)
@@ -463,6 +473,21 @@ static int onedrive_file_discard(HiveFile *base)
 
     return 0;
 }
+
+#if defined(_WIN32) || defined(_WIN64)
+static int mkstemp(char *template)
+{
+    errno_t err;
+
+    err = _mktemp_s(template, strlen(template) + 1);
+    if (err) {
+        errno = err;
+        return -1;
+    }
+
+    return open(template, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+}
+#endif
 
 int onedrive_file_open(oauth_token_t *token, const char *path,
                        int flags, const char *tmp_template, HiveFile **file)

@@ -2,10 +2,12 @@
 #include <string.h>
 #include <assert.h>
 #include <pthread.h>
+#include <stdbool.h>
+
 #ifdef HAVE_MALLOC_H
 #include <malloc.h>
 #endif
-#include <stdbool.h>
+
 #include <curl/curl.h>
 #include <crystal.h>
 
@@ -471,7 +473,7 @@ int http_client_set_timeout(http_client_t *client, int timeout)
     CURLcode code;
 
     assert(client);
-    assert(time > 0);
+    assert(timeout > 0);
 
     code = curl_easy_setopt(client->curl, CURLOPT_TIMEOUT, timeout);
 
@@ -543,7 +545,7 @@ static size_t http_response_body_write_callback(char *ptr, size_t size, size_t n
 
         if (response->sz + length < response->sz) {
             response->used = 0;
-            return -1;
+            return 0;
         }
 
         for (new_sz = response->sz ? response->sz << 1 : 512, last_try = response->sz;
@@ -556,7 +558,7 @@ static size_t http_response_body_write_callback(char *ptr, size_t size, size_t n
         new_data = realloc(response->data, new_sz);
         if (!new_data) {
             response->used = 0;
-            return -1;
+            return 0;
         }
 
         response->data = new_data;

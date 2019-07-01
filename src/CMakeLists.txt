@@ -4,6 +4,11 @@ cmake_policy(SET CMP0054 NEW)
 include(HiveDefaults)
 include(CheckIncludeFile)
 
+check_include_file(arpa/inet.h HAVE_ARPA_INET_H)
+if(HAVE_ARPA_INET_H)
+    add_definitions(-DHAVE_ARPA_INET_H=1)
+endif()
+
 check_include_file(unistd.h HAVE_UNISTD_H)
 if(HAVE_UNISTD_H)
     add_definitions(-DHAVE_UNISTD_H=1)
@@ -17,6 +22,11 @@ endif()
 check_include_file(malloc.h HAVE_MALLOC_H)
 if(HAVE_MALLOC_H)
     add_definitions(-DHAVE_MALLOC_H=1)
+endif()
+
+check_include_file(alloca.h HAVE_ALLOCA_H)
+if(HAVE_ALLOCA_H)
+    add_definitions(-DHAVE_ALLOCA_H=1)
 endif()
 
 check_include_file(libgen.h HAVE_LIBGEN_H)

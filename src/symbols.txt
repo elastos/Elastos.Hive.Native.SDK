@@ -21,3 +21,6 @@ _hive_file_read
 _hive_file_write
 _hive_file_commit
 _hive_file_discard
+_hive_get_error
+_hive_clear_error
+_hive_get_strerror

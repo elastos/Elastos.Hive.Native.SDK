@@ -161,8 +161,14 @@ static cJSON *parse_list_files_response(const char *response)
     }
 
     entries = cJSON_GetObjectItemCaseSensitive(json, "Entries");
-    if (!entries || !cJSON_IsArray(entries)) {
+    if (!entries || (!cJSON_IsArray(entries) && !cJSON_IsNull(entries))) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT));
+        cJSON_Delete(json);
+        return NULL;
+    }
+
+    if (cJSON_IsNull(entries)) {
+        hive_set_error(HIVEOK);
         cJSON_Delete(json);
         return NULL;
     }
@@ -194,23 +200,24 @@ static void notify_file_entries(cJSON *entries,
 {
     cJSON *entry;
 
-    assert(entries);
     assert(callback);
 
-    cJSON_ArrayForEach(entry, entries) {
-        cJSON *name;
-        KeyValue properties[1];
-        bool resume;
+    if (cJSON_IsArray(entries)) {
+        cJSON_ArrayForEach(entry, entries) {
+            cJSON *name;
+            KeyValue properties[1];
+            bool resume;
 
-        name = cJSON_GetObjectItemCaseSensitive(entry, "Name");
+            name = cJSON_GetObjectItemCaseSensitive(entry, "Name");
 
-        properties[0].key   = "name";
-        properties[0].value = name->valuestring;
+            properties[0].key   = "name";
+            properties[0].value = name->valuestring;
 
-        resume = callback(properties, sizeof(properties) / sizeof(properties[0]),
-                          context);
-        if (!resume)
-            return;
+            resume = callback(properties, sizeof(properties) / sizeof(properties[0]),
+                              context);
+            if (!resume)
+                return;
+        }
     }
     callback(NULL, 0, context);
 }
@@ -273,7 +280,7 @@ static int ipfs_drive_list_files(HiveDrive *base, const char *path,
 
     response = parse_list_files_response(p);
     free(p);
-    if (!response)
+    if (!response && hive_get_error() != HIVEOK)
         return hive_get_error();
 
     notify_file_entries(cJSON_GetObjectItemCaseSensitive(response, "Entries"),
@@ -461,7 +468,7 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(drive->token);
         }
-        return -1;
+        return rc;
     }
 
     return 0;

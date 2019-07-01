@@ -30,9 +30,10 @@ typedef struct OneDriveDrive {
 #define DECODE_INFO_FIELD(json, name, field) do { \
         int rc; \
         rc = decode_info_field(json, name, field, sizeof(field)); \
-        if (rc < 0) \
+        if (rc < 0) { \
             cJSON_Delete(json); \
-        return rc; \
+            return rc; \
+        } \
     } while(0)
 
 static
@@ -149,7 +150,7 @@ int onedrive_decode_file_info(const char *info_str, HiveFileInfo *info)
     else
         strcpy(info->type, "directory");
 
-    size = cJSON_GetObjectItemCaseSensitive(json, "file");
+    size = cJSON_GetObjectItemCaseSensitive(json, "size");
     if (!size || !cJSON_IsNumber(size)) {
         cJSON_Delete(json);
         return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
@@ -403,7 +404,7 @@ int onedrive_drive_list_files(HiveDrive *base, const char *path,
         }
 
         sub_array = cJSON_GetObjectItemCaseSensitive(json, "value");
-        if (!sub_array || !cJSON_IsArray(sub_array) || !cJSON_GetArraySize(sub_array)) {
+        if (!sub_array || !cJSON_IsArray(sub_array)) {
             cJSON_Delete(json);
             rc = HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
             break;
@@ -475,6 +476,7 @@ int onedrive_drive_mkdir(HiveDrive *base, const char *path)
     OneDriveDrive *drive = (OneDriveDrive *)base;
     http_client_t *httpc;
     char url[MAX_URL_LEN] = {0};
+    char path_tmp[PATH_MAX];
     char *body;
     char *dir;
     long resp_code = 0;
@@ -498,7 +500,8 @@ int onedrive_drive_mkdir(HiveDrive *base, const char *path)
     if (!httpc)
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
-    dir = dirname((char *)path);
+    strcpy(path_tmp, path);
+    dir = dirname(path_tmp);
     if (!strcmp(dir, "/"))
         sprintf(url, "%s/root/children", MY_DRIVE);
     else
@@ -548,11 +551,11 @@ error_exit:
 static char *create_cp_mv_request_body(const char *path)
 {
     char url[MAX_URL_LEN] = {0};
+    char path_tmp[PATH_MAX];
     cJSON *body;
     cJSON *item;
     cJSON *parent_ref;
     char *body_str;
-    int rc;
 
     body = cJSON_CreateObject();
     if (!body)
@@ -562,7 +565,8 @@ static char *create_cp_mv_request_body(const char *path)
     if (!parent_ref)
         goto error_exit;
 
-    sprintf(url, "/drive/root:%s", dirname((char *)path));
+    strcpy(path_tmp, path);
+    sprintf(url, "/drive/root:%s", dirname(path_tmp));
     item = cJSON_AddStringToObject(parent_ref, "path", url);
     if (!item)
         goto error_exit;

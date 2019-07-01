@@ -2,21 +2,34 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <pthread.h>
-#include <crystal.h>
-#ifdef HAVE_SYS_PARAM_H
-#include <sys/param.h>
-#endif
-#include <arpa/inet.h>
 #include <stdbool.h>
-#include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <errno.h>
-#include <cjson/cJSON.h>
 
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#ifdef HAVE_ARPA_INET_H
+#include <arpa/inet.h>
+#endif
+#ifdef HAVE_SYS_PARAM_H
+#include <sys/param.h>
+#endif
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
+#ifdef HAVE_ALLOCA_H
+#include <alloca.h>
+#endif
 #if defined(_WIN32) || defined(_WIN64)
+#include <io.h>
+#include <winsock2.h>
 #include <winnt.h>
 #endif
+
+#include <cjson/cJSON.h>
+#include <crystal.h>
 
 #include "ela_hive.h"
 #include "ipfs_client.h"
@@ -41,6 +54,9 @@ static int ipfs_client_login(HiveClient *base,
     IPFSClient *client = (IPFSClient *)base;
     ipfs_token_t *token = client->token;
     int rc;
+
+    (void)cb;
+    (void)user_data;
 
     rc = ipfs_token_check_reachable(client->token);
     if (rc < 0)
@@ -70,7 +86,7 @@ static int ipfs_client_logout(HiveClient *base)
 static int ipfs_client_get_info(HiveClient *base, HiveClientInfo *result)
 {
     IPFSClient *client = (IPFSClient *)base;
-    ipfs_token_t *token = (ipfs_token_t *)client->token;
+    ipfs_token_t *token = client->token;
     int rc;
 
     assert(client);
@@ -129,7 +145,7 @@ static void ipfs_client_destructor(void *p)
     IPFSClient *client = (IPFSClient *)p;
 
     if (client->token)
-        ipfs_token_close((ipfs_token_t *)client->token);
+        ipfs_token_close(client->token);
 }
 
 static inline bool is_valid_ip(const char *ip)
@@ -186,6 +202,7 @@ static int writeback_token(const cJSON *json, void *user_data)
 {
     IPFSClient *client = (IPFSClient *)user_data;
     char *json_str;
+    int json_str_len;
     int fd;
     int bytes;
 
@@ -201,11 +218,12 @@ static int writeback_token(const cJSON *json, void *user_data)
         return -1;
     }
 
-    bytes = (int)write(fd, json_str, strlen(json_str) + 1);
+    json_str_len = strlen(json_str);
+    bytes = (int)write(fd, json_str, json_str_len + 1);
     free(json_str);
     close(fd);
 
-    if (bytes != (int)strlen(json_str) + 1)
+    if (bytes != json_str_len + 1)
         return -1;
 
     return 0;
@@ -289,7 +307,7 @@ HiveClient *ipfs_client_new(const HiveOptions *options)
     }
 
     // check token cookie
-    rc = snprintf(token_cookie, sizeof(token_cookie), "%s/ipfs.json",
+    rc = snprintf(token_cookie, sizeof(token_cookie), "%s/.data/ipfs.json",
                   opts->base.persistent_location);
     if (rc < 0 || rc >= sizeof(token_cookie))
         return NULL;

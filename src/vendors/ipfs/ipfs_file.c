@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+
 #include <crystal.h>
 
 #include "ipfs_file.h"
@@ -78,7 +79,7 @@ static int get_file_stat(ipfs_token_t *token, const char *path, size_t *fsz)
         return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
     }
 
-    *fsz = item->valuedouble;
+    *fsz = (size_t)item->valuedouble;
     cJSON_Delete(json);
 
     return 0;

@@ -6,7 +6,11 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <pthread.h>
+
+#ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
+#endif
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -16,7 +20,6 @@
 #ifdef HAVE_IO_H
 #include <io.h>
 #endif
-#include <pthread.h>
 
 #include <crystal.h>
 #include <cjson/cJSON.h>
@@ -129,7 +132,7 @@ static int restore_access_token(const cJSON *json, oauth_token_t *token)
         !cJSON_IsString(access_token) ||
         !cJSON_IsString(refresh_token) ||
         !cJSON_IsNumber(expires_at))
-        return HIVE_GENERAL_ERROR(HIVEERR_BAD_PERSISTENT_DATA);;
+        return 0;
 
     mem_len += strlen(token_type->valuestring) + 1;
     mem_len += strlen(access_token->valuestring) + 1;
@@ -154,7 +157,7 @@ static int restore_access_token(const cJSON *json, oauth_token_t *token)
     return 0;
 }
 
-oauth_token_t *oauth_token_new(const oauth_options_t *opts, oauth_writeback_func_t cb,
+oauth_token_t *oauth_token_new(const oauth_options_t *opts, oauth_writeback_func_t *cb,
                                void *user_data)
 {
     oauth_token_t *token;
@@ -211,7 +214,6 @@ oauth_token_t *oauth_token_new(const oauth_options_t *opts, oauth_writeback_func
 
     token->redirect_url = p;
     strcpy(p, opts->redirect_url);
-    p += strlen(p) + 1;
 
 
     token->writeback_cb = cb;
@@ -285,7 +287,7 @@ static int handle_auth_redirect(sb_Event *e)
 static void *request_auth_entry(void *args)
 {
     oauth_request_func_t *cb = (oauth_request_func_t *)ARGV(args, 0);
-    void *user_data = (void *)ARGV(args, 1);
+    void *user_data = ARGV(args, 1);
     char *url = (char *)ARGV(args, 2);
 
     assert(url);
@@ -628,7 +630,7 @@ error_exit:
 }
 
 int oauth_token_request(oauth_token_t *token,
-                        oauth_request_func_t cb, void *user_data)
+                        oauth_request_func_t *cb, void *user_data)
 {
     char authorize_code[512] = {0};
     char *code;

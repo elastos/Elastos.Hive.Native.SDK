@@ -56,6 +56,7 @@ int http_client_get_path(http_client_t *, char **path);
  * Http client request/response body.
  */
 
+#define HTTP_CLIENT_REQBODY_ABORT 0x10000000
 typedef size_t (*http_client_request_body_callback_t)(char *buffer,
     size_t size, size_t nitems, void *userdata);
 
