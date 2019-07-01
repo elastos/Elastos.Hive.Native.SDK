@@ -404,7 +404,7 @@ int onedrive_drive_list_files(HiveDrive *base, const char *path,
         }
 
         sub_array = cJSON_GetObjectItemCaseSensitive(json, "value");
-        if (!sub_array || !cJSON_IsArray(sub_array) || !cJSON_GetArraySize(sub_array)) {
+        if (!sub_array || !cJSON_IsArray(sub_array)) {
             cJSON_Delete(json);
             rc = HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
             break;

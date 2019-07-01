@@ -132,7 +132,7 @@ static int restore_access_token(const cJSON *json, oauth_token_t *token)
         !cJSON_IsString(access_token) ||
         !cJSON_IsString(refresh_token) ||
         !cJSON_IsNumber(expires_at))
-        return HIVE_GENERAL_ERROR(HIVEERR_BAD_PERSISTENT_DATA);
+        return 0;
 
     mem_len += strlen(token_type->valuestring) + 1;
     mem_len += strlen(access_token->valuestring) + 1;

@@ -202,6 +202,7 @@ static int writeback_token(const cJSON *json, void *user_data)
 {
     IPFSClient *client = (IPFSClient *)user_data;
     char *json_str;
+    int json_str_len;
     int fd;
     int bytes;
 
@@ -217,11 +218,12 @@ static int writeback_token(const cJSON *json, void *user_data)
         return -1;
     }
 
-    bytes = (int)write(fd, json_str, strlen(json_str) + 1);
+    json_str_len = strlen(json_str);
+    bytes = (int)write(fd, json_str, json_str_len + 1);
     free(json_str);
     close(fd);
 
-    if (bytes != (int)strlen(json_str) + 1)
+    if (bytes != json_str_len + 1)
         return -1;
 
     return 0;

@@ -73,7 +73,10 @@ const ErrorDesc error_codes[] = {
     { HIVEERR_BAD_PERSISTENT_DATA,         "Bad persistent data"     },
     { HIVEERR_INVALID_PERSISTENCE_FILE,    "Invalid persistent file" },
     { HIVEERR_INVALID_CREDENTIAL,          "Invalid credential"      },
-    { HIVEERR_INVALID_USERID,              "Invalid userid"          },
+    { HIVEERR_NOT_READY,                   "SDK not ready"           },
+    { HIVEERR_NOT_EXIST,                   "Entity not exists"       },
+    { HIVEERR_ALREADY_EXIST,               "Entity already exists"   },
+    { HIVEERR_INVALID_USERID,              "Invalid user id"         },
     { HIVEERR_WRONG_STATE,                 "Being in wrong state"    },
     { HIVEERR_BUSY,                        "Instance is being busy"  },
     { HIVEERR_LANGUAGE_BINDING,            "Language binding error"  },
@@ -85,6 +88,8 @@ const ErrorDesc error_codes[] = {
     { HIVEERR_BAD_BOOTSTRAP_HOST,          "Bad bootstrap host"      },
     { HIVEERR_BAD_BOOTSTRAP_PORT,          "Bad bootstrap port"      },
     { HIVEERR_BAD_ADDRESS,                 "Bad carrier node address"},
+    { HIVEERR_BAD_JSON_FORMAT,             "Bad json format"         },
+    { HIVEERR_TRY_AGAIN,                   "Try again the operation" },
     { HIVEERR_UNKNOWN,                     "Unknown error"           }
 };
 
