@@ -5,6 +5,8 @@ matrix:
   - os: osx
     env: BUILD_ENV=darwin_x64 BUILD_TYPE=Debug
 
+  - env: BUILD_ENV=linux_x64 BUILD_TYPE=Debug
+
 script:
   - cd $TRAVIS_BUILD_DIR/build && mkdir ${BUILD_ENV}_${BUILD_TYPE} && cd ${BUILD_ENV}_${BUILD_TYPE}
   - cmake -DCMAKE_INSTALL_PREFIX=dist -DCMAKE_BUILD_TYPE=BUILD_TYPE ../..
