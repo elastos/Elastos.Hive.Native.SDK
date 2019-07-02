@@ -180,7 +180,7 @@ typedef struct OneDriveOptions {
 
 /**
  * \~English
- * The Hive hive node.
+ * The Hive RPC node.
  */
 typedef struct HiveRpcNode {
     /**
@@ -203,6 +203,10 @@ typedef struct HiveRpcNode {
     const char *port;
 } HiveRpcNode;
 
+/**
+ * \~English
+ * The IPFS client options.
+ */
 typedef struct IPFSOptions {
     /**
      * \~English
@@ -216,12 +220,12 @@ typedef struct IPFSOptions {
     const char *uid;
 
     /**
-     * The count of IPFS rpc addresses.
+     * The count of IPFS RPC nodes.
      */
     size_t rpc_node_count;
 
     /**
-     * The array of rpc address of hive IPFS nodes.
+     * The array of addresses of IPFS RPC nodes.
      */
     HiveRpcNode *rpcNodes;
 } IPFSOptions;
@@ -298,7 +302,8 @@ typedef struct HiveFileInfo {
  *
  * If the data is stored under @options.peristent_location, the client
  * instance would be created base on it. Otherwise, a new client instance
- * would be created and returned without any user context.
+ * would be created and returned without any user context. On sucessfully
+ * returning, the state of client instance is "raw".
  *
  * All other hive APIs should be called after having client instance.
  *
@@ -320,9 +325,9 @@ HiveClient *hive_client_new(const HiveOptions *options);
  *
  * After closing client instance, all derived instances of this client,
  * such as drive and file instances would become invalid. And any calling
- * APIs with invalid derive and file instance would be undefined.
+ * APIs with invalid drive and file instance would be undefined.
  *
- * All derived instances such drive and files should be closed before
+ * All derived instances such as drive and files should be closed before
  * calling this API.
  *
  * @param
@@ -336,20 +341,33 @@ HIVE_API
 int hive_client_close(HiveClient *client);
 
 /**
- * TODO
+ * \~English
+ * User defined function to open authentication URL during login process.
+ *
+ * @param
+ *      url         [in] Authentication URL to be opened.
+ * @param
+ *      context     [in] User data.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1.
  */
 typedef int HiveRequestAuthenticationCallback(const char *url, void *context);
 
 /**
  * \~English
  * Associate a user with the @client. During the process, the user
- * delegates to the @client.
+ * delegates to the @client. On successfully returning, the state of @client
+ * becomes "logined".
  *
- * This function is effective only when no user is associated with the
- * @client.
+ * This function is effective only when state of @client is "raw".
  *
  * @param
  *      client      [in] A handle identifying the Hive client instance.
+ * @param
+ *      callback    [in] Callback to open authentication URL during login process.
+ * @param
+ *      context     [in] User data to be passed as context parameter to @callback.
  *
  * @return
  *      If no error occurs, return 0. Otherwise, return -1, and a specific
@@ -363,11 +381,11 @@ int hive_client_login(HiveClient *client,
 /**
  * \~English
  * Dissociate the user from the @client. All client's data in persistent
- * location is deleted. If a drive had been constructed out of the client,
- * it would also be closed. The drive handle becomes invalid after the call,
- * no functions should be called upon the drive handle.
+ * location is deleted. All derived instances of this client, such as drive
+ * and file instances would become invalid. And any calling APIs with invalid
+ * drive and file instance would be undefined.
  *
- * This function is effective only when a user is associated with the
+ * This function is effective only when state of @client is "logined".
  * @client.
  *
  * @param
@@ -383,10 +401,9 @@ int hive_client_logout(HiveClient *client);
 /**
  * \~English
  * Get @client associated user's information. The result is filled into
- * @result.
+ * @client_info.
  *
- * This function is effective only when a user is associated with the
- * @client.
+ * This function is effective only when state of @client is "logined".
  *
  * @param
  *      client      [in] A handle identifying the Hive client instance.
@@ -410,9 +427,9 @@ int hive_client_get_info(HiveClient *client, HiveClientInfo *client_info);
  * Create a new Hive drive instance representing the default drive of
  * specific client.
  *
- * This function is effective only after the client has logined with
- * authentication. Caller is reponsible for close this drive instance
- * to reclaim resources when drive instance would not be used anymore.
+ * This function is effective only when state of @client is "logined". Caller is
+ * responsible for closing this drive instance to reclaim resources when drive
+ * instance would not be used anymore.
  *
  * @param
  *      client      [in] A handle identifying the Hive client instance.
@@ -444,10 +461,10 @@ int hive_drive_close(HiveDrive *drive);
 
 /**
  * \~English
- * Get @drive's information. The result is filled into @result.
+ * Get @drive's information. The result is filled into @drive_info.
  *
- * This function is effective only when a user is associated with the
- * client generating the @drive.
+ * This function is effective only when state of client generating the @drive is
+ * "logined".
  *
  * @param
  *      drive       [in] A handle identifying the Hive drive instance.
@@ -464,7 +481,7 @@ int hive_drive_get_info(HiveDrive *drive, HiveDriveInfo *drive_info);
 
 /**
  * \~English
- * A structure aimed at describing one of the properties of a file.
+ * A structure aimed to describing one of the properties of a file.
  */
 typedef struct KeyValue {
     /**
@@ -488,30 +505,31 @@ typedef struct KeyValue {
  *
  * @param
  *      info        [in] A pointer to an array of KeyValue carrying various
- *                       properties of the file. Null means interation end.
+ *                       properties of the file. NULL means end of iteration.
  * @param
  *      size        [in] the size of the KeyValue array.
  * @param
  *      context     [in] The application-defined context data.
  *
  * @return
- *      Return true to continue iteration, false to abort from interation
- *      process immediately.
+ *      Return true to continue iteration, false to abort from iteration
+ *      immediately.
  */
 typedef bool HiveFilesIterateCallback(const KeyValue *info, size_t size,
                                       void *context);
 
 /**
  * \~English
- * Iterate file info under the sepcified directory path.
+ * Iterate file info under the specified directory path.
  *
  * Callback would be invoked to iterate information of each file after having
  * acquired the list of information under the directory from remote drive.
  *
- * This function is effective only after the client has been logined.
+ * This function is effective only when state of client generating @drive is
+ * "logined".
  *
  * @param
- *      drive      [in] A handle identifying the Hive client instance.
+ *      drive      [in] A handle identifying the Hive drive instance.
  * @param
  *      path       [in] The absolute path to a directory list its file infos.
  * @param
@@ -530,14 +548,13 @@ int hive_drive_list_files(HiveDrive *drive, const char *path,
 
 /**
  * \~English
- * Create a directory specified by @path in @drive. The result is
- * a json string(not necessarily null-terminated) passed to @result.
+ * Create a directory specified by @path in @drive.
  *
- * This function is effective only when a user is associated with the
- * client generating the @drive.
+ * This function is effective only when state of client generating @drive is
+ * "logined".
  *
  * @param
- *      drive      [in] A handle identifying the Hive client instance.
+ *      drive      [in] A handle identifying the Hive drive instance.
  * @param
  *      path       [in] The absolute path to a directory in @drive.
  *
@@ -552,11 +569,11 @@ int hive_drive_mkdir(HiveDrive *drive, const char *path);
  * \~English
  * Move the file specified by @old to the new path @new in @drive.
  *
- * This function is effective only when a user is associated with the
- * client generating the @drive.
+ * This function is effective only when state of client generating @drive is
+ * "logined".
  *
  * @param
- *      drive      [in] A handle identifying the Hive client instance.
+ *      drive      [in] A handle identifying the Hive drive instance.
  * @param
  *      old        [in] The absolute path of file that would be moved.
  * @param
@@ -573,11 +590,11 @@ int hive_drive_move_file(HiveDrive *drive, const char *old, const char *new);
  * \~English
  * Copy the file specified by @src_path to path specified by @dest_path in @drive.
  *
- * This function is effective only when a user is associated with the
- * client generating the @drive.
+ * This function is effective only when state of client generating @drive is
+ * "logined".
  *
  * @param
- *      drive      [in] A handle identifying the Hive client instance.
+ *      drive      [in] A handle identifying the Hive drive instance.
  * @param
  *      src        [in] The absolute path of file that would be copied.
  * @param
@@ -594,11 +611,11 @@ int hive_drive_copy_file(HiveDrive *drive, const char *src, const char *dest);
  * \~English
  * Delete the file specified by @path in @drive.
  *
- * This function is effective only when a user is associated with the
- * client generating the @drive.
+ * This function is effective only when state of client generating @drive is
+ * "logined".
  *
  * @param
- *      drive      [in] A handle identifying the Hive client instance.
+ *      drive      [in] A handle identifying the Hive drive instance.
  * @param
  *      path       [in] The absolute path to a file in @drive.
  *
@@ -612,13 +629,13 @@ int hive_drive_delete_file(HiveDrive *drive, const char *path);
 /**
  * \~English
  * Get status of the file specified by @file_path in @drive. The result is
- * a json string(not necessarily null-terminated) passed to @result.
+ * filled into @file_info.
  *
- * This function is effective only when a user is associated with the
- * client generating the @drive.
+ * This function is effective only when state of client generating @drive is
+ * "logined".
  *
  * @param
- *      drive      [in] A handle identifying the Hive client instance.
+ *      drive      [in] A handle identifying the Hive drive instance.
  * @param
  *      path       [in] The absolute path to a file in @drive.
  * @param
@@ -633,30 +650,169 @@ HIVE_API
 int hive_drive_file_stat(HiveDrive *drive, const char *path,
                          HiveFileInfo *file_info);
 
+/******************************************************************************
+ * File APIs
+ *****************************************************************************/
+/**
+ * \~English
+ *
+ * Open a file specified by @path under @drive.
+ *
+ * This function is effective only when state of client generating @drive is
+ * "logined".
+ *
+ * @param
+ *      drive      [in] A handle identifying the Hive drive instance.
+ * @param
+ *      path       [in] The absolute path to a file in @drive.
+ * @param
+ *      mode       [in] The operation mode of the file instance(same as type
+ *                      parameter of fopen()).
+ *
+ * @return
+ *      If no error occurs, return the file instance. Otherwise, return NULL,
+ *      and a specific error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 HiveFile *hive_file_open(HiveDrive *drive, const char *path, const char *mode);
 
+/**
+ * \~English
+ * Close the hive file instance to destroy all associated resources.
+ *
+ * As long as the file instance is closed, it becomes invalid. And calling
+ * any function related invalid drive instance would be undefined.
+ *
+ * @param
+ *      file      [in] A handle identifying the Hive file instance.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 int hive_file_close(HiveFile *file);
 
+/**
+ * \~English
+ * Enumeration of whence parameter of hive_file_seek().
+ */
 enum {
+    /**
+     * \~English
+     * The base is the beginning of the file.
+     */
     HiveSeek_Set = (int)0,
+    /**
+     * \~English
+     * The base is the current file's position indicator.
+     */
     HiveSeek_Cur = (int)1,
+    /**
+     * \~English
+     * The base is the end of file.
+     */
     HiveSeek_End = (int)2,
 };
 
+/**
+ * \~English
+ * Modify @file's position indicator.
+ *
+ * This function is effective only when state of client associated with @file is
+ * "logined".
+ *
+ * @param
+ *      file       [in] A handle identifying the Hive file instance.
+ * @param
+ *      offset     [in] The offset relative to @whence where @file's position
+ *                      indicator is to be positioned.
+ * @param
+ *      whence     [in] The base of @offset(one of HiveSeek_Set, HiveSeek_Cur,
+ *                      HiveSeek_End).
+ *
+ * @return
+ *      If no error occurs, return new file offset. Otherwise, return -1, and a
+ *      specific error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 ssize_t hive_file_seek(HiveFile *file, ssize_t offset, int whence);
 
+/**
+ * \~English
+ * Read @bufsz bytes of data from @file.
+ *
+ * This function is effective only when state of client associated with @file is
+ * "logined".
+ *
+ * @param
+ *      file       [in] A handle identifying the Hive file instance.
+ * @param
+ *      buf        [in] Buffer to hold data.
+ * @param
+ *      bufsz      [in] Length of data to be read.
+ *
+ *
+ * @return
+ *      If no error occurs, return length of data actually read. Otherwise, return -1,
+ *      and a specific error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 ssize_t hive_file_read(HiveFile *file, char *buf, size_t bufsz);
 
+/**
+ * \~English
+ * write @bufsz bytes of data to @file.
+ *
+ * This function is effective only when state of client associated with @file is
+ * "logined".
+ *
+ * @param
+ *      file       [in] A handle identifying the Hive file instance.
+ * @param
+ *      buf        [in] Buffer to hold data.
+ * @param
+ *      bufsz      [in] Length of data to be written.
+ *
+ *
+ * @return
+ *      If no error occurs, return length of data actually written. Otherwise, return -1,
+ *      and a specific error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 ssize_t hive_file_write(HiveFile *file, const char *buf, size_t bufsz);
 
+/**
+ * \~English
+ * Commit local change on @file to backend.
+ *
+ * This function is effective only when state of client associated with @file is
+ * "logined".
+ *
+ * @param
+ *      file       [in] A handle identifying the Hive file instance.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific error code
+ *      can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 int hive_file_commit(HiveFile *file);
 
+/**
+ * \~English
+ * Discard local change on @file.
+ *
+ * This function is effective only when state of client associated with @file is
+ * "logined".
+ *
+ * @param
+ *      file       [in] A handle identifying the Hive file instance.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific error code
+ *      can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 int hive_file_discard(HiveFile *file);
 
@@ -822,6 +978,10 @@ int hive_file_discard(HiveFile *file);
  */
 #define HIVEERR_UNKNOWN                              0xFF
 
+/**
+ * \~English
+ * HTTP status code.
+ */
 #define HttpStatus_Continue                          100
 #define HttpStatus_SwitchingProtocols                101
 #define HttpStatus_Processing                        102
