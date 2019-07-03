@@ -15,24 +15,24 @@ Elastos Hive Native SDK provides a set of APIs to enable SDK users to perform fi
    - [Introduction](#introduction)  
    - [Table of Contents](#table-of-contents)  
    - [Usage](#usage)  
-   - [Build on Ubuntu / Debian / Linux Host](#build-on-ubuntu-debian-linux-host)  
+   - [Build on Ubuntu / Debian / Linux Host](#build-on-ubuntu--debian--linux-host)  
       - [1. Install Pre-Requirements](#1-install-pre-requirements)  
-      - [2. Build to run on host (Ubuntu / Debian / Linux)](#2-build-to-run-on-host-ubuntu-debian-linux)  
-      - [3. Run HiveDemo](#3-run-HiveDemo)  
+      - [2. Build to run on host (Ubuntu / Debian / Linux)](#2-build-to-run-on-host-ubuntu--debian--linux)  
+      - [3. Run HiveDemo](#3-run-hivedemo)  
    - [Build on MacOS Host](#build-on-macos-host)  
-      - [1. Install Pre-Requirements](#1-install-pre-requirements)  
+      - [1. Install Pre-Requirements](#1-install-pre-requirements-1)  
       - [2. Build to run on host](#2-build-to-run-on-host)  
-      - [3. Run HiveDemo](#3-run-HiveDemo)  
+      - [3. Run HiveDemo](#3-run-hivedemo-1)  
    - [Build on Windows Host](#build-on-windows-host)  
       - [1. Brief introduction](#1-brief-introduction)  
       - [2. Set up Environment](#2-set-up-environment)  
       - [3. Build to run on host](#3-build-to-run-on-host)  
-      - [4. Run HiveDemo](#4-run-HiveDemo)  
+      - [4. Run HiveDemo](#4-run-hivedemo)  
    - [Build API Documentation](#build-api-documentation)  
-   - [Build on Ubuntu / Debian / Linux Host](#build-on-ubuntu-debian-linux-host)  
-      - [1. Install Pre-Requirements](#1-install-pre-requirements)  
-      - [2. Build](#2-build)  
-      - [3. View](#3-view)  
+      - [Build on Ubuntu / Debian / Linux Host](#build-on-ubuntu--debian--linux-host-1)  
+         - [1. Install Pre-Requirements](#1-install-pre-requirements-2)  
+         - [2. Build](#2-build)  
+         - [3. View](#3-view)  
    - [Contribution](#contribution)  
    - [Acknowledgments](#acknowledgments)  
    - [License](#license)  
@@ -370,7 +370,7 @@ Available commands in the shell can be listed by using the command **help**. Spe
   
 Currently, the API documentation can only be built on **Linux** hosts. MacOS has a bug issue with python, which would cause build process failure.  
   
-## Build on Ubuntu / Debian / Linux Host  
+### Build on Ubuntu / Debian / Linux Host  
   
 #### 1. Install Pre-Requirements  
   
