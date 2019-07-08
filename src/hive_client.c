@@ -23,6 +23,14 @@ static FactoryMethod factory_methods[] = {
     { HiveDriveType_Butt,      NULL }
 };
 
+void ela_log_init(ElaLogLevel level, const char *log_file,
+                  void (*log_printer)(const char *format, va_list args))
+{
+#if !defined(__ANDROID__)
+    vlog_init(level, log_file, log_printer);
+#endif
+}
+
 HiveClient *hive_client_new(const HiveOptions *options)
 {
     FactoryMethod *method = &factory_methods[0];
@@ -30,14 +38,18 @@ HiveClient *hive_client_new(const HiveOptions *options)
     struct stat st;
     int rc;
 
+    vlogD("Client: Calling hive_client_new().");
+
     if (!options || !options->persistent_location ||
         !*options->persistent_location) {
+        vlogE("Client: Failed to create hive client instance: invalid arguments.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return NULL;
     }
 
     rc = stat(options->persistent_location, &st);
     if (rc < 0|| !S_ISDIR(st.st_mode)) {
+        vlogE("Client: Failed to create hive client instance: failed to call stat().");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return NULL;
     }
@@ -50,6 +62,7 @@ HiveClient *hive_client_new(const HiveOptions *options)
     }
 
     if (!method->create_client) {
+        vlogE("Client: Failed to create hive client instance: unsupported client type.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED));
         return NULL;
     }
@@ -74,7 +87,10 @@ int hive_client_login(HiveClient *client,
 {
     int rc;
 
+    vlogD("Client: Calling hive_client_login().");
+
     if (!client) {
+        vlogE("Client: Failed to login: no given client instance.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
     }
@@ -103,6 +119,7 @@ int hive_client_login(HiveClient *client,
     if (client->login) {
         rc = client->login(client, callback, context);
         if (rc < 0) {
+            vlogE("Client: Failed to login (%d).", rc);
             // recover back to 'RAW' state.
             _test_and_swap(&client->state, LOGINING, RAW);
             hive_set_error(rc);
@@ -120,7 +137,10 @@ int hive_client_logout(HiveClient *client)
 {
     int rc;
 
+    vlogD("Client: Calling hive_client_logout().");
+
     if (!client) {
+        vlogE("Client: Failed to logout: no given client instance.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
     }
@@ -151,17 +171,22 @@ int hive_client_get_info(HiveClient *client, HiveClientInfo *info)
 {
     int rc;
 
+    vlogD("Client: Calling hive_client_get_info().");
+
     if (!client || !info) {
+        vlogE("Client: Failed to get client info: invalid arguments.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
     }
 
     if (!has_valid_token(client))  {
+        vlogE("Client: Failed to get client info: client not in valid state.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_READY));
         return -1;
     }
 
     if (!client->get_info) {
+        vlogE("Client: Failed to get client info: client type does not support this method.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED));
         return -1;
     }
@@ -180,23 +205,29 @@ HiveDrive *hive_drive_open(HiveClient *client)
     HiveDrive *drive;
     int rc;
 
+    vlogD("Client: Calling hive_drive_open().");
+
     if (!client) {
+        vlogE("Client: Failed to open drive: no given client instance.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return NULL;
     }
 
     if (!has_valid_token(client))  {
+        vlogE("Client: Failed to open drive: client is not in valid state.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_READY));
         return NULL;
     }
 
     if (!client->get_drive) {
+        vlogE("Client: Failed to open drive: client type does not support this method.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED));
         return NULL;
     }
 
     rc = client->get_drive(client, &drive);
     if (rc < 0) {
+        vlogE("Client: Failed to open drive (%d).", rc);
         hive_set_error(rc);
         return NULL;
     }

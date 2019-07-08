@@ -58,20 +58,27 @@ static int ipfs_client_login(HiveClient *base,
     (void)cb;
     (void)user_data;
 
-    rc = ipfs_token_check_reachable(client->token);
-    if (rc < 0)
-        return rc;
+    vlogD("IpfsClient: Calling ipfs_client_login().");
 
-    rc = ipfs_token_synchronize(token);
+    rc = ipfs_token_check_reachable(client->token);
     if (rc < 0) {
-        if (RC_NODE_UNREACHABLE(rc)) {
-            rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
-            ipfs_token_mark_node_unreachable(client->token);
-        }
+        vlogE("IpfsClient: No reachable IPFS node (%d).", rc);
         return rc;
     }
 
-    vlogI("Hive: This client logined onto Hive IPFS in success");
+    rc = ipfs_token_synchronize(token);
+    if (RC_NODE_UNREACHABLE(rc)) {
+        rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
+        vlogE("IpfsClient: Current IPFS node is unreachable (%d).", rc);
+        ipfs_token_mark_node_unreachable(client->token);
+    }
+
+    if (rc < 0) {
+        vlogE("IpfsClient: IPFS node synchronization failure (%d).", rc);
+        return rc;
+    }
+
+    vlogI("IpfsClient: This client logined onto Hive IPFS in success");
     return 0;
 }
 
@@ -79,8 +86,18 @@ static int ipfs_client_logout(HiveClient *base)
 {
     IPFSClient *client = (IPFSClient *)base;
     ipfs_token_t *token = client->token;
+    int rc;
 
-    return ipfs_token_reset(token);
+    vlogD("IpfsClient: Calling ipfs_client_logout().");
+
+    rc = ipfs_token_reset(token);
+    if (rc < 0) {
+        vlogE("IpfsClient: IPFS node synchronization failure (%d).", rc);
+        return rc;
+    }
+
+    vlogI("IpfsClient: Successfully logout of IPFS.");
+    return 0;
 }
 
 static int ipfs_client_get_info(HiveClient *base, HiveClientInfo *result)
@@ -92,26 +109,38 @@ static int ipfs_client_get_info(HiveClient *base, HiveClientInfo *result)
     assert(client);
     assert(result);
 
+    vlogD("IpfsClient: Calling ipfs_client_get_info().");
+
     rc = snprintf(result->user_id, sizeof(result->user_id), "%s",
                   ipfs_token_get_uid(token));
-    if (rc < 0 || rc >= sizeof(result->user_id))
+    if (rc < 0 || rc >= sizeof(result->user_id)) {
+        vlogE("IpfsClient: Failed to fill user id field of client info.");
         return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
+    }
 
     rc = snprintf(result->display_name, sizeof(result->display_name), "");
-    if (rc < 0 || rc >= sizeof(result->display_name))
+    if (rc < 0 || rc >= sizeof(result->display_name)) {
+        vlogE("IpfsClient: Failed to fill display name field of client info.");
         return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
+    }
 
     rc = snprintf(result->email, sizeof(result->email), "");
-    if (rc < 0 || rc >= sizeof(result->email))
+    if (rc < 0 || rc >= sizeof(result->email)) {
+        vlogE("IpfsClient: Failed to fill email field of client info.");
         return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
+    }
 
     rc = snprintf(result->phone_number, sizeof(result->phone_number), "");
-    if (rc < 0 || rc >= sizeof(result->phone_number))
+    if (rc < 0 || rc >= sizeof(result->phone_number)) {
+        vlogE("IpfsClient: Failed to fill phone number field of client info.");
         return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
+    }
 
     rc = snprintf(result->region, sizeof(result->region), "");
-    if (rc < 0 || rc >= sizeof(result->region))
+    if (rc < 0 || rc >= sizeof(result->region)) {
+        vlogE("IpfsClient: Failed to fill region field of client info.");
         return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
+    }
 
     return 0;
 }
@@ -123,9 +152,13 @@ static int ipfs_client_drive_open(HiveClient *base, HiveDrive **drive)
 
     assert(base);
 
+    vlogD("IpfsClient: Calling ipfs_client_drive_open().");
+
     tmp = ipfs_drive_open(client->token);
-    if (!tmp)
+    if (!tmp) {
+        vlogE("IpfsClient: Failed to open IPFS drive (%d).", hive_get_error());
         return hive_get_error();
+    }
 
     *drive = tmp;
 
@@ -170,30 +203,42 @@ static cJSON *load_ipfs_token_cookie(const char *path)
 
     assert(path);
 
+    vlogD("IpfsClient: Calling load_ipfs_token_cookie().");
+
     rc = stat(path, &st);
-    if (rc < 0)
+    if (rc < 0) {
+        vlogE("IpfsClient: Failed to token from cookie: cookie file does not exist.");
         return NULL;
+    }
 
     if (!st.st_size || st.st_size > sizeof(buf)) {
+        vlogE("IpfsClient: Failed to token from cookie: cookie file size does not meet requirment.");
         errno = ERANGE;
         return NULL;
     }
 
     fd = open(path, O_RDONLY);
-    if (fd < 0)
+    if (fd < 0) {
+        vlogE("IpfsClient: Failed to token from cookie: cookie file can not be opened.");
         return NULL;
+    }
 
     rc = (int)read(fd, buf, st.st_size);
     close(fd);
 
-    if (rc < 0 || rc != st.st_size)
+    if (rc < 0 || rc != st.st_size) {
+        vlogE("IpfsClient: Failed to token from cookie: read cookie file error.");
         return NULL;
+    }
 
     json = cJSON_Parse(buf);
     if (!json) {
+        vlogE("IpfsClient: Failed to token from cookie: invalid cookie file content.");
         errno = ENOMEM;
         return NULL;
     }
+
+    vlogI("IpfsClient: Successfully loaded token from cookie.");
 
     return json;
 }
@@ -206,14 +251,18 @@ static int writeback_token(const cJSON *json, void *user_data)
     int fd;
     int bytes;
 
+    vlogD("IpfsClient: Calling writeback_token().");
+
     json_str = cJSON_PrintUnformatted(json);
     if (!json_str || !*json_str) {
+        vlogE("IpfsClient: Write back token to cookie: invalid token format.");
         errno = ENOMEM;
         return -1;
     }
 
     fd = open(client->token_cookie, O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
     if (fd < 0) {
+        vlogE("IpfsClient: Write back token to cookie: failed to open cookie file.");
         free(json_str);
         return -1;
     }
@@ -223,8 +272,12 @@ static int writeback_token(const cJSON *json, void *user_data)
     free(json_str);
     close(fd);
 
-    if (bytes != json_str_len + 1)
+    if (bytes != json_str_len + 1) {
+        vlogE("IpfsClient: Write back token to cookie: failed to write to cookie file.");
         return -1;
+    }
+
+    vlogI("IpfsClient: Successfully save token to cookie file.");
 
     return 0;
 }
@@ -242,21 +295,27 @@ HiveClient *ipfs_client_new(const HiveOptions *options)
 
     assert(options);
 
+    vlogD("IpfsClient: Calling ipfs_client_new().");
+
     token_options_sz = sizeof(*token_options) +
                        sizeof(rpc_node_t) * opts->rpc_node_count;
     token_options = alloca(token_options_sz);
     memset(token_options, 0, token_options_sz);
 
     // check uid configuration
-    if (opts->uid && (!*opts->uid || strlen(opts->uid) >= sizeof(token_options->uid)))
+    if (opts->uid && (!*opts->uid || strlen(opts->uid) >= sizeof(token_options->uid))) {
+        vlogE("IpfsClient: Failed to create IPFS client instance: invalid uid configuration.");
         return NULL;
+    }
 
     if (opts->uid)
         strcpy(token_options->uid, opts->uid);
 
     // check bootstraps configuration
-    if (!opts->rpc_node_count)
+    if (!opts->rpc_node_count) {
+        vlogE("IpfsClient: Failed to create IPFS client instance: at least one rpc node address is needed.");
         return NULL;
+    }
 
     token_options->rpc_nodes_count = opts->rpc_node_count;
     for (i = 0; i < opts->rpc_node_count; ++i) {
@@ -270,38 +329,54 @@ HiveClient *ipfs_client_new(const HiveOptions *options)
         ipv4_len = node->ipv4 ? strlen(node->ipv4) : 0;
         ipv6_len = node->ipv6 ? strlen(node->ipv6) : 0;
 
-        if (!ipv4_len && !ipv6_len)
+        if (!ipv4_len && !ipv6_len) {
+            vlogE("IpfsClient: Failed to create IPFS client instance: node configuration does not contain an address.");
             return NULL;
+        }
 
         if (ipv4_len) {
-            if (ipv4_len >= sizeof(node_options->ipv4))
+            if (ipv4_len >= sizeof(node_options->ipv4)) {
+                vlogE("IpfsClient: Failed to create IPFS client instance: ipv4 address too long.");
                 return NULL;
+            }
 
-            if (!is_valid_ip(node->ipv4))
+            if (!is_valid_ip(node->ipv4)) {
+                vlogE("IpfsClient: Failed to create IPFS client instance: invalid ipv4 address.");
                 return NULL;
+            }
 
             strcpy(node_options->ipv4, node->ipv4);
         }
 
         if (ipv6_len) {
-            if (ipv6_len >= sizeof(node_options->ipv6))
+            if (ipv6_len >= sizeof(node_options->ipv6)) {
+                vlogE("IpfsClient: Failed to create IPFS client instance: ipv6 address too long.");
                 return NULL;
+            }
 
-            if (!is_valid_ipv6(node->ipv6))
+            if (!is_valid_ipv6(node->ipv6)) {
+                vlogE("IpfsClient: Failed to create IPFS client instance: invalid ipv6 address.");
                 return NULL;
+            }
 
             strcpy(node_options->ipv6, node->ipv6);
         }
 
-        if (!node->port || !*node->port)
+        if (!node->port || !*node->port) {
+            vlogE("IpfsClient: Failed to create IPFS client instance: missing port configuration.");
             return NULL;
+        }
 
         port = strtol(node->port, &endptr, 10);
-        if (*endptr)
+        if (*endptr) {
+            vlogE("IpfsClient: Failed to create IPFS client instance: invalid port configuration.");
             return NULL;
+        }
 
-        if (port < 1 || port > 65535)
+        if (port < 1 || port > 65535) {
+            vlogE("IpfsClient: Failed to create IPFS client instance: invalid port range.");
             return NULL;
+        }
 
         node_options->port = (uint16_t)port;
     }
@@ -309,12 +384,15 @@ HiveClient *ipfs_client_new(const HiveOptions *options)
     // check token cookie
     rc = snprintf(token_cookie, sizeof(token_cookie), "%s/.data/ipfs.json",
                   opts->base.persistent_location);
-    if (rc < 0 || rc >= sizeof(token_cookie))
+    if (rc < 0 || rc >= sizeof(token_cookie)) {
+        vlogE("IpfsClient: Failed to create IPFS client instance: invalid cookie path length.");
         return NULL;
+    }
 
     if (!access(token_cookie, F_OK)) {
         token_cookie_json = load_ipfs_token_cookie(token_cookie);
         if (!token_cookie_json) {
+            vlogE("IpfsClient: Failed to create IPFS client instance: load token from cookie error.");
             hive_set_error(HIVE_SYS_ERROR(errno));
             return NULL;
         }
@@ -324,6 +402,7 @@ HiveClient *ipfs_client_new(const HiveOptions *options)
 
     client = (IPFSClient *)rc_zalloc(sizeof(IPFSClient), &ipfs_client_destructor);
     if (!client) {
+        vlogE("IpfsClient: Failed to create IPFS client instance: out of memory.");
         if (token_options->store)
             cJSON_Delete(token_options->store);
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY));
@@ -342,6 +421,7 @@ HiveClient *ipfs_client_new(const HiveOptions *options)
     if (token_options->store)
         cJSON_Delete(token_options->store);
     if (!client->token) {
+        vlogE("IpfsClient: Failed to create IPFS client instance: failed to create IPFS token.");
         deref(client);
         return NULL;
     }

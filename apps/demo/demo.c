@@ -854,7 +854,7 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    // ela_log_init(cfg->loglevel, cfg->logfile, logging);
+    ela_log_init(cfg->loglevel, cfg->logfile, logging);
     demo.cfg = cfg;
     mkdir(cfg->persistent_location, S_IRUSR | S_IWUSR | S_IXUSR);
     if (cfg->client->vendor == HiveDriveType_OneDrive) {

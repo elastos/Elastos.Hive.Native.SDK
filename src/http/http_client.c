@@ -92,35 +92,40 @@ static void finalizer()
 }
 #endif
 
-#ifndef NDEBUG
 static
-void dump(const char *text, FILE *stream, unsigned char *ptr, size_t size)
+void dump(const char *text, unsigned char *ptr, size_t size)
 {
     size_t i;
     size_t c;
     unsigned int width=0x10;
 
-    fprintf(stream, "%s, %10.10ld bytes (0x%8.8lx)\n",
-            text, (long)size, (long)size);
+    vlogD("HttpClient: %s, %10.10ld bytes (0x%8.8lx)",
+          text, (long)size, (long)size);
 
     for(i=0; i<size; i+= width) {
-        fprintf(stream, "%4.4lx: ", (long)i);
+        char buf[1024] = {0};
+        char *cur = buf;
+
+        sprintf(cur, "%4.4lx: ", (long)i);
+        cur += strlen(cur);
 
         /* show hex to the left */
         for(c = 0; c < width; c++) {
             if(i+c < size)
-                fprintf(stream, "%02x ", ptr[i+c]);
+                sprintf(cur, "%02x ", ptr[i+c]);
             else
-                fputs("   ", stream);
+                sprintf(cur, "   ");
+            cur += strlen(cur);
         }
 
         /* show data on the right */
         for(c = 0; (c < width) && (i+c < size); c++) {
             char x = (ptr[i+c] >= 0x20 && ptr[i+c] < 0x80) ? ptr[i+c] : '.';
-            fputc(x, stream);
+            *(cur++) = x;
         }
+        *cur = '\0';
 
-        fputc('\n', stream); /* newline */
+        vlogD("HttpClient: %s", buf);
     }
 }
 
@@ -132,9 +137,12 @@ int trace_func(CURL *handle, curl_infotype type, char *data, size_t size,
     (void)handle; /* prevent compiler warning */
     (void)userp;
 
+    if (log_level < VLOG_DEBUG)
+        return 0;
+
     switch (type) {
     case CURLINFO_TEXT:
-        fprintf(stderr, "== Info: %s", data);
+        vlogD("== Info: %s", data);
     default: /* in case a new one is introduced to shock us */
         return 0;
 
@@ -158,10 +166,9 @@ int trace_func(CURL *handle, curl_infotype type, char *data, size_t size,
         break;
     }
 
-    dump(text, stderr, (unsigned char *)data, size);
+    dump(text, (unsigned char *)data, size);
     return 0;
 }
-#endif
 
 static void http_client_destroy(void *obj)
 {
@@ -181,45 +188,39 @@ static void http_client_destroy(void *obj)
         curl_mime_free(client->mime);
 }
 
-static size_t eat_output(char *ptr, size_t size,
-                         size_t nmemb,
-                         void *userdata)
-{
-    (void)ptr;
-    (void)size;
-    (void)nmemb;
-    (void)userdata;
-    return size * nmemb;
-}
-
 http_client_t *http_client_new(void)
 {
     http_client_t *client;
 
-    if (!initialized)
+    vlogD("HttpClient: Calling http_client_new()");
+
+    if (!initialized) {
+        vlogE("HttpClient: Create http client instance error: curl not initialized.");
         return NULL;
+    }
 
     client = (http_client_t *)rc_zalloc(sizeof(http_client_t), http_client_destroy);
-    if (!client)
+    if (!client) {
+        vlogE("HttpClient: Create http client instance error: out of memory.");
         return NULL;
+    }
 
     client->url = curl_url();
     if (!client->url) {
+        vlogE("HttpClient: Create http client instance error: curl_url() failure.");
         deref(client);
         return NULL;
     }
 
     client->curl = curl_easy_init();
     if (!client->curl) {
+        vlogE("HttpClient: Create http client instance error: curl_easy_init() failure.");
         deref(client);
         return NULL;
     }
 
-#ifndef NDEBUG
     curl_easy_setopt(client->curl, CURLOPT_DEBUGFUNCTION, trace_func);
     curl_easy_setopt(client->curl, CURLOPT_VERBOSE, 1L);
-#endif
-    curl_easy_setopt(client->curl, CURLOPT_WRITEFUNCTION, &eat_output);
     curl_easy_setopt(client->curl, CURLOPT_CURLU, client->url);
     curl_easy_setopt(client->curl, CURLOPT_NOSIGNAL, 1L);
 #if defined(_WIN32) || defined(_WIN64)
@@ -254,11 +255,8 @@ void http_client_reset(http_client_t *client)
 
     client->response_body.used = 0;
 
-#ifndef NDEBUG
     curl_easy_setopt(client->curl, CURLOPT_DEBUGFUNCTION, trace_func);
     curl_easy_setopt(client->curl, CURLOPT_VERBOSE, 1L);
-#endif
-    curl_easy_setopt(client->curl, CURLOPT_WRITEFUNCTION, &eat_output);
     curl_easy_setopt(client->curl, CURLOPT_CURLU, client->url);
     curl_easy_setopt(client->curl, CURLOPT_NOSIGNAL, 1L);
 #if defined(_WIN32) || defined(_WIN64)
@@ -302,6 +300,8 @@ int http_client_set_url(http_client_t *client, const char *url)
     assert(url);
     assert(*url);
 
+    vlogD("HttpClient: Calling http_client_set_url().");
+
     code = curl_url_set(client->url, CURLUPART_URL, url, CURLU_URLENCODE);
     if (code != CURLUE_OK) {
         vlogE("HttpClient: Set url %s error (%d)", url, code);
@@ -319,6 +319,8 @@ int http_client_set_url_escape(http_client_t *client, const char *url)
     assert(url);
     assert(*url);
 
+    vlogD("HttpClient: Calling http_client_set_url_escape().");
+
     code = curl_url_set(client->url, CURLUPART_URL, url, 0);
     if (code != CURLUE_OK) {
         vlogE("HttpClient: Escape url %s error (%d)", url, code);
@@ -334,6 +336,8 @@ int http_client_get_url_escape(http_client_t *client, char **url)
 
     assert(client);
     assert(url);
+
+    vlogD("HttpClient: Calling http_client_get_url_escape().");
 
     code = curl_url_get(client->url, CURLUPART_URL, url, 0);
     if (code != CURLUE_OK)  {
@@ -351,6 +355,8 @@ int http_client_get_scheme(http_client_t *client, char **scheme)
     assert(client);
     assert(scheme);
 
+    vlogD("HttpClient: Calling http_client_get_scheme().");
+
     code = curl_url_get(client->url, CURLUPART_SCHEME, scheme, CURLU_URLDECODE);
     if (code != CURLUE_OK)  {
         vlogE("HttpClient: Get url from curl error (%d)", code);
@@ -366,6 +372,8 @@ int http_client_get_host(http_client_t *client, char **host)
 
     assert(client);
     assert(host);
+
+    vlogD("HttpClient: Calling http_client_get_host().");
 
     code = curl_url_get(client->url, CURLUPART_HOST, host, CURLU_URLDECODE);
     if (code != CURLUE_OK)  {
@@ -383,6 +391,8 @@ int http_client_get_port(http_client_t *client, char **port)
     assert(client);
     assert(port);
 
+    vlogD("HttpClient: Calling http_client_get_port().");
+
     code = curl_url_get(client->url, CURLUPART_PORT, port, CURLU_URLDECODE);
     if (code != CURLUE_OK)  {
         vlogE("HttpClient: Get url from curl error (%d)", code);
@@ -398,6 +408,8 @@ int http_client_get_path(http_client_t *client, char **path)
 
     assert(client);
     assert(path);
+
+    vlogD("HttpClient: Calling http_client_get_path().");
 
     code = curl_url_get(client->url, CURLUPART_PATH, path, CURLU_URLDECODE);
     if (code != CURLUE_OK)  {
@@ -416,9 +428,13 @@ int http_client_set_path(http_client_t *client, const char *path)
     assert(path);
     assert(*path);
 
+    vlogD("HttpClient: Calling http_client_set_path().");
+
     code = curl_url_set(client->url, CURLUPART_PATH, path, CURLU_URLENCODE);
-    if (code != CURLUE_OK)
+    if (code != CURLUE_OK) {
+        vlogE("HttpClient: Set path from curl error (%d)", code);
         return code;
+    }
 
     return 0;
 }
@@ -435,13 +451,17 @@ int http_client_set_query(http_client_t *client,
     assert(*name);
     assert(*value);
 
+    vlogD("HttpClient: Calling http_client_set_query().");
+
     query = alloca(strlen(name) + strlen(value) + 2);
     sprintf(query, "%s=%s", name, value);
 
     code = curl_url_set(client->url, CURLUPART_QUERY, query,
                         CURLU_URLENCODE | CURLU_APPENDQUERY);
-    if (code != CURLUE_OK)
+    if (code != CURLUE_OK) {
+        vlogE("HttpClient: Set query from curl error (%d)", code);
         return code;
+    }
 
     return 0;
 }
@@ -457,12 +477,16 @@ int http_client_set_header(http_client_t *client,
     assert(value);
     assert(*name);
 
+    vlogD("HttpClient: Calling http_client_set_header().");
+
     header = alloca(strlen(name) + strlen(value) + 3);
     sprintf(header, "%s: %s", name, value);
 
     hdr = curl_slist_append(client->hdr, header);
-    if (!hdr)
+    if (!hdr) {
+        vlogE("HttpClient: Set header from curl error");
         return CURLE_OUT_OF_MEMORY;
+    }
 
     client->hdr = hdr;
     return 0;
@@ -630,6 +654,8 @@ int http_client_request(http_client_t *client)
 
     assert(client);
 
+    vlogD("HttpClient: Calling http_client_request().");
+
     if (client->hdr)
         curl_easy_setopt(client->curl, CURLOPT_HTTPHEADER, client->hdr);
 
@@ -652,10 +678,14 @@ int http_client_get_response_code(http_client_t *client, long *response_code)
     assert(client);
     assert(response_code);
 
+    vlogD("HttpClient: Calling http_client_get_response_code().");
+
     code = curl_easy_getinfo(client->curl, CURLINFO_RESPONSE_CODE,
                              response_code);
-    if (code != CURLE_OK)
+    if (code != CURLE_OK) {
+        vlogE("HttpClient: Get http response code error (%d)", code);
         return code;
+    }
 
     return 0;
 }
@@ -668,9 +698,13 @@ char *http_client_escape(http_client_t *client, const char *data, size_t len)
     assert(data);
     assert(len);
 
+    vlogD("HttpClient: Calling http_client_escape().");
+
     escaped_data = curl_easy_escape(client->curl, data, len);
-    if (!escaped_data)
+    if (!escaped_data) {
+        vlogE("HttpClient: Escape data error");
         return NULL;
+    }
 
     return escaped_data;
 }
@@ -686,9 +720,13 @@ char *http_client_unescape(http_client_t *client, const char *data, size_t len,
     assert(len);
     assert(outlen);
 
+    vlogD("HttpClient: Calling http_client_unescape().");
+
     unescaped_data = curl_easy_unescape(client->curl, data, len, &_outlen);
-    if (!unescaped_data)
+    if (!unescaped_data) {
+        vlogE("HttpClient: Unescape data error");
         return NULL;
+    }
 
     *outlen = (size_t)_outlen;
     return unescaped_data;
