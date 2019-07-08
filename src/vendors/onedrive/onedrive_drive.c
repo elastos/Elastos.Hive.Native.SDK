@@ -90,14 +90,14 @@ int onedrive_drive_get_info(HiveDrive *base, HiveDriveInfo *info)
 
     rc = http_client_request(httpc);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("OneDriveDrive: failed to perform http request.");
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("OneDriveDrive: failed to get http response code.");
         goto error_exit;
     }
@@ -226,14 +226,14 @@ int onedrive_drive_stat_file(HiveDrive *base, const char *path, HiveFileInfo *in
 
     rc = http_client_request(httpc);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("OneDriveDrive: failed to perform http request.");
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("OneDriveDrive: failed to get http response code.");
         goto error_exit;
     }
@@ -411,14 +411,14 @@ int onedrive_drive_list_files(HiveDrive *base, const char *path,
             cJSON_Delete(json);
 
         if (rc) {
-            rc = HIVE_HTTPC_ERROR(rc);
+            rc = HIVE_CURL_ERROR(rc);
             vlogE("OneDriveDrive: failed to perform http request.");
             break;
         }
 
         rc = http_client_get_response_code(httpc, &resp_code);
         if (rc) {
-            rc = HIVE_HTTPC_ERROR(rc);
+            rc = HIVE_CURL_ERROR(rc);
             vlogE("OneDriveDrive: failed to get http response code.");
             break;
         }
@@ -582,7 +582,7 @@ int onedrive_drive_mkdir(HiveDrive *base, const char *path)
     free(body);
 
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("OneDriveDrive: failed to perform http request.");
         goto error_exit;
     }
@@ -592,7 +592,7 @@ int onedrive_drive_mkdir(HiveDrive *base, const char *path)
 
     if (rc) {
         vlogE("OneDriveDrive: failed to get http response code.");
-        return HIVE_HTTPC_ERROR(rc);
+        return HIVE_CURL_ERROR(rc);
     }
 
     if (resp_code == HttpStatus_Unauthorized) {
@@ -712,7 +712,7 @@ int onedrive_drive_move_file(HiveDrive *base, const char *old, const char *new)
     free(body);
 
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("OneDriveDrive: failed to perform http request.");
         goto error_exit;
     }
@@ -722,7 +722,7 @@ int onedrive_drive_move_file(HiveDrive *base, const char *old, const char *new)
 
     if (rc) {
         vlogE("OneDriveDrive: failed to get http response code.");
-        return HIVE_HTTPC_ERROR(rc);
+        return HIVE_CURL_ERROR(rc);
     }
 
     if (resp_code == HttpStatus_Unauthorized) {
@@ -789,7 +789,7 @@ int onedrive_drive_copy_file(HiveDrive *base, const char *src, const char *dest)
     free(body);
 
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("OneDriveDrive: failed to perform http request.");
         goto error_exit;
     }
@@ -799,7 +799,7 @@ int onedrive_drive_copy_file(HiveDrive *base, const char *src, const char *dest)
 
     if (rc) {
         vlogE("OneDriveDrive: failed to get http response code.");
-        return HIVE_HTTPC_ERROR(rc);
+        return HIVE_CURL_ERROR(rc);
     }
 
     if (resp_code == HttpStatus_Unauthorized) {
@@ -859,7 +859,7 @@ int onedrive_drive_delete_file(HiveDrive *base, const char *path)
 
     rc = http_client_request(httpc);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("OneDriveDrive: failed to perform http request.");
         goto error_exit;
     }
@@ -869,7 +869,7 @@ int onedrive_drive_delete_file(HiveDrive *base, const char *path)
 
     if (rc) {
         vlogE("OneDriveDrive: failed to get http response code.");
-        return HIVE_HTTPC_ERROR(rc);
+        return HIVE_CURL_ERROR(rc);
     }
 
     if (resp_code == HttpStatus_Unauthorized) {

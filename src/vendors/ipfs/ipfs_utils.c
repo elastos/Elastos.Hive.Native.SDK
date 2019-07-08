@@ -39,14 +39,14 @@ static int ipfs_resolve(ipfs_token_t *token, const char *peerid, char **result)
 
     rc = http_client_request(httpc);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("IpfsUtils: failed to perform http request.");
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("IpfsUtils: failed to get http response code.");
         goto error_exit;
     }
@@ -101,7 +101,7 @@ static int ipfs_login(ipfs_token_t *token, const char *hash)
 
     rc = http_client_request(httpc);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("IpfsUtils: failed to perform http request.");
         goto error_exit;
     }
@@ -111,7 +111,7 @@ static int ipfs_login(ipfs_token_t *token, const char *hash)
 
     if (rc) {
         vlogE("IpfsUtils: failed to get http response code.");
-        return HIVE_HTTPC_ERROR(rc);
+        return HIVE_CURL_ERROR(rc);
     }
 
     if (resp_code != HttpStatus_OK) {
@@ -223,14 +223,14 @@ static int get_last_root_hash(ipfs_token_t *token,
 
     rc = http_client_request(httpc);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("IpfsUtils: failed to perform http request.");
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("IpfsUtils: failed to get http response code.");
         goto error_exit;
     }
@@ -313,7 +313,7 @@ static int pub_last_root_hash(ipfs_token_t *token,
 
     rc = http_client_request(httpc);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("IpfsUtils: failed to perform http request.");
         goto error_exit;
     }
@@ -322,7 +322,7 @@ static int pub_last_root_hash(ipfs_token_t *token,
     http_client_close(httpc);
     if (rc) {
         vlogE("IpfsUtils: failed to get http response code.");
-        return HIVE_HTTPC_ERROR(rc);
+        return HIVE_CURL_ERROR(rc);
     }
 
     if (resp_code != HttpStatus_OK) {

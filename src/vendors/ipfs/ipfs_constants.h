@@ -19,9 +19,9 @@ extern "C" {
 #define HIVE_MAX_IPFS_UID_LEN     (127)
 
 #define RC_NODE_UNREACHABLE(rc)                              \
-    ((rc) == HIVE_HTTPC_ERROR(CURLE_COULDNT_CONNECT)      || \
-     (rc) == HIVE_HTTPC_ERROR(CURLE_REMOTE_ACCESS_DENIED) || \
-     (rc) == HIVE_HTTPC_ERROR(CURLE_OPERATION_TIMEDOUT))
+    ((rc) == HIVE_CURL_ERROR(CURLE_COULDNT_CONNECT)      || \
+     (rc) == HIVE_CURL_ERROR(CURLE_REMOTE_ACCESS_DENIED) || \
+     (rc) == HIVE_CURL_ERROR(CURLE_OPERATION_TIMEDOUT))
 
 #ifdef __cplusplus
 }

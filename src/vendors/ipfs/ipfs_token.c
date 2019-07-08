@@ -53,7 +53,7 @@ static int test_reachable(const char *ipaddr)
 
     rc = http_client_request(httpc);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("IpfsToken: failed to perform http request.");
         goto error_exit;
     }
@@ -63,7 +63,7 @@ static int test_reachable(const char *ipaddr)
 
     if (rc) {
         vlogE("IpfsToken: failed to get http response code.");
-        return HIVE_HTTPC_ERROR(rc);
+        return HIVE_CURL_ERROR(rc);
     }
 
     if (resp_code != HttpStatus_MethodNotAllowed) {
@@ -111,14 +111,14 @@ static int _ipfs_token_get_uid_info(const char *node_ip,
 
     rc = http_client_request(httpc);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("IpfsToken: failed to perform http request.");
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc)  {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("IpfsToken: failed to get http response code.");
         goto error_exit;
     }
@@ -249,14 +249,14 @@ static int uid_new(const char *node_ip, char *uid, size_t uid_len)
 
     rc = http_client_request(httpc);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("IpfsToken: failed to perform http request.");
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("IpfsToken: failed to get http response code.");
         goto error_exit;
     }

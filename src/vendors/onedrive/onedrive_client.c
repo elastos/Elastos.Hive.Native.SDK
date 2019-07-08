@@ -133,14 +133,14 @@ static int onedrive_client_get_info(HiveClient *base, HiveClientInfo *info)
 
     rc = http_client_request(httpc);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("OneDriveClient: failed to perform http request.");
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("OneDriveClient: failed to get http response code.");
         goto error_exit;
     }

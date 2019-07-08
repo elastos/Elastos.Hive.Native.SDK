@@ -79,7 +79,7 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *path,
 
     rc = http_client_request(httpc);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         if (RC_NODE_UNREACHABLE(rc)) {
             vlogE("IpfsDrive: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
@@ -92,7 +92,7 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *path,
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc) {
         vlogE("IpfsDrive: failed to get http response code.");
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         goto error_exit;
     }
 
@@ -281,7 +281,7 @@ static int ipfs_drive_list_files(HiveDrive *base, const char *path,
 
     rc = http_client_request(httpc);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         if (RC_NODE_UNREACHABLE(rc)) {
             vlogE("IpfsDrive: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
@@ -293,7 +293,7 @@ static int ipfs_drive_list_files(HiveDrive *base, const char *path,
 
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("IpfsDrive: failed to get response code.");
         goto error_exit;
     }
@@ -361,7 +361,7 @@ static int ipfs_drive_make_dir(HiveDrive *base, const char *path)
 
     rc = http_client_request(httpc);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         if (RC_NODE_UNREACHABLE(rc)) {
             vlogE("IpfsDrive: current node is not reachable.");
             HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
@@ -375,7 +375,7 @@ static int ipfs_drive_make_dir(HiveDrive *base, const char *path)
     http_client_close(httpc);
     if (rc) {
         vlogE("IpfsDrive: failed to get http response code.");
-        return HIVE_HTTPC_ERROR(rc);
+        return HIVE_CURL_ERROR(rc);
     }
 
     if (resp_code != HttpStatus_OK) {
@@ -433,7 +433,7 @@ static int ipfs_drive_move_file(HiveDrive *base, const char *old, const char *ne
 
     rc = http_client_request(httpc);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         if (RC_NODE_UNREACHABLE(rc)) {
             vlogE("IpfsDrive: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
@@ -447,7 +447,7 @@ static int ipfs_drive_move_file(HiveDrive *base, const char *old, const char *ne
     http_client_close(httpc);
     if (rc) {
         vlogE("IpfsDrive: failed to get http response code.");
-        return HIVE_HTTPC_ERROR(rc);
+        return HIVE_CURL_ERROR(rc);
     }
 
     if (resp_code != HttpStatus_OK) {
@@ -512,7 +512,7 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
 
     rc = http_client_request(httpc);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         if (RC_NODE_UNREACHABLE(rc)) {
             vlogE("IpfsDrive: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
@@ -526,7 +526,7 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
     http_client_close(httpc);
     if (rc) {
         vlogE("IpfsDrive: failed to get http response code.");
-        return HIVE_HTTPC_ERROR(rc);
+        return HIVE_CURL_ERROR(rc);
     }
 
     if (resp_code != HttpStatus_OK) {
@@ -584,7 +584,7 @@ static int ipfs_drive_delete_file(HiveDrive *base, const char *path)
 
     rc = http_client_request(httpc);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         if (RC_NODE_UNREACHABLE(rc)) {
             vlogE("IpfsDrive: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
@@ -598,7 +598,7 @@ static int ipfs_drive_delete_file(HiveDrive *base, const char *path)
     http_client_close(httpc);
     if (rc) {
         vlogE("IpfsDrive: failed to get http response code.");
-        return HIVE_HTTPC_ERROR(rc);
+        return HIVE_CURL_ERROR(rc);
     }
 
     if (resp_code != HttpStatus_OK) {

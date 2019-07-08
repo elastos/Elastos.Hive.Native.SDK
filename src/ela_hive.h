@@ -906,8 +906,9 @@ int hive_file_discard(HiveFile *file);
 #define HIVEF_SYS                                    0x02
 #define HIVEF_RESERVED1                              0x03
 #define HIVEF_RESERVED2                              0x04
-#define HIVEF_HTTP_CLIENT                            0x05
-#define HIVEF_HTTP_STATUS                            0x06
+#define HIVEF_CURL                                   0x05
+#define HIVEF_CURLU                                  0x06
+#define HIVEF_HTTP_STATUS                            0x07
 
 /**
  * \~English
@@ -1064,7 +1065,8 @@ int hive_file_discard(HiveFile *file);
 
 #define HIVE_GENERAL_ERROR(code)       HIVE_MK_ERROR(HIVEF_GENERAL, code)
 #define HIVE_SYS_ERROR(code)           HIVE_MK_ERROR(HIVEF_SYS, code)
-#define HIVE_HTTPC_ERROR(code)         HIVE_MK_ERROR(HIVEF_HTTP_CLIENT, code)
+#define HIVE_CURL_ERROR(code)          HIVE_MK_ERROR(HIVEF_CURL, code)
+#define HIVE_CURLU_ERROR(code)         HIVE_MK_ERROR(HIVEF_CURLU, code)
 #define HIVE_HTTP_STATUS_ERROR(code)   HIVE_MK_ERROR(HIVEF_HTTP_STATUS, code)
 
 /*
