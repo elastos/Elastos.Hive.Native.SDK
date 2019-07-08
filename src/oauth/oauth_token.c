@@ -29,6 +29,7 @@
 #include "http_client.h"
 #include "oauth_token.h"
 #include "sandbird.h"
+#include "http_status.h"
 
 #define ARGV(args, index) (((void **)(args))[index])
 

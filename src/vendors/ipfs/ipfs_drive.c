@@ -14,6 +14,7 @@
 #include "http_client.h"
 #include "hive_error.h"
 #include "hive_client.h"
+#include "http_status.h"
 
 typedef struct IPFSDrive {
     HiveDrive base;

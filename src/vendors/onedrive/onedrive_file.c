@@ -20,6 +20,7 @@
 #include "oauth_token.h"
 #include "onedrive_constants.h"
 #include "http_client.h"
+#include "http_status.h"
 
 typedef struct OneDriveFile {
     HiveFile base;
