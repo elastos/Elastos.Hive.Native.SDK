@@ -30,11 +30,9 @@ static int get_file_stat(ipfs_token_t *token, const char *path, size_t *fsz)
     assert(path);
     assert(fsz);
 
-    vlogD("IpfsFile: Calling get_file_stat().");
-
     rc = ipfs_token_check_reachable(token);
     if (rc < 0) {
-        vlogE("IpfsFile: Failed to get file status: failed to check node connectivity.");
+        vlogE("IpfsFile: failed to check node connectivity.");
         return rc;
     }
 
@@ -43,7 +41,7 @@ static int get_file_stat(ipfs_token_t *token, const char *path, size_t *fsz)
 
     httpc = http_client_new();
     if (!httpc) {
-        vlogE("IpfsFile: Failed to get file status: failed to create http client instance.");
+        vlogE("IpfsFile: failed to create http client instance.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
@@ -58,23 +56,23 @@ static int get_file_stat(ipfs_token_t *token, const char *path, size_t *fsz)
     if (rc) {
         rc = HIVE_HTTPC_ERROR(rc);
         if (RC_NODE_UNREACHABLE(rc)) {
-            vlogE("IpfsFile: Failed to get file status: current node is not reachable.");
+            vlogE("IpfsFile: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(token);
         } else
-            vlogE("IpfsFile: Failed to get file status: failed to perform http request (%d).", rc);
+            vlogE("IpfsFile: failed to perform http request.");
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc) {
-        vlogE("IpfsFile: Failed to get file status: failed to get http response code.");
+        vlogE("IpfsFile: failed to get http response code.");
         rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
     if (resp_code != HttpStatus_OK) {
-        vlogE("IpfsFile: Failed to get file status: error from http response (%d).", resp_code);
+        vlogE("IpfsFile: error from http response (%d).", resp_code);
         rc = HIVE_HTTP_STATUS_ERROR(resp_code);
         goto error_exit;
     }
@@ -83,7 +81,7 @@ static int get_file_stat(ipfs_token_t *token, const char *path, size_t *fsz)
     http_client_close(httpc);
 
     if (!p) {
-        vlogE("IpfsFile: Failed to get file status: failed to get http response body.");
+        vlogE("IpfsFile: failed to get http response body.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
@@ -91,13 +89,13 @@ static int get_file_stat(ipfs_token_t *token, const char *path, size_t *fsz)
     free(p);
 
     if (!json) {
-        vlogE("IpfsFile: Failed to get file status: bad json format for response body.");
+        vlogE("IpfsFile: bad json format for response body.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
     item = cJSON_GetObjectItem(json, "Size");
     if (!cJSON_IsNumber(item)) {
-        vlogE("IpfsFile: Failed to get file status: missing Size json object in response body.");
+        vlogE("IpfsFile: missing Size json object in response body.");
         cJSON_Delete(json);
         return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
     }
@@ -118,8 +116,6 @@ static ssize_t ipfs_file_lseek(HiveFile *base, ssize_t offset, int whence)
     int rc;
     size_t fsz;
 
-    vlogD("IpfsFile: Calling ipfs_file_lseek().");
-
     switch (whence) {
     case HiveSeek_Cur:
         file->lpos = offset + file->lpos < 0 ? 0 : offset + file->lpos;
@@ -130,7 +126,7 @@ static ssize_t ipfs_file_lseek(HiveFile *base, ssize_t offset, int whence)
     case HiveSeek_End:
         rc = get_file_stat(file->token, file->base.path, &fsz);
         if (rc < 0) {
-            vlogE("IpfsFile: Failed to seek position: failed to get file status (%d).", rc);
+            vlogE("IpfsFile: failed to get file status.");
             return rc;
         }
 
@@ -138,7 +134,7 @@ static ssize_t ipfs_file_lseek(HiveFile *base, ssize_t offset, int whence)
         return 0;
     default:
         assert(0);
-        vlogE("IpfsFile: Failed to seek position: unrecognizable whence parameter.");
+        vlogE("IpfsFile: unrecognizable whence parameter.");
         return HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED);
     }
 }
@@ -171,11 +167,9 @@ static ssize_t ipfs_file_read(HiveFile *base, char *buffer, size_t bufsz)
     void *user_data[] = {buffer, &bufsz, &nrd};
     int rc;
 
-    vlogD("IpfsFile: Calling ipfs_file_read().");
-
     rc = ipfs_token_check_reachable(file->token);
     if (rc < 0) {
-        vlogE("IpfsFile: Failed to read from file: failed to check node connectivity.");
+        vlogE("IpfsFile: failed to check node connectivity.");
         return rc;
     }
 
@@ -184,7 +178,7 @@ static ssize_t ipfs_file_read(HiveFile *base, char *buffer, size_t bufsz)
 
     httpc = http_client_new();
     if (!httpc) {
-        vlogE("IpfsFile: Failed to read from file: failed to create http client instance.");
+        vlogE("IpfsFile: failed to create http client instance.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
@@ -203,23 +197,23 @@ static ssize_t ipfs_file_read(HiveFile *base, char *buffer, size_t bufsz)
     if (rc) {
         rc = HIVE_HTTPC_ERROR(rc);
         if (RC_NODE_UNREACHABLE(rc)) {
-            vlogE("IpfsFile: Failed to read from file: current node is not reachable.");
+            vlogE("IpfsFile: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(file->token);
         } else
-            vlogE("IpfsFile: Failed to read from file: failed to perform http request (%d).", rc);
+            vlogE("IpfsFile: failed to perform http request.");
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     http_client_close(httpc);
     if (rc) {
-        vlogE("IpfsFile: Failed to read from file: failed to get http response code.");
+        vlogE("IpfsFile: failed to get http response code.");
         return HIVE_HTTPC_ERROR(rc);
     }
 
     if (resp_code != HttpStatus_OK) {
-        vlogE("IpfsFile: Failed to read from file: error from http response (%d).", resp_code);
+        vlogE("IpfsFile: error from http response (%d).", resp_code);
         return HIVE_HTTP_STATUS_ERROR(resp_code);
     }
 
@@ -240,11 +234,9 @@ static ssize_t ipfs_file_write(HiveFile *base, const char *buffer, size_t bufsz)
     long resp_code = 0;
     int rc;
 
-    vlogD("IpfsFile: Calling ipfs_file_write().");
-
     rc = ipfs_token_check_reachable(file->token);
     if (rc < 0) {
-        vlogE("IpfsFile: Failed to write to file: failed to check node connectivity.");
+        vlogE("IpfsFile: failed to check node connectivity.");
         return rc;
     }
 
@@ -253,7 +245,7 @@ static ssize_t ipfs_file_write(HiveFile *base, const char *buffer, size_t bufsz)
 
     httpc = http_client_new();
     if (!httpc) {
-        vlogE("IpfsFile: Failed to write to file: failed to create http client instance.");
+        vlogE("IpfsFile: failed to create http client instance.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
@@ -275,34 +267,34 @@ static ssize_t ipfs_file_write(HiveFile *base, const char *buffer, size_t bufsz)
     if (rc) {
         rc = HIVE_HTTPC_ERROR(rc);
         if (RC_NODE_UNREACHABLE(rc)) {
-            vlogE("IpfsFile: Failed to write to file: current node is not reachable.");
+            vlogE("IpfsFile: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(file->token);
         } else
-            vlogE("IpfsFile: Failed to write to file: failed to perform http request (%d).", rc);
+            vlogE("IpfsFile: failed to perform http request.");
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     http_client_close(httpc);
     if (rc) {
-        vlogE("IpfsFile: Failed to write to file: failed to get http response code.");
+        vlogE("IpfsFile: failed to get http response code.");
         return HIVE_HTTPC_ERROR(rc);
     }
 
     if (resp_code != HttpStatus_OK) {
-        vlogE("IpfsFile: Failed to write to file: error from http response (%d).", resp_code);
+        vlogE("IpfsFile: error from http response (%d).", resp_code);
         return HIVE_HTTP_STATUS_ERROR(resp_code);
     }
 
     rc = publish_root_hash(file->token, buf, sizeof(buf));
     if (rc < 0) {
         if (RC_NODE_UNREACHABLE(rc)) {
-            vlogE("IpfsFile: Failed to write to file: current node is not reachable.");
+            vlogE("IpfsFile: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(file->token);
         } else
-            vlogE("IpfsFile: Failed to write to file: failed to publish root hash (%d).", rc);
+            vlogE("IpfsFile: failed to publish root hash.");
         return rc;
     }
 
@@ -337,11 +329,9 @@ int ipfs_file_open(ipfs_token_t *token, const char *path, int flags, HiveFile **
     size_t fsz;
     bool file_exists;
 
-    vlogD("IpfsFile: Calling ipfs_file_open().");
-
     rc = get_file_stat(token, path, &fsz);
     if (rc < 0 && rc != HIVE_HTTP_STATUS_ERROR(HttpStatus_InternalServerError)) {
-        vlogE("IpfsFile: Failed to create file instance: failed to get file status (%d).", rc);
+        vlogE("IpfsFile: failed to get file status.");
         return rc;
     }
 
@@ -349,22 +339,20 @@ int ipfs_file_open(ipfs_token_t *token, const char *path, int flags, HiveFile **
 
     if (HIVE_F_IS_EQ(flags, HIVE_F_RDONLY)) {
         if (!file_exists) {
-            vlogE("IpfsFile: Failed to create file instance: readonly but file does not exist.");
+            vlogE("IpfsFile: readonly but file does not exist.");
             return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
         }
     } else if (HIVE_F_IS_SET(flags, HIVE_F_CREAT | HIVE_F_EXCL) && file_exists) {
-        vlogE("IpfsFile: Failed to create file instance: file exists while EXCL flag is set.");
+        vlogE("IpfsFile:  file exists while EXCL flag is set.");
         return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
     } else if (!HIVE_F_IS_SET(flags, HIVE_F_CREAT) && !file_exists) {
-        vlogE("IpfsFile: Failed to create file instance: CREAT flag is not set while file does not exist.");
+        vlogE("IpfsFile:  CREAT flag is not set while file does not exist.");
         return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
     }
 
     tmp = rc_zalloc(sizeof(IPFSFile), ipfs_file_destructor);
-    if (!tmp) {
-        vlogE("IpfsFile: Failed to create file instance: out of memory.");
+    if (!tmp)
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
-    }
 
     strcpy(tmp->base.path, path);
     tmp->base.flags   = flags;

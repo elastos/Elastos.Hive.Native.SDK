@@ -199,10 +199,8 @@ http_client_t *http_client_new(void)
     }
 
     client = (http_client_t *)rc_zalloc(sizeof(http_client_t), http_client_destroy);
-    if (!client) {
-        vlogE("HttpClient: out of memory.");
+    if (!client)
         return NULL;
-    }
 
     client->url = curl_url();
     if (!client->url) {

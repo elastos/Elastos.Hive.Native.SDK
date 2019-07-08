@@ -72,8 +72,6 @@ static void writeback_tokens(oauth_token_t *token)
 
     assert(token);
 
-    vlogD("OauthToken: Calling writeback_tokens()");
-
     json = cJSON_CreateObject();
     if (!json) {
         vlogE("OauthToken: Failed to create cjson object");
@@ -92,7 +90,7 @@ static void writeback_tokens(oauth_token_t *token)
 
     rc = token->writeback_cb(json, token->user_data);
     if (rc < 0)
-        vlogE("OauthToken: Write access token to persistent storage error (%d)", rc);
+        vlogE("OauthToken: Write access token to persistent storage error");
 
     cJSON_Delete(json);
 }
@@ -119,8 +117,6 @@ static int restore_access_token(const cJSON *json, oauth_token_t *token)
     assert(token);
     assert(token->client_id);
 
-    vlogD("OauthToken: Calling restore_access_token()");
-
     if (!json) {
         vlogI("OauthToken: No cache is found");
         return 0;
@@ -129,7 +125,7 @@ static int restore_access_token(const cJSON *json, oauth_token_t *token)
     client_id = cJSON_GetObjectItem(json, "client_id");
     if (!cJSON_IsString(client_id) ||
         strcmp(token->client_id, client_id->valuestring) != 0) {
-        vlogE("Oauth Token: Restore oauth token instance from cache error.");
+        vlogE("OauthToken: Missing client_id json object.");
         return HIVE_GENERAL_ERROR(HIVEERR_BAD_PERSISTENT_DATA);
     }
 
@@ -152,10 +148,8 @@ static int restore_access_token(const cJSON *json, oauth_token_t *token)
 
     token->expires_at.tv_sec = expires_at->valuedouble;
     p = (char *)calloc(1, mem_len);
-    if (!p) {
-        vlogE("OauthToken: Restore oauth token instance from cache error: out of memory");
+    if (!p)
         return HIVE_SYS_ERROR(errno);
-    }
 
     token->token_type = p;
     strcpy(p, token_type->valuestring);
@@ -194,8 +188,6 @@ oauth_token_t *oauth_token_new(const oauth_options_t *opts, oauth_writeback_func
     assert(opts->token_url[0]);
     assert(cb);
 
-    vlogD("OauthToken: Calling oauth_token_new()");
-
     extra_len += strlen(opts->authorize_url) + 1;
     extra_len += strlen(opts->token_url) + 1;
     extra_len += strlen(opts->client_id) + 1;
@@ -205,7 +197,6 @@ oauth_token_t *oauth_token_new(const oauth_options_t *opts, oauth_writeback_func
     token =(oauth_token_t *)rc_zalloc(sizeof(oauth_token_t) + extra_len,
                                       oauth_token_destrcutor);
     if (!token) {
-        vlogE("OauthToken: Create oauth token instance error: out of memory");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY));
         return NULL;
     }
@@ -243,7 +234,7 @@ oauth_token_t *oauth_token_new(const oauth_options_t *opts, oauth_writeback_func
      */
     rc = restore_access_token(opts->store, token);
     if (rc < 0)
-        vlogW("Hive: Could not load access token from json object");
+        vlogW("OauthToken: Could not load access token from json object");
 
     return token;
 }
@@ -282,8 +273,6 @@ static int handle_auth_redirect(sb_Event *e)
     assert(code);
     assert(sz);
 
-    vlogD("OauthToken: Calling restore_access_token()");
-
     if (e->type != SB_EV_REQUEST) {
         if (e->type == SB_EV_CLOSE)
             *stop = true;
@@ -291,14 +280,14 @@ static int handle_auth_redirect(sb_Event *e)
     }
 
     if (strcmp(e->path, path)){
-        vlogE("Oauth Token: Wrong redirect URL path.");
+        vlogE("OauthToken: Wrong redirect URL path.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_BAD_ADDRESS));
         return SB_RES_OK;
     }
 
     rc = sb_get_var(e->stream, "code", code, *sz);
     if (rc != SB_ESUCCESS) {
-        vlogE("Oauth Token: Missing authorization code.");
+        vlogE("OauthToken: Missing authorization code.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_CREDENTIAL));
         return SB_RES_OK;
     }
@@ -334,8 +323,6 @@ static char *get_authorize_code(oauth_token_t *token,
     assert(token);
     assert(code_buf);
 
-    vlogD("OauthToken: Calling get_authorize_code()");
-
     /*
      * Generate the full url to make the authentication request.
      */
@@ -354,7 +341,7 @@ static char *get_authorize_code(oauth_token_t *token,
 
     rc = http_client_get_url_escape(httpc, &url);
     if (rc) {
-        vlogE("OauthToken: Wrong redirect URL path (%d).", HIVE_HTTPC_ERROR(rc));
+        vlogE("OauthToken: Wrong redirect URL path.");
         hive_set_error(HIVE_HTTPC_ERROR(rc));
         http_client_close(httpc);
         return NULL;
@@ -365,7 +352,7 @@ static char *get_authorize_code(oauth_token_t *token,
 
     rc = http_client_get_host(httpc, &redirect_host);
     if (rc) {
-        vlogE("OauthToken: Failed to get redirect URL host (%d).", HIVE_HTTPC_ERROR(rc));
+        vlogE("OauthToken: Failed to get redirect URL host.");
         hive_set_error(HIVE_HTTPC_ERROR(rc));
         http_client_close(httpc);
         http_client_memory_free(url);
@@ -374,7 +361,7 @@ static char *get_authorize_code(oauth_token_t *token,
 
     rc = http_client_get_port(httpc, &redirect_port);
     if (rc) {
-        vlogE("OauthToken: Failed to get redirect URL port (%d).", HIVE_HTTPC_ERROR(rc));
+        vlogE("OauthToken: Failed to get redirect URL port.");
         hive_set_error(HIVE_HTTPC_ERROR(rc));
         http_client_close(httpc);
         http_client_memory_free(url);
@@ -385,7 +372,7 @@ static char *get_authorize_code(oauth_token_t *token,
     rc = http_client_get_path(httpc, &redirect_path);
     http_client_close(httpc);
     if (rc) {
-        vlogE("OauthToken: Failed to get redirect URL path (%d).", HIVE_HTTPC_ERROR(rc));
+        vlogE("OauthToken: Failed to get redirect URL path.");
         hive_set_error(HIVE_HTTPC_ERROR(rc));
         http_client_memory_free(url);
         http_client_memory_free(redirect_host);
@@ -485,8 +472,6 @@ static int decode_access_token(oauth_token_t *token, const char *json_str)
 
     assert(token);
     assert(json_str);
-
-    vlogD("OauthToken: Calling decode_access_token()");
 
     json = cJSON_Parse(json_str);
     if (!json) {
@@ -598,8 +583,6 @@ static int redeem_access_token(oauth_token_t *token, char *code)
     assert(token);
     assert(code);
 
-    vlogD("OauthToken: Calling redeem_access_token()");
-
     httpc = http_client_new();
     if (!httpc) {
         vlogE("OauthToken: Failed to create http client instance.");
@@ -650,20 +633,20 @@ static int redeem_access_token(oauth_token_t *token, char *code)
 
     rc = http_client_request(httpc);
     if (rc) {
-        vlogE("OauthToken: Failed to perform http request (%d).", HIVE_HTTPC_ERROR(rc));
+        vlogE("OauthToken: Failed to perform http request.");
         rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc < 0) {
-        vlogE("OauthToken: Failed to get response code (%d).", HIVE_HTTPC_ERROR(rc));
+        vlogE("OauthToken: Failed to get response code.");
         rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
     if (resp_code != HttpStatus_OK) {
-        vlogE("OauthToken: Failed to redeem access token (%d).", HIVE_HTTPC_ERROR(rc));
+        vlogE("OauthToken: Error from http response (%d).", resp_code);
         rc = HIVE_HTTP_STATUS_ERROR(resp_code);
         goto error_exit;
     }
@@ -672,7 +655,7 @@ static int redeem_access_token(oauth_token_t *token, char *code)
     http_client_close(httpc);
 
     if (!body) {
-        vlogE("OauthToken: Failed to redeem access token response body.");
+        vlogE("OauthToken: Failed to get response body.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
@@ -696,10 +679,8 @@ int oauth_token_request(oauth_token_t *token,
     assert(token);
     assert(cb);
 
-    vlogD("OauthToken: Calling redeem_access_token()");
-
     if (token->access_token) {
-        vlogI("OauthToken: access token already exists, no need to get access token.");
+        vlogI("OauthToken: Access token already exists.");
         return 0;
     }
 
@@ -731,8 +712,6 @@ static int refresh_access_token(oauth_token_t *token)
     char *redirect_uri;
     char *refresh_token;
     int rc;
-
-    vlogD("OauthToken: Calling refresh_access_token()");
 
     httpc = http_client_new();
     if (!httpc) {
@@ -785,14 +764,14 @@ static int refresh_access_token(oauth_token_t *token)
 
     rc = http_client_request(httpc);
     if (rc) {
-        vlogE("OauthToken: Failed to perform refresh access token request (%d).", HIVE_HTTPC_ERROR(rc));
+        vlogE("OauthToken: Failed to perform refresh access token request.");
         rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc) {
-        vlogE("OauthToken: Failed to get refresh access token response code (%d).", HIVE_HTTPC_ERROR(rc));
+        vlogE("OauthToken: Failed to get refresh access token response code.");
         rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
@@ -844,8 +823,6 @@ int oauth_token_check_expire(oauth_token_t *token)
 {
     int rc;
 
-    vlogD("OauthToken: Calling oauth_token_check_expire()");
-
     if (!oauth_token_is_expired(token))
         return 0;
 
@@ -853,7 +830,7 @@ int oauth_token_check_expire(oauth_token_t *token)
 
     rc = refresh_access_token(token);
     if (rc < 0) {
-        vlogD("OauthToken: Failed to refresh access token.");
+        vlogE("OauthToken: Failed to refresh access token.");
         return rc;
     }
 

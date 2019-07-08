@@ -33,17 +33,15 @@ static int test_reachable(const char *ipaddr)
     int rc;
     long resp_code;
 
-    vlogD("IpfsToken: Calling test_reachable().");
-
     rc = snprintf(url, sizeof(url), "http://%s:%d/version", ipaddr, CLUSTER_API_PORT);
     if (rc < 0 || rc >= sizeof(url)) {
-        vlogE("IpfsToken: Failed to test node connectivity: URL too long.");
+        vlogE("IpfsToken: URL too long.");
         return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
     }
 
     httpc = http_client_new();
     if (!httpc) {
-        vlogE("IpfsToken: Failed to test node connectivity: failed to create http client instance.");
+        vlogE("IpfsToken: failed to create http client instance.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
@@ -55,7 +53,7 @@ static int test_reachable(const char *ipaddr)
     rc = http_client_request(httpc);
     if (rc) {
         rc = HIVE_HTTPC_ERROR(rc);
-        vlogE("IpfsToken: Failed to test node connectivity: failed to perform http request (%d).", rc);
+        vlogE("IpfsToken: failed to perform http request.");
         goto error_exit;
     }
 
@@ -63,12 +61,12 @@ static int test_reachable(const char *ipaddr)
     http_client_close(httpc);
 
     if (rc) {
-        vlogE("IpfsToken: Failed to test node connectivity: failed to get http response code.");
+        vlogE("IpfsToken: failed to get http response code.");
         return HIVE_HTTPC_ERROR(rc);
     }
 
     if (resp_code != HttpStatus_MethodNotAllowed) {
-        vlogE("IpfsToken: Failed to test node connectivity: unexpected response code (%d).", resp_code);
+        vlogE("IpfsToken: error from response (%d).", resp_code);
         return HIVE_HTTP_STATUS_ERROR(resp_code);
     }
 
@@ -93,13 +91,13 @@ static int _ipfs_token_get_uid_info(const char *node_ip,
     rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/uid/info",
                   node_ip, NODE_API_PORT);
     if (rc < 0 || rc >= sizeof(url)) {
-        vlogE("IpfsToken: Failed to get uid info: URL too long.");
+        vlogE("IpfsToken: URL too long.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
     httpc = http_client_new();
     if (!httpc) {
-        vlogE("IpfsToken: Failed to get uid info: failed to create http client instance.");
+        vlogE("IpfsToken: failed to create http client instance.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
@@ -113,20 +111,20 @@ static int _ipfs_token_get_uid_info(const char *node_ip,
     rc = http_client_request(httpc);
     if (rc) {
         rc = HIVE_HTTPC_ERROR(rc);
-        vlogE("IpfsToken: Failed to get uid info: failed to perform http request (%d).", rc);
+        vlogE("IpfsToken: failed to perform http request.");
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc)  {
         rc = HIVE_HTTPC_ERROR(rc);
-        vlogE("IpfsToken: Failed to get uid info: failed to get http response code (%d).", rc);
+        vlogE("IpfsToken: failed to get http response code.");
         goto error_exit;
     }
 
     if (resp_code != HttpStatus_OK) {
         rc = HIVE_HTTP_STATUS_ERROR(resp_code);
-        vlogE("IpfsToken: Failed to get uid info: error from http response (%d).", resp_code);
+        vlogE("IpfsToken: error from http response (%d).", resp_code);
         goto error_exit;
     }
 
@@ -136,7 +134,7 @@ static int _ipfs_token_get_uid_info(const char *node_ip,
         p = http_client_move_response_body(httpc, NULL);
         if (!p) {
             rc = HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
-            vlogE("IpfsToken: Failed to get uid info: failed to get http response body.");
+            vlogE("IpfsToken: failed to get http response body.");
             goto error_exit;
         }
 
@@ -163,8 +161,6 @@ static int select_bootstrap(rpc_node_t *rpc_nodes, size_t nodes_cnt, char *selec
     size_t i;
     size_t base;
     int rc;
-
-    vlogD("IpfsToken: Calling select_bootstrap().");
 
     srand((unsigned)time(NULL));
     base = (size_t)rand() % nodes_cnt;
@@ -200,15 +196,13 @@ int ipfs_token_check_reachable(ipfs_token_t *token)
 {
     int rc;
 
-    vlogD("IpfsToken: Calling ipfs_token_check_reachable().");
-
     if (token->current_node[0])
         return 0;
 
     rc = select_bootstrap(token->rpc_nodes, token->rpc_nodes_count,
                           token->current_node);
     if (rc < 0) {
-        vlogE("IpfsToken: Check node connectivity failure: no node configured is reachable (%d).", rc);
+        vlogE("IpfsToken: no node configured is reachable.");
         return rc;
     }
 
@@ -234,18 +228,16 @@ static int uid_new(const char *node_ip, char *uid, size_t uid_len)
     char *p;
     int rc;
 
-    vlogD("IpfsToken: Calling uid_new().");
-
     rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/uid/new",
                   node_ip, NODE_API_PORT);
     if (rc < 0 || rc >= sizeof(url)) {
-        vlogE("IpfsToken: Failed to generate new uid: URL too long.", rc);
+        vlogE("IpfsToken: URL too long.");
         return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
     }
 
     httpc = http_client_new();
     if (!httpc) {
-        vlogE("IpfsToken: Failed to generate new uid: failed to create http client instance.", rc);
+        vlogE("IpfsToken: failed to create http client instance.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
@@ -257,40 +249,40 @@ static int uid_new(const char *node_ip, char *uid, size_t uid_len)
     rc = http_client_request(httpc);
     if (rc) {
         rc = HIVE_HTTPC_ERROR(rc);
-        vlogE("IpfsToken: Failed to generate new uid: failed to perform http request.", rc);
+        vlogE("IpfsToken: failed to perform http request.");
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc) {
         rc = HIVE_HTTPC_ERROR(rc);
-        vlogE("IpfsToken: Failed to generate new uid: failed to get http response code.", rc);
+        vlogE("IpfsToken: failed to get http response code.");
         goto error_exit;
     }
 
     if (resp_code != HttpStatus_OK) {
         rc = HIVE_HTTP_STATUS_ERROR(resp_code);
-        vlogE("IpfsToken: Failed to generate new uid: error from http response code (%d).", resp_code);
+        vlogE("IpfsToken: error from http response (%d).", resp_code);
         goto error_exit;
     }
 
     p = http_client_move_response_body(httpc, NULL);
     http_client_close(httpc);
     if (!p) {
-        vlogE("IpfsToken: Failed to generate new uid: failed to get http response body.");
+        vlogE("IpfsToken: failed to get http response body.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
     json = cJSON_Parse(p);
     free(p);
     if (!json) {
-        vlogE("IpfsToken: Failed to generate new uid: invalid json format for http response.");
+        vlogE("IpfsToken: invalid json format for http response.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
     uid_json = cJSON_GetObjectItemCaseSensitive(json, "UID");
     if (!cJSON_IsString(uid_json) || !uid_json->valuestring || !*uid_json->valuestring) {
-        vlogE("IpfsToken: Failed to generate new uid: missing UID json object for http response body.");
+        vlogE("IpfsToken: missing UID json object for http response body.");
         cJSON_Delete(json);
         return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
     }
@@ -298,7 +290,7 @@ static int uid_new(const char *node_ip, char *uid, size_t uid_len)
     rc = snprintf(uid, uid_len, "%s", uid_json->valuestring);
     cJSON_Delete(json);
     if (rc < 0 || rc >= uid_len) {
-        vlogE("IpfsToken: Failed to generate new uid: uid length too long.");
+        vlogE("IpfsToken: uid length too long.");
         return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
     }
 
@@ -328,7 +320,7 @@ static int load_store(const cJSON *store, char *uid, size_t len)
     uid_json = cJSON_GetObjectItemCaseSensitive(store, "uid");
     if (!uid_json || !cJSON_IsString(uid_json) || !uid_json->valuestring ||
         !*uid_json->valuestring || strlen(uid_json->valuestring) >= len) {
-        vlogE("IpfsToken: Failed to generate new uid: uid length too long.");
+        vlogE("IpfsToken: uid length too long.");
         return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
     }
 
@@ -341,23 +333,21 @@ static int writeback_tokens(ipfs_token_t *token)
     cJSON *json;
     int rc;
 
-    vlogD("IpfsToken: Calling writeback_tokens().");
-
     json = cJSON_CreateObject();
     if (!json) {
-        vlogE("IpfsToken: Failed to save token: failed to create json object.");
+        vlogE("IpfsToken: failed to create json object.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
     if (!cJSON_AddStringToObject(json, "uid", token->uid)) {
-        vlogE("IpfsToken: Failed to save token: failed to add uid json object.");
+        vlogE("IpfsToken: failed to add uid json object.");
         cJSON_Delete(json);
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
     rc = token->writeback_cb(json, token->user_data);
     if (rc < 0)
-        vlogE("IpfsToken: Failed to save token: failed to write to file.");
+        vlogE("IpfsToken: failed to write to file.");
     cJSON_Delete(json);
     return rc;
 }
@@ -382,12 +372,9 @@ ipfs_token_t *ipfs_token_new(ipfs_token_options_t *options,
     char url[MAX_URL_LEN] = {0};
     int rc;
 
-    vlogD("IpfsToken: Calling ipfs_token_new().");
-
     bootstraps_nbytes = sizeof(options->rpc_nodes[0]) * options->rpc_nodes_count;
     tmp = rc_zalloc(sizeof(ipfs_token_t) + bootstraps_nbytes, NULL);
     if (!tmp) {
-        vlogE("IpfsToken: Failed to create token instance: out of memory.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY));
         return NULL;
     }
@@ -400,7 +387,7 @@ ipfs_token_t *ipfs_token_new(ipfs_token_options_t *options,
     rc = select_bootstrap(options->rpc_nodes, options->rpc_nodes_count,
                           tmp->current_node);
     if (rc < 0) {
-        vlogE("IpfsToken: Failed to create token instance: No configured node is reachable.");
+        vlogE("IpfsToken: No configured node is reachable.");
         hive_set_error(rc);
         deref(tmp);
         return NULL;
@@ -409,7 +396,7 @@ ipfs_token_t *ipfs_token_new(ipfs_token_options_t *options,
     if (options->uid[0]) {
         rc = _ipfs_token_get_uid_info(tmp->current_node, options->uid, NULL);
         if (rc < 0) {
-            vlogE("IpfsToken: Failed to create token instance: failed to get info of configured uid (%d).", rc);
+            vlogE("IpfsToken: failed to get info of configured uid.");
             hive_set_error(rc);
             deref(tmp);
             return NULL;
@@ -419,7 +406,7 @@ ipfs_token_t *ipfs_token_new(ipfs_token_options_t *options,
     } else if (options->store) {
         rc = load_store(options->store, tmp->uid, sizeof(tmp->uid));
         if (rc < 0) {
-            vlogE("IpfsToken: Failed to create token instance: failed to restore from cache (%d).", rc);
+            vlogE("IpfsToken: failed to restore from cache.");
             hive_set_error(rc);
             deref(tmp);
             return NULL;
@@ -427,7 +414,7 @@ ipfs_token_t *ipfs_token_new(ipfs_token_options_t *options,
 
         rc = _ipfs_token_get_uid_info(tmp->current_node, tmp->uid, NULL);
         if (rc < 0) {
-            vlogE("IpfsToken: Failed to create token instance: failed to get info of cached uid (%d).", rc);
+            vlogE("IpfsToken: failed to get info of cached uid.");
             hive_set_error(rc);
             deref(tmp);
             return NULL;
@@ -439,7 +426,7 @@ ipfs_token_t *ipfs_token_new(ipfs_token_options_t *options,
 
         rc = uid_new(tmp->current_node, tmp->uid, sizeof(tmp->uid));
         if (rc < 0) {
-            vlogE("IpfsToken: Failed to create token instance: failed to create uid (%d).", rc);
+            vlogE("IpfsToken: failed to create uid.");
             hive_set_error(rc);
             deref(tmp);
             return NULL;
@@ -447,7 +434,7 @@ ipfs_token_t *ipfs_token_new(ipfs_token_options_t *options,
 
         rc = publish_root_hash(tmp, url, sizeof(url));
         if (rc < 0) {
-            vlogE("IpfsToken: Failed to create token instance: failed to publish root hash (%d).", rc);
+            vlogE("IpfsToken: failed to publish root hash.");
             hive_set_error(rc);
             deref(tmp);
             return NULL;

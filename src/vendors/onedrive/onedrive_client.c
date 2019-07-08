@@ -38,10 +38,8 @@ static int onedrive_client_login(HiveClient *base,
     OneDriveClient *client = (OneDriveClient *)base;
     int rc;
 
-    vlogD("OneDriveClient: Calling onedrive_client_login().");
-
     if (!callback) {
-        vlogE("OneDriveClient: Try to login onto onedrive error: no open URL callback configured.");
+        vlogE("OneDriveClient: no open URL callback configured.");
         return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
     }
 
@@ -73,7 +71,7 @@ static int onedrive_client_logout(HiveClient *base)
         int rc; \
         rc = decode_info_field(json, name, field, sizeof(field)); \
         if (rc < 0) { \
-            vlogE("OneDriveClient: Failed to decode client info: missing %s json object.", name); \
+            vlogE("OneDriveClient: missing %s json object.", name); \
             cJSON_Delete(json); \
             return rc; \
         } \
@@ -87,11 +85,9 @@ int onedrive_decode_client_info(const char *info_str, HiveClientInfo *info)
     assert(info_str);
     assert(info);
 
-    vlogD("OneDriveClient: Calling onedrive_decode_client_info().");
-
     json = cJSON_Parse(info_str);
     if (!json) {
-        vlogE("OneDriveClient: Failed to decode client info: bad json format.");
+        vlogE("OneDriveClient: bad json format.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
@@ -117,17 +113,15 @@ static int onedrive_client_get_info(HiveClient *base, HiveClientInfo *info)
     assert(client->token);
     assert(info);
 
-    vlogD("OneDriveClient: Calling onedrive_client_get_info().");
-
     rc = oauth_token_check_expire(client->token);
     if (rc < 0) {
-        vlogE("OneDriveClient: Get client info failure: checking access token expired error (%d).", rc);
+        vlogE("OneDriveClient: checking access token expired error.");
         return rc;
     }
 
     httpc = http_client_new();
     if (!httpc) {
-        vlogE("OneDriveClient: Get client info failure: failed to create http client instance.");
+        vlogE("OneDriveClient: failed to create http client instance.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
@@ -139,26 +133,26 @@ static int onedrive_client_get_info(HiveClient *base, HiveClientInfo *info)
     rc = http_client_request(httpc);
     if (rc) {
         rc = HIVE_HTTPC_ERROR(rc);
-        vlogE("OneDriveClient: Get client info failure: failed to perform http request (%d).", rc);
+        vlogE("OneDriveClient: failed to perform http request.");
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc) {
         rc = HIVE_HTTPC_ERROR(rc);
-        vlogE("OneDriveClient: Get client info failure: failed to get http response code (%d).", rc);
+        vlogE("OneDriveClient: failed to get http response code.");
         goto error_exit;
     }
 
     if (resp_code == HttpStatus_Unauthorized) {
-        vlogE("OneDriveClient: Get client info failure: current node is not reachable.");
+        vlogE("OneDriveClient: current node is not reachable.");
         oauth_token_set_expired(client->token);
         rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
         goto error_exit;
     }
 
     if (resp_code != HttpStatus_OK) {
-        vlogE("OneDriveClient: Get client info failure: error from http response (%d).", resp_code);
+        vlogE("OneDriveClient: error from http response (%d).", resp_code);
         rc = HIVE_HTTP_STATUS_ERROR(resp_code);
         goto error_exit;
     }
@@ -167,7 +161,7 @@ static int onedrive_client_get_info(HiveClient *base, HiveClientInfo *info)
     http_client_close(httpc);
 
     if (!p) {
-        vlogE("OneDriveClient: Get client info failure: failed to get response body.");
+        vlogE("OneDriveClient: failed to get response body.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
@@ -190,11 +184,9 @@ static int onedrive_client_drive_open(HiveClient *base, HiveDrive **drive)
     assert(client->token);
     assert(drive);
 
-    vlogD("OneDriveClient: Calling onedrive_client_drive_open().");
-
     rc = onedrive_drive_open(client->token, "default", client->tmp_template, drive);
     if (rc < 0) {
-        vlogE("OneDriveClient: Opening onedrive drive handle error (error: 0x%x)", rc);
+        vlogE("OneDriveClient: Opening onedrive drive handle error");
         return rc;
     }
 
@@ -219,23 +211,21 @@ static cJSON *load_keystore_in_json(const char *path)
 
     assert(path);
 
-    vlogD("OneDriveClient: Calling load_keystore_in_json().");
-
     rc = stat(path, &st);
     if (rc < 0) {
-        vlogE("OneDriveClient: load cache failure: cache does not exist.");
+        vlogE("OneDriveClient: cache does not exist.");
         return NULL;
     }
 
     if (!st.st_size || st.st_size > sizeof(buf)) {
-        vlogE("OneDriveClient: load cache failure: cache size does not meet requirement.");
+        vlogE("OneDriveClient: cache size does not meet requirement.");
         errno = ERANGE;
         return NULL;
     }
 
     fd = open(path, O_RDONLY);
     if (fd < 0) {
-        vlogE("OneDriveClient: load cache failure: failed to open cache.");
+        vlogE("OneDriveClient: failed to open cache.");
         return NULL;
     }
 
@@ -243,13 +233,13 @@ static cJSON *load_keystore_in_json(const char *path)
     close(fd);
 
     if (rc < 0 || rc != st.st_size) {
-        vlogE("OneDriveClient: load cache failure: read size error.");
+        vlogE("OneDriveClient: read size error.");
         return NULL;
     }
 
     json = cJSON_Parse(buf);
     if (!json) {
-        vlogE("OneDriveClient: load cache failure: bad json format for cache.");
+        vlogE("OneDriveClient: bad json format for cache.");
         errno = ENOMEM;
         return NULL;
     }
@@ -265,17 +255,15 @@ static int oauth_writeback(const cJSON *json, void *user_data)
     int fd;
     int bytes;
 
-    vlogD("OneDriveClient: Calling oauth_writeback().");
-
     json_str = cJSON_PrintUnformatted(json);
     if (!json_str || !*json_str) {
-        vlogE("OneDriveClient: save cache failure: bad json format.");
+        vlogE("OneDriveClient: bad json format.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
     fd = open(client->keystore_path, O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
     if (fd < 0) {
-        vlogE("OneDriveClient: save cache failure: open cache failure.");
+        vlogE("OneDriveClient: open cache failure (%d).", errno);
         free(json_str);
         return HIVE_SYS_ERROR(errno);
     }
@@ -286,7 +274,7 @@ static int oauth_writeback(const cJSON *json, void *user_data)
     close(fd);
 
     if (bytes != json_str_len + 1) {
-        vlogE("OneDriveClient: save cache failure: write size error.");
+        vlogE("OneDriveClient: write size error.");
         return HIVE_SYS_ERROR(errno);
     }
 
@@ -312,20 +300,16 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
 
     assert(opts);
 
-    vlogD("OneDriveClient: Calling onedrive_client_new().");
-
     if (!opts->client_id    || !*opts->client_id    ||
         !opts->redirect_url || !*opts->redirect_url ||
         !opts->scope        || !*opts->scope        ||
         opts->base.drive_type != HiveDriveType_OneDrive) {
-        vlogE("OneDriveClient: Failed to create onedrive client instance: invalid argument.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return NULL;
     }
 
     client = (OneDriveClient *)rc_zalloc(sizeof(OneDriveClient), onedrive_client_destructor);
     if (!client) {
-        vlogE("OneDriveClient: Failed to create onedrive client instance: out of memory.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY));
         return NULL;
     }
@@ -333,7 +317,7 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
     rc = snprintf(client->keystore_path, sizeof(client->keystore_path),
                   "%s/.data/onedrive.json", options->persistent_location);
     if (rc < 0 || rc >= (int)sizeof(client->keystore_path)) {
-        vlogE("OneDriveClient: Failed to create onedrive client instance: keystore path too long.");
+        vlogE("OneDriveClient: keystore path too long.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         deref(client);
         return NULL;
@@ -344,7 +328,7 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
     rc = snprintf(client->tmp_template, sizeof(client->tmp_template),
                   "%s/.tmp/onedrive/XXXXXX", options->persistent_location);
     if (rc < 0 || rc >= (int)sizeof(client->tmp_template)) {
-        vlogE("OneDriveClient: Failed to create onedrive client instance: template too long.");
+        vlogE("OneDriveClient: template too long.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         deref(client);
         return NULL;
@@ -357,7 +341,7 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
     if (!access(client->keystore_path, F_OK)) {
         keystore = load_keystore_in_json(client->keystore_path);
         if (!keystore) {
-            vlogE("OneDriveClient: Failed to create onedrive client instance: load cache failure.");
+            vlogE("OneDriveClient: load cache failure.");
             hive_set_error(HIVE_SYS_ERROR(errno));
             deref(client);
             return NULL;

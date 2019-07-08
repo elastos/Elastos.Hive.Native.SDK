@@ -29,11 +29,9 @@ static int ipfs_drive_get_info(HiveDrive *base, HiveDriveInfo *info)
 
     (void)base;
 
-    vlogD("IpfsDrive: Calling ipfs_drive_get_info().");
-
     rc = snprintf(info->driveid, sizeof(info->driveid), "");
     if (rc < 0 || rc >= sizeof(info->driveid)) {
-        vlogE("IpfsDrive: Failed to fill drive id field of drive info: buffer to small.");
+        vlogE("IpfsDrive: drive id too long.");
         return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
     }
 
@@ -56,11 +54,9 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *path,
     assert(path);
     assert(info);
 
-    vlogD("IpfsDrive: Calling ipfs_drive_stat_file().");
-
     rc = ipfs_token_check_reachable(drive->token);
     if (rc < 0) {
-        vlogE("IpfsDrive: Failed to get file status: failed to check node's connectivity.");
+        vlogE("IpfsDrive: failed to check node's connectivity.");
         return rc;
     }
 
@@ -69,7 +65,7 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *path,
 
     httpc = http_client_new();
     if (!httpc) {
-        vlogE("IpfsDrive: Failed to get file status: failed to create http client instance.");
+        vlogE("IpfsDrive: failed to create http client instance.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
@@ -84,23 +80,23 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *path,
     if (rc) {
         rc = HIVE_HTTPC_ERROR(rc);
         if (RC_NODE_UNREACHABLE(rc)) {
-            vlogE("IpfsDrive: Failed to get file status: current node is not reachable.");
+            vlogE("IpfsDrive: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(drive->token);
         } else
-            vlogE("IpfsDrive: Failed to get file status: failed to perform http request (%d).", rc);
+            vlogE("IpfsDrive: failed to perform http request.");
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc) {
-        vlogE("IpfsDrive: Failed to get file status: failed to get http response code.");
+        vlogE("IpfsDrive: failed to get http response code.");
         rc = HIVE_HTTPC_ERROR(rc);
         goto error_exit;
     }
 
     if (resp_code != HttpStatus_OK) {
-        vlogE("IpfsDrive: Failed to get file status: error from response (%d).", resp_code);
+        vlogE("IpfsDrive: error from response (%d).", resp_code);
         rc = HIVE_HTTP_STATUS_ERROR(resp_code);
         goto error_exit;
     }
@@ -109,7 +105,7 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *path,
     http_client_close(httpc);
 
     if (!p) {
-        vlogE("IpfsDrive: Failed to get file status: failed to get response body.");
+        vlogE("IpfsDrive: failed to get response body.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
@@ -117,7 +113,7 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *path,
     free(p);
 
     if (!json) {
-        vlogE("IpfsDrive: Failed to get file status: invalid json format from response.");
+        vlogE("IpfsDrive: invalid json format from response.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
@@ -128,14 +124,14 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *path,
         !*item->valuestring ||
         strlen(item->valuestring) >= sizeof(info->fileid)) {
         cJSON_Delete(json);
-        vlogE("IpfsDrive: Failed to get file status: missing Hash json object from response.");
+        vlogE("IpfsDrive: missing Hash json object from response.");
         return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
     }
 
     rc = snprintf(info->fileid, sizeof(info->fileid),
                   "/ipfs/%s", item->valuestring);
     if (rc < 0 || rc >= sizeof(info->fileid)) {
-        vlogE("IpfsDrive: Failed to get file status: file id field of file info too small.");
+        vlogE("IpfsDrive: file id field of file info too small.");
         cJSON_Delete(json);
         return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
     }
@@ -143,7 +139,7 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *path,
     item = cJSON_GetObjectItem(json, "Type");
     if (!item || !cJSON_IsString(item) || !item->valuestring || !*item->valuestring ||
         (strcmp(item->valuestring, "file") && strcmp(item->valuestring, "directory"))) {
-        vlogE("IpfsDrive: Failed to get file status: missing Type json object from response.");
+        vlogE("IpfsDrive: missing Type json object from response.");
         cJSON_Delete(json);
         return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
     }
@@ -152,7 +148,7 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *path,
 
     item = cJSON_GetObjectItem(json, "Size");
     if (!item || !cJSON_IsNumber(item)) {
-        vlogE("IpfsDrive: Failed to get file status: missing Size json object from response.");
+        vlogE("IpfsDrive: missing Size json object from response.");
         cJSON_Delete(json);
         return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
     }
@@ -175,18 +171,16 @@ static cJSON *parse_list_files_response(const char *response)
 
     assert(response);
 
-    vlogD("IpfsDrive: Calling parse_list_files_response().");
-
     json = cJSON_Parse(response);
     if (!json) {
-        vlogE("IpfsDrive: Failed to parse list files response: invalid json format.");
+        vlogE("IpfsDrive: invalid json format.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY));
         return NULL;
     }
 
     entries = cJSON_GetObjectItemCaseSensitive(json, "Entries");
     if (!entries || (!cJSON_IsArray(entries) && !cJSON_IsNull(entries))) {
-        vlogE("IpfsDrive: Failed to parse list files response: missing Entries json ojbect.");
+        vlogE("IpfsDrive: missing Entries json ojbect.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT));
         cJSON_Delete(json);
         return NULL;
@@ -202,7 +196,7 @@ static cJSON *parse_list_files_response(const char *response)
         cJSON *name;
 
         if (!cJSON_IsObject(entry)) {
-            vlogE("IpfsDrive: Failed to parse list files response: element of Entries array is not json object type.");
+            vlogE("IpfsDrive: element of Entries array is not json object type.");
             hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT));
             cJSON_Delete(json);
             return NULL;
@@ -211,7 +205,7 @@ static cJSON *parse_list_files_response(const char *response)
         name = cJSON_GetObjectItemCaseSensitive(entry, "Name");
         if (!name || !cJSON_IsString(name) || !name->valuestring ||
             !*name->valuestring) {
-            vlogE("IpfsDrive: Failed to parse list files response: element of Entries array misses Name object.");
+            vlogE("IpfsDrive: element of Entries array misses Name object.");
             hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT));
             cJSON_Delete(json);
             return NULL;
@@ -264,7 +258,7 @@ static int ipfs_drive_list_files(HiveDrive *base, const char *path,
 
     rc = ipfs_token_check_reachable(drive->token);
     if (rc < 0) {
-        vlogE("IpfsDrive: Failed to list files: failed to check node's connectivity.");
+        vlogE("IpfsDrive: failed to check node's connectivity.");
         return rc;
     }
 
@@ -273,7 +267,7 @@ static int ipfs_drive_list_files(HiveDrive *base, const char *path,
 
     httpc = http_client_new();
     if (!httpc) {
-        vlogE("IpfsDrive: Failed to list files: failed to create http client instance.");
+        vlogE("IpfsDrive: failed to create http client instance.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
@@ -288,24 +282,24 @@ static int ipfs_drive_list_files(HiveDrive *base, const char *path,
     if (rc) {
         rc = HIVE_HTTPC_ERROR(rc);
         if (RC_NODE_UNREACHABLE(rc)) {
-            vlogE("IpfsDrive: Failed to list files: current node is not reachable.");
+            vlogE("IpfsDrive: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(drive->token);
         } else
-            vlogE("IpfsDrive: Failed to list files: failed to perform http request (%d).", rc);
+            vlogE("IpfsDrive: failed to perform http request.");
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc) {
         rc = HIVE_HTTPC_ERROR(rc);
-        vlogE("IpfsDrive: Failed to list files: failed to get response code (%d).", rc);
+        vlogE("IpfsDrive: failed to get response code.");
         goto error_exit;
     }
 
     if (resp_code != HttpStatus_OK) {
         rc = HIVE_HTTP_STATUS_ERROR(resp_code);
-        vlogE("IpfsDrive: Failed to list files: error from http response (%d).", resp_code);
+        vlogE("IpfsDrive: error from http response (%d).", resp_code);
         goto error_exit;
     }
 
@@ -313,14 +307,14 @@ static int ipfs_drive_list_files(HiveDrive *base, const char *path,
     http_client_close(httpc);
 
     if (!p) {
-        vlogE("IpfsDrive: Failed to list files: failed to get response body.");
+        vlogE("IpfsDrive: failed to get response body.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
     response = parse_list_files_response(p);
     free(p);
     if (!response && hive_get_error() != HIVEOK) {
-        vlogE("IpfsDrive: Failed to list files: failed to parse response body (%d).", hive_get_error());
+        vlogE("IpfsDrive: failed to parse response body.");
         return hive_get_error();
     }
 
@@ -342,11 +336,9 @@ static int ipfs_drive_make_dir(HiveDrive *base, const char *path)
     long resp_code;
     int rc;
 
-    vlogD("IpfsDrive: Calling ipfs_drive_make_dir().");
-
     rc = ipfs_token_check_reachable(drive->token);
     if (rc < 0) {
-        vlogE("IpfsDrive: Failed to make dir: failed to check node's connectivity.");
+        vlogE("IpfsDrive: failed to check node's connectivity.");
         return rc;
     }
 
@@ -355,7 +347,7 @@ static int ipfs_drive_make_dir(HiveDrive *base, const char *path)
 
     httpc = http_client_new();
     if (!httpc) {
-        vlogE("IpfsDrive: Failed to make dir: failed to create http client instance.");
+        vlogE("IpfsDrive: failed to create http client instance.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
@@ -370,34 +362,34 @@ static int ipfs_drive_make_dir(HiveDrive *base, const char *path)
     if (rc) {
         rc = HIVE_HTTPC_ERROR(rc);
         if (RC_NODE_UNREACHABLE(rc)) {
-            vlogE("IpfsDrive: Failed to make dir: current node is not reachable.");
+            vlogE("IpfsDrive: current node is not reachable.");
             HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(drive->token);
         } else
-            vlogE("IpfsDrive: Failed to make dir: failed to perform http request (%d).", rc);
+            vlogE("IpfsDrive: failed to perform http request.");
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     http_client_close(httpc);
     if (rc) {
-        vlogE("IpfsDrive: Failed to make dir: failed to get http response code.");
+        vlogE("IpfsDrive: failed to get http response code.");
         return HIVE_HTTPC_ERROR(rc);
     }
 
     if (resp_code != HttpStatus_OK) {
-        vlogE("IpfsDrive: Failed to make dir: error from http response (%d).", resp_code);
+        vlogE("IpfsDrive: error from http response.");
         return HIVE_HTTP_STATUS_ERROR(resp_code);
     }
 
     rc = publish_root_hash(drive->token, url, sizeof(url));
     if (rc < 0) {
         if (RC_NODE_UNREACHABLE(rc)) {
-            vlogE("IpfsDrive: Failed to make dir: current node is not reachable.");
+            vlogE("IpfsDrive: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(drive->token);
         } else
-            vlogE("IpfsDrive: Failed to make dir: failed to publish root hash (%d).", rc);
+            vlogE("IpfsDrive: failed to publish root hash.");
         return rc;
     }
 
@@ -416,11 +408,9 @@ static int ipfs_drive_move_file(HiveDrive *base, const char *old, const char *ne
     long resp_code;
     int rc;
 
-    vlogD("IpfsDrive: Calling ipfs_drive_move_file().");
-
     rc = ipfs_token_check_reachable(drive->token);
     if (rc < 0) {
-        vlogE("IpfsDrive: Failed to move file: failed to check node's connectivity.");
+        vlogE("IpfsDrive: failed to check node's connectivity.");
         return rc;
     }
 
@@ -429,7 +419,7 @@ static int ipfs_drive_move_file(HiveDrive *base, const char *old, const char *ne
 
     httpc = http_client_new();
     if (!httpc) {
-        vlogE("IpfsDrive: Failed to move file: failed to create http client instance.");
+        vlogE("IpfsDrive: failed to create http client instance.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
@@ -444,34 +434,34 @@ static int ipfs_drive_move_file(HiveDrive *base, const char *old, const char *ne
     if (rc) {
         rc = HIVE_HTTPC_ERROR(rc);
         if (RC_NODE_UNREACHABLE(rc)) {
-            vlogE("IpfsDrive: Failed to move file: current node is not reachable.");
+            vlogE("IpfsDrive: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(drive->token);
         } else
-            vlogE("IpfsDrive: Failed to move file: failed to perform http request (%d).", rc);
+            vlogE("IpfsDrive: failed to perform http request.");
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     http_client_close(httpc);
     if (rc) {
-        vlogE("IpfsDrive: Failed to move file: failed to get http response code.");
+        vlogE("IpfsDrive: failed to get http response code.");
         return HIVE_HTTPC_ERROR(rc);
     }
 
     if (resp_code != HttpStatus_OK) {
-        vlogE("IpfsDrive: Failed to move file: error from http response (%d).", resp_code);
+        vlogE("IpfsDrive: error from http response (%d).", resp_code);
         return HIVE_HTTP_STATUS_ERROR(resp_code);
     }
 
     rc = publish_root_hash(drive->token, url, sizeof(url));
     if (rc < 0) {
         if (RC_NODE_UNREACHABLE(rc)) {
-            vlogE("IpfsDrive: Failed to move file: current node is not reachable.");
+            vlogE("IpfsDrive: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(drive->token);
         } else
-            vlogE("IpfsDrive: Failed to move file: failed to publish root hash (%d).", rc);
+            vlogE("IpfsDrive: failed to publish root hash.");
         return rc;
     }
 
@@ -491,17 +481,15 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
     HiveFileInfo src_info;
     int rc;
 
-    vlogD("IpfsDrive: Calling ipfs_drive_copy_file().");
-
     rc = ipfs_token_check_reachable(drive->token);
     if (rc < 0) {
-        vlogE("IpfsDrive: Failed to copy file: failed to check node's connectivity.");
+        vlogE("IpfsDrive: failed to check node's connectivity.");
         return rc;
     }
 
     rc = ipfs_drive_stat_file(base, src_path, &src_info);
     if (rc < 0) {
-        vlogE("IpfsDrive: Failed to copy file: failed to get file status (%d).", rc);
+        vlogE("IpfsDrive: failed to get file status.");
         return rc;
     }
 
@@ -510,7 +498,7 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
 
     httpc = http_client_new();
     if (!httpc) {
-        vlogE("IpfsDrive: Failed to copy file: failed to create http client instance.");
+        vlogE("IpfsDrive: failed to create http client instance.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
@@ -525,34 +513,34 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
     if (rc) {
         rc = HIVE_HTTPC_ERROR(rc);
         if (RC_NODE_UNREACHABLE(rc)) {
-            vlogE("IpfsDrive: Failed to copy file: current node is not reachable.");
+            vlogE("IpfsDrive: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(drive->token);
         } else
-            vlogE("IpfsDrive: Failed to copy file: failed to perform http request.");
+            vlogE("IpfsDrive: failed to perform http request.");
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     http_client_close(httpc);
     if (rc) {
-        vlogE("IpfsDrive: Failed to copy file: failed to get http response code.");
+        vlogE("IpfsDrive: failed to get http response code.");
         return HIVE_HTTPC_ERROR(rc);
     }
 
     if (resp_code != HttpStatus_OK) {
-        vlogE("IpfsDrive: Failed to copy file: error from response (%d).", resp_code);
+        vlogE("IpfsDrive: error from response (%d).", resp_code);
         return HIVE_HTTP_STATUS_ERROR(resp_code);
     }
 
     rc = publish_root_hash(drive->token, url, sizeof(url));
     if (rc < 0) {
         if (RC_NODE_UNREACHABLE(rc)) {
-            vlogE("IpfsDrive: Failed to copy file: current node is not reachable.");
+            vlogE("IpfsDrive: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(drive->token);
         } else
-            vlogE("IpfsDrive: Failed to copy file: failed to publish root hash (%d).", rc);
+            vlogE("IpfsDrive: failed to publish root hash.");
         return rc;
     }
 
@@ -571,11 +559,9 @@ static int ipfs_drive_delete_file(HiveDrive *base, const char *path)
     long resp_code;
     int rc;
 
-    vlogD("IpfsDrive: Calling ipfs_drive_delete_file().");
-
     rc = ipfs_token_check_reachable(drive->token);
     if (rc < 0) {
-        vlogE("IpfsDrive: Failed to delete file: failed to check node's connectivity.");
+        vlogE("IpfsDrive: failed to check node's connectivity.");
         return rc;
     }
 
@@ -584,7 +570,7 @@ static int ipfs_drive_delete_file(HiveDrive *base, const char *path)
 
     httpc = http_client_new();
     if (!httpc) {
-        vlogE("IpfsDrive: Failed to delete file: failed to create http client instance.");
+        vlogE("IpfsDrive: failed to create http client instance.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
@@ -599,34 +585,34 @@ static int ipfs_drive_delete_file(HiveDrive *base, const char *path)
     if (rc) {
         rc = HIVE_HTTPC_ERROR(rc);
         if (RC_NODE_UNREACHABLE(rc)) {
-            vlogE("IpfsDrive: Failed to delete file: current node is not reachable.");
+            vlogE("IpfsDrive: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(drive->token);
         } else
-            vlogE("IpfsDrive: Failed to delete file: failed to peform http request (%d).", rc);
+            vlogE("IpfsDrive: failed to peform http request.");
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     http_client_close(httpc);
     if (rc) {
-        vlogE("IpfsDrive: Failed to delete file: failed to get http response code.");
+        vlogE("IpfsDrive: failed to get http response code.");
         return HIVE_HTTPC_ERROR(rc);
     }
 
     if (resp_code != HttpStatus_OK) {
-        vlogE("IpfsDrive: Failed to delete file: error from http response (%d).", resp_code);
+        vlogE("IpfsDrive: error from http response (%d).", resp_code);
         return HIVE_HTTP_STATUS_ERROR(resp_code);
     }
 
     rc = publish_root_hash(drive->token, url, sizeof(url));
     if (rc < 0) {
         if (RC_NODE_UNREACHABLE(rc)) {
-            vlogE("IpfsDrive: Failed to delete file: current node is not reachable.");
+            vlogE("IpfsDrive: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
             ipfs_token_mark_node_unreachable(drive->token);
         } else
-            vlogE("IpfsDrive: Failed to delete file: failed to publish root hash (%d).", rc);
+            vlogE("IpfsDrive: failed to publish root hash.");
 
         return rc;
     }
@@ -656,11 +642,9 @@ int ipfs_drive_open_file(HiveDrive *base, const char *path, int flags, HiveFile 
     IPFSDrive *drive = (IPFSDrive *)base;
     int rc;
 
-    vlogD("IpfsDrive: Calling ipfs_drive_open_file().");
-
     rc = ipfs_file_open(drive->token, path, flags, file);
     if (rc < 0) {
-        vlogE("IpfsDrive: Failed to open file (%d).", rc);
+        vlogE("IpfsDrive: Failed to open file.");
         return rc;
     }
 
@@ -673,11 +657,8 @@ HiveDrive *ipfs_drive_open(ipfs_token_t *token)
 
     assert(token);
 
-    vlogD("IpfsDrive: Calling ipfs_drive_open().");
-
     drive = (IPFSDrive *)rc_zalloc(sizeof(IPFSDrive), ipfs_drive_destructor);
     if (!drive) {
-        vlogE("IpfsDrive: Failed to create drive instance: out of memory.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY));
         return NULL;
     }
