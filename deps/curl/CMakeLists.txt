@@ -81,9 +81,9 @@ ExternalProject_Add(
     curl
 
     PREFIX ${HIVE_DEPS_BUILD_PREFIX}
-    URL "https://github.com/curl/curl/releases/download/curl-7_64_0/curl-7.64.0.zip"
-    URL_HASH SHA256=b765e85d0fa1a5e3a9806f4b4cc86148b0c7ed8d613e9ec6fc3a72f546b77014
-    DOWNLOAD_NAME "curl-7.64.0.zip"
+    URL "https://github.com/curl/curl/releases/download/curl-7_64_0/curl-7.64.0.tar.bz2"
+    URL_HASH SHA256=d573ba1c2d1cf9d8533fadcce480d778417964e8d04ccddcc76e591d544cf2eb
+    DOWNLOAD_NAME "curl-7.64.0.tar.bz2"
     DOWNLOAD_DIR ${HIVE_DEPS_TARBALL_DIR}
     DOWNLOAD_NO_PROGRESS 1
     LOG_DOWNLOAD FALSE
