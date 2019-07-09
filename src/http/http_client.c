@@ -209,6 +209,17 @@ int trace_func(CURL *handle, curl_infotype type, char *data, size_t size,
     return 0;
 }
 
+static size_t eat_output(char *ptr, size_t size,
+                         size_t nmemb,
+                         void *userdata)
+{
+    (void)ptr;
+    (void)size;
+    (void)nmemb;
+    (void)userdata;
+    return size * nmemb;
+}
+
 static void http_client_destroy(void *obj)
 {
     http_client_t *client = (http_client_t *)obj;
@@ -257,6 +268,7 @@ http_client_t *http_client_new(void)
 
     curl_easy_setopt(client->curl, CURLOPT_DEBUGFUNCTION, trace_func);
     curl_easy_setopt(client->curl, CURLOPT_VERBOSE, 1L);
+    curl_easy_setopt(client->curl, CURLOPT_WRITEFUNCTION, eat_output);
     curl_easy_setopt(client->curl, CURLOPT_CURLU, client->url);
     curl_easy_setopt(client->curl, CURLOPT_NOSIGNAL, 1L);
 #if defined(_WIN32) || defined(_WIN64)
@@ -293,6 +305,7 @@ void http_client_reset(http_client_t *client)
 
     curl_easy_setopt(client->curl, CURLOPT_DEBUGFUNCTION, trace_func);
     curl_easy_setopt(client->curl, CURLOPT_VERBOSE, 1L);
+    curl_easy_setopt(client->curl, CURLOPT_WRITEFUNCTION, eat_output);
     curl_easy_setopt(client->curl, CURLOPT_CURLU, client->url);
     curl_easy_setopt(client->curl, CURLOPT_NOSIGNAL, 1L);
 #if defined(_WIN32) || defined(_WIN64)
