@@ -37,7 +37,7 @@
 #include "ela_hive.h"
 #include "ipfs_client.h"
 #include "ipfs_drive.h"
-#include "ipfs_token.h"
+#include "ipfs_rpc.h"
 #include "ipfs_utils.h"
 #include "ipfs_constants.h"
 #include "http_client.h"
@@ -46,7 +46,7 @@
 
 typedef struct IPFSClient {
     HiveClient base;
-    ipfs_token_t *token;
+    ipfs_rpc_t *rpc;
     char token_cookie[MAXPATHLEN + 1];
 } IPFSClient;
 
@@ -55,23 +55,23 @@ static int ipfs_client_login(HiveClient *base,
                              void *user_data)
 {
     IPFSClient *client = (IPFSClient *)base;
-    ipfs_token_t *token = client->token;
+    ipfs_rpc_t *rpc = client->rpc;
     int rc;
 
     (void)cb;
     (void)user_data;
 
-    rc = ipfs_token_check_reachable(client->token);
+    rc = ipfs_rpc_check_reachable(client->rpc);
     if (rc < 0) {
         vlogE("IpfsClient: No reachable IPFS node.");
         return rc;
     }
 
-    rc = ipfs_token_synchronize(token);
+    rc = ipfs_rpc_synchronize(rpc);
     if (RC_NODE_UNREACHABLE(rc)) {
         rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
         vlogE("IpfsClient: Current IPFS node is unreachable.");
-        ipfs_token_mark_node_unreachable(client->token);
+        ipfs_rpc_mark_node_unreachable(client->rpc);
     }
 
     if (rc < 0) {
@@ -86,10 +86,10 @@ static int ipfs_client_login(HiveClient *base,
 static int ipfs_client_logout(HiveClient *base)
 {
     IPFSClient *client = (IPFSClient *)base;
-    ipfs_token_t *token = client->token;
+    ipfs_rpc_t *rpc = client->rpc;
     int rc;
 
-    rc = ipfs_token_reset(token);
+    rc = ipfs_rpc_reset(rpc);
     if (rc < 0) {
         vlogE("IpfsClient: IPFS node synchronization failure.");
         return rc;
@@ -102,14 +102,14 @@ static int ipfs_client_logout(HiveClient *base)
 static int ipfs_client_get_info(HiveClient *base, HiveClientInfo *result)
 {
     IPFSClient *client = (IPFSClient *)base;
-    ipfs_token_t *token = client->token;
+    ipfs_rpc_t *rpc = client->rpc;
     int rc;
 
     assert(client);
     assert(result);
 
     rc = snprintf(result->user_id, sizeof(result->user_id), "%s",
-                  ipfs_token_get_uid(token));
+                  ipfs_rpc_get_uid(rpc));
     if (rc < 0 || rc >= sizeof(result->user_id)) {
         vlogE("IpfsClient: Failed to fill user id field of client info.");
         return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
@@ -149,7 +149,7 @@ static int ipfs_client_drive_open(HiveClient *base, HiveDrive **drive)
 
     assert(base);
 
-    tmp = ipfs_drive_open(client->token);
+    tmp = ipfs_drive_open(client->rpc);
     if (!tmp) {
         vlogE("IpfsClient: Failed to open IPFS drive.");
         return hive_get_error();
@@ -172,8 +172,8 @@ static void ipfs_client_destructor(void *p)
 {
     IPFSClient *client = (IPFSClient *)p;
 
-    if (client->token)
-        ipfs_token_close(client->token);
+    if (client->rpc)
+        ipfs_rpc_close(client->rpc);
 }
 
 static inline bool is_valid_ip(const char *ip)
@@ -231,7 +231,7 @@ static cJSON *load_ipfs_token_cookie(const char *path)
         return NULL;
     }
 
-    vlogI("IpfsClient: Successfully loaded token from cookie.");
+    vlogI("IpfsClient: Successfully loaded rpc from cookie.");
 
     return json;
 }
@@ -246,7 +246,7 @@ static int writeback_token(const cJSON *json, void *user_data)
 
     json_str = cJSON_PrintUnformatted(json);
     if (!json_str || !*json_str) {
-        vlogE("IpfsClient: invalid token format.");
+        vlogE("IpfsClient: invalid rpc format.");
         errno = ENOMEM;
         return -1;
     }
@@ -268,7 +268,7 @@ static int writeback_token(const cJSON *json, void *user_data)
         return -1;
     }
 
-    vlogI("IpfsClient: Successfully save token to cookie file.");
+    vlogI("IpfsClient: Successfully save rpc to cookie file.");
 
     return 0;
 }
@@ -276,7 +276,7 @@ static int writeback_token(const cJSON *json, void *user_data)
 HiveClient *ipfs_client_new(const HiveOptions *options)
 {
     IPFSOptions *opts = (IPFSOptions *)options;
-    ipfs_token_options_t *token_options;
+    ipfs_rpc_options_t *token_options;
     size_t token_options_sz;
     char token_cookie[MAXPATHLEN + 1];
     cJSON *token_cookie_json = NULL;
@@ -351,7 +351,7 @@ HiveClient *ipfs_client_new(const HiveOptions *options)
         node_options->port = (uint16_t)port;
     }
 
-    // check token cookie
+    // check rpc cookie
     rc = snprintf(token_cookie, sizeof(token_cookie), "%s/.data/ipfs.json",
                   opts->base.persistent_location);
     if (rc < 0 || rc >= sizeof(token_cookie)) {
@@ -370,7 +370,7 @@ HiveClient *ipfs_client_new(const HiveOptions *options)
     if (!access(token_cookie, F_OK)) {
         token_cookie_json = load_ipfs_token_cookie(token_cookie);
         if (!token_cookie_json) {
-            vlogE("IpfsClient: load token from cookie error.");
+            vlogE("IpfsClient: load rpc from cookie error.");
             hive_set_error(HIVE_SYS_ERROR(errno));
             return NULL;
         }
@@ -394,11 +394,11 @@ HiveClient *ipfs_client_new(const HiveOptions *options)
     client->base.get_drive   = &ipfs_client_drive_open;
     client->base.close       = &ipfs_client_close;
 
-    client->token = ipfs_token_new(token_options, &writeback_token, client);
+    client->rpc = ipfs_rpc_new(token_options, &writeback_token, client);
     if (token_options->store)
         cJSON_Delete(token_options->store);
-    if (!client->token) {
-        vlogE("IpfsClient: failed to create IPFS token.");
+    if (!client->rpc) {
+        vlogE("IpfsClient: failed to create IPFS rpc.");
         deref(client);
         return NULL;
     }

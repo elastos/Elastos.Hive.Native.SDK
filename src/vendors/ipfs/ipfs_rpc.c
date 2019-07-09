@@ -11,17 +11,17 @@
 
 #include "ela_hive.h"
 #include "hive_error.h"
-#include "ipfs_token.h"
+#include "ipfs_rpc.h"
 #include "ipfs_utils.h"
 #include "ipfs_constants.h"
 #include "ipfs_drive.h"
 #include "http_client.h"
 #include "http_status.h"
 
-struct ipfs_token {
+struct ipfs_rpc {
     char uid[HIVE_MAX_IPFS_UID_LEN + 1];
     char current_node[HIVE_MAX_IPV6_ADDRESS_LEN  + 1];
-    ipfs_token_writeback_func_t *writeback_cb;
+    ipfs_rpc_writeback_func_t *writeback_cb;
     void *user_data;
     size_t rpc_nodes_count;
     rpc_node_t rpc_nodes[0];
@@ -150,11 +150,11 @@ error_exit:
     return rc;
 }
 
-int ipfs_token_get_uid_info(ipfs_token_t *token, char **result)
+int ipfs_rpc_get_uid_info(ipfs_rpc_t *rpc, char **result)
 {
-    assert(token);
+    assert(rpc);
 
-    return _ipfs_token_get_uid_info(token->current_node, token->uid, result);
+    return _ipfs_token_get_uid_info(rpc->current_node, rpc->uid, result);
 }
 
 static int select_bootstrap(rpc_node_t *rpc_nodes, size_t nodes_cnt, char *selected)
@@ -193,30 +193,30 @@ static int select_bootstrap(rpc_node_t *rpc_nodes, size_t nodes_cnt, char *selec
     return HIVE_GENERAL_ERROR(HIVEERR_BAD_BOOTSTRAP_HOST);
 }
 
-int ipfs_token_check_reachable(ipfs_token_t *token)
+int ipfs_rpc_check_reachable(ipfs_rpc_t *rpc)
 {
     int rc;
 
-    if (token->current_node[0])
+    if (rpc->current_node[0])
         return 0;
 
-    rc = select_bootstrap(token->rpc_nodes, token->rpc_nodes_count,
-                          token->current_node);
+    rc = select_bootstrap(rpc->rpc_nodes, rpc->rpc_nodes_count,
+                          rpc->current_node);
     if (rc < 0) {
         vlogE("IpfsToken: no node configured is reachable.");
         return rc;
     }
 
-    rc = ipfs_synchronize(token);
+    rc = ipfs_synchronize(rpc);
     if (rc < 0)
-        token->current_node[0] = '\0';
+        rpc->current_node[0] = '\0';
 
     return rc;
 }
 
-void ipfs_token_mark_node_unreachable(ipfs_token_t *token)
+void ipfs_rpc_mark_node_unreachable(ipfs_rpc_t *rpc)
 {
-    token->current_node[0] = '\0';
+    rpc->current_node[0] = '\0';
 }
 
 static int uid_new(const char *node_ip, char *uid, size_t uid_len)
@@ -302,14 +302,14 @@ error_exit:
     return rc;
 }
 
-const char *ipfs_token_get_uid(ipfs_token_t *token)
+const char *ipfs_rpc_get_uid(ipfs_rpc_t *rpc)
 {
-    return token->uid;
+    return rpc->uid;
 }
 
-const char *ipfs_token_get_current_node(ipfs_token_t *token)
+const char *ipfs_rpc_get_current_node(ipfs_rpc_t *rpc)
 {
-    return token->current_node;
+    return rpc->current_node;
 }
 
 static int load_store(const cJSON *store, char *uid, size_t len)
@@ -329,7 +329,7 @@ static int load_store(const cJSON *store, char *uid, size_t len)
     return 0;
 }
 
-static int writeback_tokens(ipfs_token_t *token)
+static int writeback_tokens(ipfs_rpc_t *rpc)
 {
     cJSON *json;
     int rc;
@@ -340,41 +340,41 @@ static int writeback_tokens(ipfs_token_t *token)
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
-    if (!cJSON_AddStringToObject(json, "uid", token->uid)) {
+    if (!cJSON_AddStringToObject(json, "uid", rpc->uid)) {
         vlogE("IpfsToken: failed to add uid json object.");
         cJSON_Delete(json);
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
     }
 
-    rc = token->writeback_cb(json, token->user_data);
+    rc = rpc->writeback_cb(json, rpc->user_data);
     if (rc < 0)
         vlogE("IpfsToken: failed to write to file.");
     cJSON_Delete(json);
     return rc;
 }
 
-int ipfs_token_reset(ipfs_token_t *token)
+int ipfs_rpc_reset(ipfs_rpc_t *rpc)
 {
-    (void)token;
+    (void)rpc;
     return 0;
 }
 
-int ipfs_token_synchronize(ipfs_token_t *token)
+int ipfs_rpc_synchronize(ipfs_rpc_t *rpc)
 {
-    return ipfs_synchronize(token);
+    return ipfs_synchronize(rpc);
 }
 
-ipfs_token_t *ipfs_token_new(ipfs_token_options_t *options,
-                             ipfs_token_writeback_func_t cb,
-                             void *user_data)
+ipfs_rpc_t *ipfs_rpc_new(ipfs_rpc_options_t *options,
+                         ipfs_rpc_writeback_func_t cb,
+                         void *user_data)
 {
-    ipfs_token_t *tmp;
+    ipfs_rpc_t *tmp;
     size_t bootstraps_nbytes;
     char url[MAX_URL_LEN] = {0};
     int rc;
 
     bootstraps_nbytes = sizeof(options->rpc_nodes[0]) * options->rpc_nodes_count;
-    tmp = rc_zalloc(sizeof(ipfs_token_t) + bootstraps_nbytes, NULL);
+    tmp = rc_zalloc(sizeof(ipfs_rpc_t) + bootstraps_nbytes, NULL);
     if (!tmp) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY));
         return NULL;
@@ -449,8 +449,8 @@ ipfs_token_t *ipfs_token_new(ipfs_token_options_t *options,
     return tmp;
 }
 
-int ipfs_token_close(ipfs_token_t *token)
+int ipfs_rpc_close(ipfs_rpc_t *rpc)
 {
-    deref(token);
+    deref(rpc);
     return 0;
 }
