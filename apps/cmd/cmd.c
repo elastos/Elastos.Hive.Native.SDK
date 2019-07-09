@@ -56,6 +56,7 @@ typedef struct {
     HiveClient *client;
     HiveDrive *drive;
     HiveFile *file;
+    bool stop;
 } cmd_t;
 
 static cmd_t cmd_ctx;
@@ -111,325 +112,288 @@ static int open_url(const char *url, void *context)
 #endif
 }
 
-static bool login(cmd_t *ctx, int argc, char *argv[])
+static void login(cmd_t *ctx, int argc, char *argv[])
 {
     int rc;
 
     if (argc != 1) {
         console("Error: invalid command syntax.");
-        return false;
+        return;
     }
 
     rc = hive_client_login(ctx->client, open_url, NULL);
     if (rc < 0) {
         console("Error: login failed. Reason: %s.",
                 hive_get_strerror(hive_get_error(), errbuf, sizeof(errbuf)));
-        return false;
+        return;
     }
 
     ctx->drive = hive_drive_open(ctx->client);
-    if (!ctx->drive) {
+    if (!ctx->drive)
         console("Error: create drive failed. Reason: %s.",
                 hive_get_strerror(hive_get_error(), errbuf, sizeof(errbuf)));
-        return false;
-    }
-
-    return false;
 }
 
-static bool logout(cmd_t *ctx, int argc, char *argv[])
+static void logout(cmd_t *ctx, int argc, char *argv[])
 {
    int rc;
 
     if (argc != 1) {
         console("Error: invalid command syntax.");
-        return false;
+        return;
     }
 
     rc = hive_client_logout(ctx->client);
-    if (rc < 0) {
+    if (rc < 0)
         console("Error: logout failed. Reason: %s.",
                 hive_get_strerror(hive_get_error(), errbuf, sizeof(errbuf)));
-        return false;
-    }
-
-    return false;
 }
 
-static bool client_info(cmd_t *ctx, int argc, char *argv[])
+static void client_info(cmd_t *ctx, int argc, char *argv[])
 {
     HiveClientInfo info;
     int rc;
 
     if (argc != 1) {
         console("Error: invalid command syntax.");
-        return false;
+        return;
     }
 
     rc = hive_client_get_info(ctx->client, &info);
     if (rc < 0) {
         console("Error: get client info failed. Reason: %s.",
                 hive_get_strerror(hive_get_error(), errbuf, sizeof(errbuf)));
-        return false;
+        return;
     }
 
-    console("client info:");
     console("user id: %s", info.user_id);
     console("display name: %s", info.display_name);
     console("email: %s", info.email);
     console("phone number: %s", info.phone_number);
     console("region: %s", info.region);
-
-    return false;
 }
 
-static bool drive_info(cmd_t *ctx, int argc, char *argv[])
+static void drive_info(cmd_t *ctx, int argc, char *argv[])
 {
     HiveDriveInfo info;
     int rc;
 
     if (argc != 1) {
         console("Error: invalid command syntax.");
-        return false;
+        return;
     }
 
     if (!ctx->drive) {
         console("Error: get drive info failed. Reason: not login.");
-        return false;
+        return;
     }
 
     rc = hive_drive_get_info(ctx->drive, &info);
     if (rc < 0) {
         console("Error: get drive info failed. Reason: %s.",
                 hive_get_strerror(hive_get_error(), errbuf, sizeof(errbuf)));
-        return false;
+        return;
     }
 
-    console("drive info:");
     console("drive id: %s", info.driveid);
-
-    return false;
 }
 
-static bool file_info(cmd_t *ctx, int argc, char *argv[])
+static void file_info(cmd_t *ctx, int argc, char *argv[])
 {
     HiveFileInfo info;
     int rc;
 
     if (argc != 2) {
         console("Error: invalid command syntax.");
-        return false;
+        return;
     }
 
     if (!ctx->drive) {
         console("Error: get file info failed. Reason: not login.");
-        return false;
+        return;
     }
 
     rc = hive_drive_file_stat(ctx->drive, argv[1], &info);
     if (rc < 0) {
         console("Error: get file info failed. Reason: %s.",
                 hive_get_strerror(hive_get_error(), errbuf, sizeof(errbuf)));
-        return false;
+        return;
     }
 
-    console("file info:");
     console("file id: %s", info.fileid);
     console("type: %s", info.type);
     console("size: %zu", info.size);
-
-    return false;
 }
 
 static bool ls_cb(const KeyValue *info, size_t size, void *context)
 {
+    static int nth = 0;
     size_t i;
+
+    if (nth && info)
+        console("");
 
     for (i = 0; i < size; ++i)
         console("%s: %s", info[i].key, info[i].value);
 
+    nth = info ? nth + 1 : 0;
+
     return true;
 }
 
-static bool ls(cmd_t *ctx, int argc, char *argv[])
+static void ls(cmd_t *ctx, int argc, char *argv[])
 {
     int rc;
 
     if (argc != 2) {
         console("Error: invalid command syntax.");
-        return false;
+        return;
     }
 
     if (!ctx->drive) {
         console("Error: ls failed. Reason: not login.");
-        return false;
+        return;
     }
 
     rc = hive_drive_list_files(ctx->drive, argv[1], ls_cb, NULL);
-    if (rc < 0) {
+    if (rc < 0)
         console("Error: ls failed. Reason: %s.",
                 hive_get_strerror(hive_get_error(), errbuf, sizeof(errbuf)));
-        return false;
-    }
-
-    return false;
 }
 
-static bool makedir(cmd_t *ctx, int argc, char *argv[])
+static void makedir(cmd_t *ctx, int argc, char *argv[])
 {
     int rc;
 
     if (argc != 2) {
         console("Error: invalid command syntax.");
-        return false;
+        return;
     }
 
     if (!ctx->drive) {
         console("Error: mkdir failed. Reason: not login.");
-        return false;
+        return;
     }
 
     rc = hive_drive_mkdir(ctx->drive, argv[1]);
-    if (rc < 0) {
+    if (rc < 0)
         console("Error: mkdir failed. Reason: %s.",
                 hive_get_strerror(hive_get_error(), errbuf, sizeof(errbuf)));
-        return false;
-    }
-
-    return false;
 }
 
-static bool mv(cmd_t *ctx, int argc, char *argv[])
+static void mv(cmd_t *ctx, int argc, char *argv[])
 {
     int rc;
 
     if (argc != 3) {
         console("Error: invalid command syntax.");
-        return false;
+        return;
     }
 
     if (!ctx->drive) {
         console("Error: mv failed. Reason: not login.");
-        return false;
+        return;
     }
 
     rc = hive_drive_move_file(ctx->drive, argv[1], argv[2]);
-    if (rc < 0) {
+    if (rc < 0)
         console("Error: mv failed. Reason: %s.",
                 hive_get_strerror(hive_get_error(), errbuf, sizeof(errbuf)));
-        return false;
-    }
-
-    return false;
 }
 
-static bool cp(cmd_t *ctx, int argc, char *argv[])
+static void cp(cmd_t *ctx, int argc, char *argv[])
 {
     int rc;
 
     if (argc != 3) {
         console("Error: invalid command syntax.");
-        return false;
+        return;
     }
 
     if (!ctx->drive) {
         console("Error: cp failed. Reason: not login.");
-        return false;
+        return;
     }
 
     rc = hive_drive_copy_file(ctx->drive, argv[1], argv[2]);
-    if (rc < 0) {
+    if (rc < 0)
         console("Error: cp failed. Reason: %s.",
                 hive_get_strerror(hive_get_error(), errbuf, sizeof(errbuf)));
-        return false;
-    }
-
-    return false;
 }
 
-static bool rm(cmd_t *ctx, int argc, char *argv[])
+static void rm(cmd_t *ctx, int argc, char *argv[])
 {
     int rc;
 
     if (argc != 2) {
         console("Error: invalid command syntax.");
-        return false;
+        return;
     }
 
     if (!ctx->drive) {
         console("Error: rm failed. Reason: not login.");
-        return false;
+        return;
     }
 
     rc = hive_drive_delete_file(ctx->drive, argv[1]);
-    if (rc < 0) {
+    if (rc < 0)
         console("Error: rm failed. Reason: %s.",
                 hive_get_strerror(hive_get_error(), errbuf, sizeof(errbuf)));
-        return false;
-    }
-
-    return false;
 }
 
-static bool file_open(cmd_t *ctx, int argc, char *argv[])
+static void file_open(cmd_t *ctx, int argc, char *argv[])
 {
     if (argc != 3) {
         console("Error: invalid command syntax.");
-        return false;
+        return;
     }
 
     if (!ctx->drive) {
         console("Error: fopen failed. Reason: not login.");
-        return false;
+        return;
     }
 
     if (ctx->file) {
         console("Error: fopen failed. Reason: a file is already opened.");
-        return false;
+        return;
     }
 
     ctx->file = hive_file_open(ctx->drive, argv[1], argv[2]);
-    if (!ctx->file) {
+    if (!ctx->file)
         console("Error: fopen failed. Reason: %s.",
                 hive_get_strerror(hive_get_error(), errbuf, sizeof(errbuf)));
-        return false;
-    }
-
-    return false;
 }
 
-static bool file_close(cmd_t *ctx, int argc, char *argv[])
+static void file_close(cmd_t *ctx, int argc, char *argv[])
 {
     int rc;
 
     if (argc != 1) {
         console("Error: invalid command syntax.");
-        return false;
+        return;
     }
 
     if (!ctx->drive) {
         console("Error: fclose failed. Reason: not login.");
-        return false;
+        return;
     }
 
     if (!ctx->file) {
         console("Error: fclose failed. Reason: no file is opened.");
-        return false;
+        return;
     }
 
     rc = hive_file_close(ctx->file);
     if (rc < 0) {
         console("Error: fclose failed. Reason: %s.",
                 hive_get_strerror(hive_get_error(), errbuf, sizeof(errbuf)));
-        return false;
+        return;
     }
 
     ctx->file = NULL;
-
-    return false;
 }
 
-static bool file_seek(cmd_t *ctx, int argc, char *argv[])
+static void file_seek(cmd_t *ctx, int argc, char *argv[])
 {
     int rc;
     size_t offset;
@@ -438,13 +402,13 @@ static bool file_seek(cmd_t *ctx, int argc, char *argv[])
 
     if (argc != 3) {
         console("Error: invalid command syntax.");
-        return false;
+        return;
     }
 
     offset = strtol(argv[1], &endptr, 10);
     if (*endptr) {
         console("Error: invalid command syntax.");
-        return false;
+        return;
     }
 
     if (!strcmp(argv[2], "set"))
@@ -455,30 +419,26 @@ static bool file_seek(cmd_t *ctx, int argc, char *argv[])
         whence = HiveSeek_End;
     else {
         console("Error: invalid command syntax.");
-        return false;
+        return;
     }
 
     if (!ctx->drive) {
         console("Error: fseek failed. Reason: not login.");
-        return false;
+        return;
     }
 
     if (!ctx->file) {
         console("Error: fseek failed. Reason: no file is opened.");
-        return false;
+        return;
     }
 
     rc = hive_file_seek(ctx->file, offset, whence);
-    if (rc < 0) {
+    if (rc < 0)
         console("Error: fseek failed. Reason: %s.",
                 hive_get_strerror(hive_get_error(), errbuf, sizeof(errbuf)));
-        return false;
-    }
-
-    return false;
 }
 
-static bool file_read(cmd_t *ctx, int argc, char *argv[])
+static void file_read(cmd_t *ctx, int argc, char *argv[])
 {
     ssize_t rc;
     size_t size;
@@ -487,23 +447,23 @@ static bool file_read(cmd_t *ctx, int argc, char *argv[])
 
     if (argc != 2) {
         console("Error: invalid command syntax.");
-        return false;
+        return;
     }
 
     size = strtol(argv[1], &endptr, 10);
     if (*endptr || size <= 0) {
         console("Error: invalid command syntax.");
-        return false;
+        return;
     }
 
     if (!ctx->drive) {
         console("Error: fread failed. Reason: not login.");
-        return false;
+        return;
     }
 
     if (!ctx->file) {
         console("Error: fread failed. Reason: no file is opened.");
-        return false;
+        return;
     }
 
     buf = alloca(size + 1);
@@ -512,111 +472,100 @@ static bool file_read(cmd_t *ctx, int argc, char *argv[])
     if (rc < 0) {
         console("Error: fread failed. Reason: %s.",
                 hive_get_strerror(hive_get_error(), errbuf, sizeof(errbuf)));
-        return false;
+        return;
     }
 
     buf[rc] = '\0';
     console("%s", buf);
-
-    return false;
 }
 
-static bool file_write(cmd_t *ctx, int argc, char *argv[])
+static void file_write(cmd_t *ctx, int argc, char *argv[])
 {
     ssize_t rc;
 
     if (argc != 2) {
         console("Error: invalid command syntax.");
-        return false;
+        return;
     }
 
     if (!ctx->drive) {
         console("Error: fwrite failed. Reason: not login.");
-        return false;
+        return;
     }
 
     if (!ctx->file) {
         console("Error: fwrite failed. Reason: no file is opened.");
-        return false;
+        return;
     }
 
     rc = hive_file_write(ctx->file, argv[1], strlen(argv[1]));
-    if (rc < 0) {
+    if (rc < 0)
         console("Error: fwrite failed. Reason: %s.",
                 hive_get_strerror(hive_get_error(), errbuf, sizeof(errbuf)));
-        return false;
-    }
-
-    return false;
 }
 
-static bool file_commit(cmd_t *ctx, int argc, char *argv[])
+static void file_commit(cmd_t *ctx, int argc, char *argv[])
 {
     int rc;
 
     if (argc != 1) {
         console("Error: invalid command syntax.");
-        return false;
+        return;
     }
 
     if (!ctx->drive) {
         console("Error: fcommit failed. Reason: not login.");
-        return false;
+        return;
     }
 
     if (!ctx->file) {
         console("Error: fcommit failed. Reason: no file is opened.");
-        return false;
+        return;
     }
 
     rc = hive_file_commit(ctx->file);
-    if (rc < 0) {
+    if (rc < 0)
         console("Error: fcommit failed. Reason: %s.",
                 hive_get_strerror(hive_get_error(), errbuf, sizeof(errbuf)));
-        return false;
-    }
-
-    return false;
 }
 
-static bool file_discard(cmd_t *ctx, int argc, char *argv[])
+static void file_discard(cmd_t *ctx, int argc, char *argv[])
 {
     int rc;
 
     if (argc != 1) {
         console("Error: invalid command syntax.");
-        return false;
+        return;
     }
 
     if (!ctx->drive) {
         console("Error: fdiscard failed. Reason: not login.");
-        return false;
+        return;
     }
 
     if (!ctx->file) {
         console("Error: fdiscard failed. Reason: no file is opened.");
-        return false;
+        return;
     }
 
     rc = hive_file_discard(ctx->file);
-    if (rc < 0) {
+    if (rc < 0)
         console("Error: fdiscard failed. Reason: %s.",
                 hive_get_strerror(hive_get_error(), errbuf, sizeof(errbuf)));
-        return false;
-    }
-
-    return false;
 }
 
-static bool exit_app(cmd_t *ctx, int argc, char *argv[])
+static void exit_app(cmd_t *ctx, int argc, char *argv[])
 {
-    exit(-1);
+    (void)argc;
+    (void)argv;
+
+    ctx->stop = true;
 }
 
-static bool help(cmd_t *ctx, int argc, char *argv[]);
+static void help(cmd_t *ctx, int argc, char *argv[]);
 static struct command {
     const char *name;
-    bool (*cmd_cb)(cmd_t *, int argc, char *argv[]);
+    void (*cmd_cb)(cmd_t *, int argc, char *argv[]);
     const char *help;
 } commands[] = {
         { "help"       , help        , "help [cmd]"       },
@@ -641,7 +590,7 @@ static struct command {
         { NULL         , NULL        , NULL               }
 };
 
-static bool help(cmd_t *ctx, int argc, char *argv[])
+static void help(cmd_t *ctx, int argc, char *argv[])
 {
     char line[256] = {0};
     struct command *p;
@@ -655,16 +604,14 @@ static bool help(cmd_t *ctx, int argc, char *argv[])
         }
         console("  %s", line);
         memset(line, 0, sizeof(line));
-        return false;
     } else {
         for (p = commands; p->name; p++) {
             if (strcmp(argv[1], p->name) == 0) {
                 console("usage: %s", p->help);
-                return false;
+                return;
             }
         }
         console("unknown command: %s\n", argv[1]);
-        return false;
     }
 }
 
@@ -703,7 +650,7 @@ char *read_cmd(void)
     return NULL;
 }
 
-static bool do_cmd(char *line)
+static void do_cmd(char *line)
 {
     char *args[64];
     int count = 0;
@@ -727,14 +674,13 @@ static bool do_cmd(char *line)
         struct command *p;
 
         for (p = commands; p->name; p++) {
-            if (strcmp(args[0], p->name) == 0)
-                return p->cmd_cb(&cmd_ctx, count, args);
+            if (strcmp(args[0], p->name) == 0) {
+                p->cmd_cb(&cmd_ctx, count, args);
+                return;
+            }
         }
         console("unknown command: %s", args[0]);
-        return false;
     }
-
-    return false;
 }
 
 static void deinit()
@@ -771,8 +717,8 @@ static void usage(void)
 int sys_coredump_set(bool enable)
 {
     const struct rlimit rlim = {
-            enable ? RLIM_INFINITY : 0,
-            enable ? RLIM_INFINITY : 0
+        enable ? RLIM_INFINITY : 0,
+        enable ? RLIM_INFINITY : 0
     };
 
     return setrlimit(RLIMIT_CORE, &rlim);
@@ -918,9 +864,8 @@ int main(int argc, char *argv[])
 
     console_prompt();
     while ((cmd = read_cmd())) {
-        bool exit;
-        exit = do_cmd(cmd);
-        if (exit)
+        do_cmd(cmd);
+        if (cmd_ctx.stop)
             break;
         console_prompt();
     }
