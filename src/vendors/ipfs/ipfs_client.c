@@ -258,7 +258,7 @@ static int writeback_token(const cJSON *json, void *user_data)
         return -1;
     }
 
-    json_str_len = strlen(json_str);
+    json_str_len = (int)strlen(json_str);
     bytes = (int)write(fd, json_str, json_str_len + 1);
     free(json_str);
     close(fd);

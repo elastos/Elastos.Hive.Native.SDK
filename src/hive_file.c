@@ -10,20 +10,20 @@ ssize_t hive_file_seek(HiveFile *file, ssize_t offset, int whence)
 
     if (!file || (whence < HiveSeek_Set || whence > HiveSeek_End)) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
-        return -1;
+        return (ssize_t)-1;
     }
 
     if (!file->lseek) {
         vlogE("File: file type does not support this method.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED));
-        return -1;
+        return (ssize_t)-1;
     }
 
     rc = file->lseek(file, offset, whence);
     if (rc < 0) {
         vlogE("File: failed to set file position.");
-        hive_set_error(rc);
-        return -1;
+        hive_set_error((int)rc);
+        return (ssize_t)-1;
     }
 
     return rc;
@@ -47,7 +47,7 @@ ssize_t hive_file_read(HiveFile *file, char *buf, size_t bufsz)
     rc = file->read(file, buf, bufsz);
     if (rc < 0) {
         vlogE("File: Failed to read from file.");
-        hive_set_error(rc);
+        hive_set_error((int)rc);
         return -1;
     }
 
@@ -74,7 +74,7 @@ ssize_t hive_file_write(HiveFile *file, const char *buf, size_t bufsz)
     rc = file->write(file, buf, bufsz);
     if (rc < 0) {
         vlogE("File: Failed to write to file.");
-        hive_set_error(rc);
+        hive_set_error((int)rc);
         return -1;
     }
 

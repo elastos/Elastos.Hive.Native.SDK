@@ -147,7 +147,7 @@ static int restore_access_token(const cJSON *json, oauth_token_t *token)
     mem_len += strlen(access_token->valuestring) + 1;
     mem_len += strlen(refresh_token->valuestring) + 1;
 
-    token->expires_at.tv_sec = expires_at->valuedouble;
+    token->expires_at.tv_sec = (long)expires_at->valuedouble;
     p = (char *)calloc(1, mem_len);
     if (!p)
         return HIVE_SYS_ERROR(errno);
@@ -558,7 +558,7 @@ static int decode_access_token(oauth_token_t *token, const char *json_str)
     token->refresh_token = refresh_token;
 
     gettimeofday(&now, NULL);
-    interval.tv_sec = (time_t)item->valuedouble;
+    interval.tv_sec = (long)item->valuedouble;
     interval.tv_usec = 0;
     timeradd(&now, &interval, &token->expires_at);
 
