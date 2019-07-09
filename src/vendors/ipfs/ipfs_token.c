@@ -16,6 +16,7 @@
 #include "ipfs_constants.h"
 #include "ipfs_drive.h"
 #include "http_client.h"
+#include "http_status.h"
 
 struct ipfs_token {
     char uid[HIVE_MAX_IPFS_UID_LEN + 1];

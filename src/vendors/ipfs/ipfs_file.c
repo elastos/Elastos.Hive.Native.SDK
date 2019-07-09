@@ -9,6 +9,7 @@
 #include "ipfs_utils.h"
 #include "hive_client.h"
 #include "http_client.h"
+#include "http_status.h"
 
 typedef struct IPFSFile {
     HiveFile base;

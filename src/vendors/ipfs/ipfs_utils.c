@@ -9,6 +9,7 @@
 #include "ipfs_constants.h"
 #include "http_client.h"
 #include "hive_error.h"
+#include "http_status.h"
 
 static int ipfs_resolve(ipfs_token_t *token, const char *peerid, char **result)
 {

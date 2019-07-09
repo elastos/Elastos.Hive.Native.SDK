@@ -23,6 +23,7 @@
 #include "onedrive_misc.h"
 #include "onedrive_constants.h"
 #include "http_client.h"
+#include "http_status.h"
 
 typedef struct OneDriveClient {
     HiveClient base;
