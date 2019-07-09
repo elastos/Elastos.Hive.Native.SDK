@@ -343,7 +343,7 @@ static char *get_authorize_code(oauth_token_t *token,
     rc = http_client_get_url_escape(httpc, &url);
     if (rc) {
         vlogE("OauthToken: Wrong redirect URL path.");
-        hive_set_error(HIVE_HTTPC_ERROR(rc));
+        hive_set_error(HIVE_CURLU_ERROR(rc));
         http_client_close(httpc);
         return NULL;
     }
@@ -354,7 +354,7 @@ static char *get_authorize_code(oauth_token_t *token,
     rc = http_client_get_host(httpc, &redirect_host);
     if (rc) {
         vlogE("OauthToken: Failed to get redirect URL host.");
-        hive_set_error(HIVE_HTTPC_ERROR(rc));
+        hive_set_error(HIVE_CURLU_ERROR(rc));
         http_client_close(httpc);
         http_client_memory_free(url);
         return NULL;
@@ -363,7 +363,7 @@ static char *get_authorize_code(oauth_token_t *token,
     rc = http_client_get_port(httpc, &redirect_port);
     if (rc) {
         vlogE("OauthToken: Failed to get redirect URL port.");
-        hive_set_error(HIVE_HTTPC_ERROR(rc));
+        hive_set_error(HIVE_CURLU_ERROR(rc));
         http_client_close(httpc);
         http_client_memory_free(url);
         http_client_memory_free(redirect_host);
@@ -374,7 +374,7 @@ static char *get_authorize_code(oauth_token_t *token,
     http_client_close(httpc);
     if (rc) {
         vlogE("OauthToken: Failed to get redirect URL path.");
-        hive_set_error(HIVE_HTTPC_ERROR(rc));
+        hive_set_error(HIVE_CURLU_ERROR(rc));
         http_client_memory_free(url);
         http_client_memory_free(redirect_host);
         http_client_memory_free(redirect_port);
@@ -635,14 +635,14 @@ static int redeem_access_token(oauth_token_t *token, char *code)
     rc = http_client_request(httpc);
     if (rc) {
         vlogE("OauthToken: Failed to perform http request.");
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc < 0) {
         vlogE("OauthToken: Failed to get response code.");
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         goto error_exit;
     }
 
@@ -766,14 +766,14 @@ static int refresh_access_token(oauth_token_t *token)
     rc = http_client_request(httpc);
     if (rc) {
         vlogE("OauthToken: Failed to perform refresh access token request.");
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc) {
         vlogE("OauthToken: Failed to get refresh access token response code.");
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         goto error_exit;
     }
 

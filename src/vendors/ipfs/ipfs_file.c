@@ -55,7 +55,7 @@ static int get_file_stat(ipfs_token_t *token, const char *path, size_t *fsz)
 
     rc = http_client_request(httpc);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         if (RC_NODE_UNREACHABLE(rc)) {
             vlogE("IpfsFile: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
@@ -68,7 +68,7 @@ static int get_file_stat(ipfs_token_t *token, const char *path, size_t *fsz)
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc) {
         vlogE("IpfsFile: failed to get http response code.");
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         goto error_exit;
     }
 
@@ -196,7 +196,7 @@ static ssize_t ipfs_file_read(HiveFile *base, char *buffer, size_t bufsz)
 
     rc = http_client_request(httpc);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         if (RC_NODE_UNREACHABLE(rc)) {
             vlogE("IpfsFile: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
@@ -210,7 +210,7 @@ static ssize_t ipfs_file_read(HiveFile *base, char *buffer, size_t bufsz)
     http_client_close(httpc);
     if (rc) {
         vlogE("IpfsFile: failed to get http response code.");
-        return HIVE_HTTPC_ERROR(rc);
+        return HIVE_CURL_ERROR(rc);
     }
 
     if (resp_code != HttpStatus_OK) {
@@ -266,7 +266,7 @@ static ssize_t ipfs_file_write(HiveFile *base, const char *buffer, size_t bufsz)
 
     rc = http_client_request(httpc);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         if (RC_NODE_UNREACHABLE(rc)) {
             vlogE("IpfsFile: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
@@ -280,7 +280,7 @@ static ssize_t ipfs_file_write(HiveFile *base, const char *buffer, size_t bufsz)
     http_client_close(httpc);
     if (rc) {
         vlogE("IpfsFile: failed to get http response code.");
-        return HIVE_HTTPC_ERROR(rc);
+        return HIVE_CURL_ERROR(rc);
     }
 
     if (resp_code != HttpStatus_OK) {

@@ -36,9 +36,48 @@ struct http_client {
 
 static bool initialized = false;
 
-const char *http_client_strerror(int errcode)
+const char *curl_strerror(int errcode)
 {
     return curl_easy_strerror(errcode);
+}
+
+typedef struct ErrorDesc {
+    int errcode;
+    const char *errdesc;
+} ErrorDesc;
+
+static
+const ErrorDesc curlu_codes[] = {
+    { CURLUE_BAD_HANDLE,         "CURLU pointer argument passed as NULL." },
+    { CURLUE_BAD_PARTPOINTER,    "part argument passed as NULL."          },
+    { CURLUE_MALFORMED_INPUT,    "a malformed input passed."              },
+    { CURLUE_BAD_PORT_NUMBER,    "invalid port number"                    },
+    { CURLUE_UNSUPPORTED_SCHEME, "unsupported scheme"                     },
+    { CURLUE_URLDECODE,          "URL decode error"                       },
+    { CURLUE_OUT_OF_MEMORY,      "a memory function failed"               },
+    { CURLUE_USER_NOT_ALLOWED,   "credentials was passed when prohibited" },
+    { CURLUE_UNKNOWN_PART,       "an unknown part ID"                     },
+    { CURLUE_NO_SCHEME,          "no scheme part in the URL"              },
+    { CURLUE_NO_USER,            "no user part in the URL"                },
+    { CURLUE_NO_PASSWORD,        "no password part in the URL"            },
+    { CURLUE_NO_OPTIONS,         "no options part in the URL"             },
+    { CURLUE_NO_HOST,            "no host part in the URL"                },
+    { CURLUE_NO_PORT,            "no port part in the URL"                },
+    { CURLUE_NO_QUERY,           "no query part in the URL"               },
+    { CURLUE_NO_FRAGMENT,        "no fragment part in the URL"            }
+};
+
+const char *curlu_strerror(int errcode)
+{
+    int size = sizeof(curlu_codes)/sizeof(ErrorDesc);
+    int i;
+
+    for (i = 0; i < size; i++) {
+        if (errcode == curlu_codes[i].errcode)
+            return curlu_codes[i].errdesc;
+    }
+
+    return NULL;
 }
 
 #if defined(_WIN32) || defined(_WIN64)

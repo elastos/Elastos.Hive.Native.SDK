@@ -117,13 +117,13 @@ static int create_upload_session(OneDriveFile *file,
     rc = http_client_request(httpc);
     if (rc) {
         vlogE("OneDriveFile: failed to create http client instance.");
-        return HIVE_HTTPC_ERROR(rc);
+        return HIVE_CURL_ERROR(rc);
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc) {
         vlogE("OneDriveFile: failed to get http response code.");
-        return HIVE_HTTPC_ERROR(rc);
+        return HIVE_CURL_ERROR(rc);
     }
 
     if (resp_code == HttpStatus_Unauthorized) {
@@ -228,7 +228,7 @@ static int upload_to_session(OneDriveFile *file, http_client_t *httpc,
         rc = http_client_request(httpc);
         if (rc) {
             vlogE("OneDriveFile: failed to perform http request.");
-            return HIVE_HTTPC_ERROR(rc);
+            return HIVE_CURL_ERROR(rc);
         }
 
         ul_off += ul_sz;
@@ -237,7 +237,7 @@ static int upload_to_session(OneDriveFile *file, http_client_t *httpc,
         rc = http_client_get_response_code(httpc, &resp_code);
         if (rc) {
             vlogE("OneDriveFile: failed to get http response code.");
-            return HIVE_HTTPC_ERROR(rc);
+            return HIVE_CURL_ERROR(rc);
         }
 
         if ((ul_sz && resp_code != HttpStatus_Accepted) ||
@@ -354,14 +354,14 @@ static int get_file_stat(oauth_token_t *token, const char *path,
 
     rc = http_client_request(httpc);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("OneDriveFile: failed to perform http request.");
         goto error_exit;
     }
 
     rc = http_client_get_response_code(httpc, &resp_code);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("OneDriveFile: failed to get http response code.");
         goto error_exit;
     }
@@ -467,7 +467,7 @@ static int download_file(int fd, const char *download_url)
 
     rc = http_client_request(httpc);
     if (rc) {
-        rc = HIVE_HTTPC_ERROR(rc);
+        rc = HIVE_CURL_ERROR(rc);
         vlogE("OneDriveFile: failed to perform http request.");
         goto error_exit;
     }
@@ -476,7 +476,7 @@ static int download_file(int fd, const char *download_url)
     http_client_close(httpc);
     if (rc) {
         vlogE("OneDriveFile: failed to get http response code.");
-        return HIVE_HTTPC_ERROR(rc);
+        return HIVE_CURL_ERROR(rc);
     }
 
     if (resp_code != HttpStatus_OK) {

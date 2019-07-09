@@ -125,11 +125,14 @@ static int system_error(int errcode, char *buf, size_t len)
     return 0;
 }
 
-static int http_client_error(int errcode, char *buf, size_t len)
+static int curl_error(int errcode, char *buf, size_t len)
 {
     const char *errstr;
 
-    errstr = http_client_strerror(errcode);
+    errstr = curl_strerror(errcode);
+
+    if (!errstr)
+        return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
 
     if (strlen(errstr) >= len)
         return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
@@ -137,6 +140,23 @@ static int http_client_error(int errcode, char *buf, size_t len)
     strcpy(buf, errstr);
     return 0;
 }
+
+static int curlu_error(int errcode, char *buf, size_t len)
+{
+    const char *errstr;
+
+    errstr = curlu_strerror(errcode);
+
+    if (!errstr)
+        return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
+
+    if (strlen(errstr) >= len)
+        return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
+
+    strcpy(buf, errstr);
+    return 0;
+}
+
 
 typedef struct FacilityDesc {
     const char *desc;
@@ -148,7 +168,8 @@ static FacilityDesc facility_codes[] = {
     { "[System] ",          system_error },      //ELAF_SYS
     { "Reserved facility",  NULL },              //ELAF_RESERVED1
     { "Reserved facility",  NULL },              //ELAF_RESERVED2
-    { "[httpc] ",           http_client_error }, //ELAF_HTTP_CLIENT
+    { "[curl] ",            curl_error },        //ELAF_CURL
+    { "[curlu] ",           curlu_error },       //ELAF_CURLU
     { "[httpstat] ",        http_status_error }, //ELAF_HTTP_STATUS
 };
 
