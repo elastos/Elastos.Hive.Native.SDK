@@ -4,65 +4,7 @@ include(HiveDefaults)
 include(ExternalProject)
 include(ExternalConfigureArgs)
 
-ExternalProject_Add(
-    flatcc-parser
-
-    PREFIX ${HIVE_DEPS_BUILD_PREFIX}
-    URL "https://github.com/dvidelabs/flatcc/archive/v0.5.0.tar.gz"
-    URL_HASH SHA256=ef97a1c983b6d3a08572af535643600d03a6ff422f64b3dfa380a7193630695c
-    DOWNLOAD_NAME "flatcc-parser-0.5.0.tar.gz"
-    DOWNLOAD_DIR ${HIVE_DEPS_TARBALL_DIR}
-    DOWNLOAD_NO_PROGRESS 1
-
-    BUILD_IN_SOURCE 1
-
-    CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${HIVE_HOST_TOOLS_DIR}
-        -DCMAKE_BUILD_TYPE=Release
-        -DFLATCC_INSTALL=ON
-        -DFLATCC_TEST=OFF
-)
-
-if(ANDROID)
-    set(MAKE_STANDALONE_TOOLCHAIN
-        "${CMAKE_ANDROID_NDK}/build/tools/make_standalone_toolchain.py")
-
-    if(NOT EXISTS ${MAKE_STANDALONE_TOOLCHAIN})
-        message(FATAL_ERROR
-            "Android NDK: make_standalone_toolchain.py is missing.")
-    endif()
-
-    if(${CMAKE_ANDROID_STL_TYPE} MATCHES "^c\\+\\+_")
-        set(STL_LIBRARY "libc++")
-    elseif(${CMAKE_ANDROID_STL_TYPE} MATCHES "^stlport_")
-        set(STL_LIBRARY "stlport")
-    else()
-        set(STL_LIBRARY "gnustl")
-    endif()
-
-    ExternalProject_Add(
-        android-toolchain
-
-        SOURCE_DIR ${CMAKE_ANDROID_NDK}
-        BUILD_IN_SOURCE 1
-
-        CONFIGURE_COMMAND echo Done
-        BUILD_COMMAND echo Done
-        INSTALL_COMMAND ${MAKE_STANDALONE_TOOLCHAIN}
-            --force
-            --verbose
-            --arch ${CMAKE_ANDROID_ARCH}
-            --api ${CMAKE_SYSTEM_VERSION}
-            --stl ${STL_LIBRARY}
-            --install-dir ${XDK_TOOLCHAIN}
-    )
-
-    add_custom_target(platform-specific
-        COMMENT "Build platform-specific: Android Standalone Toolchain"
-        COMMAND echo Done)
-    add_dependencies(platform-specific
-        android-toolchain
-        flatcc-parser)
-elseif(WIN32)
+if(WIN32)
     if(${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "AMD64")
         set(CYGWIN_ARCH "x86_64")
     else()
@@ -184,13 +126,10 @@ elseif(WIN32)
         COMMAND echo Done
     )
     add_dependencies(platform-specific
-        cygwin-patch
-        flatcc-parser)
+        cygwin-patch)
 else()
     add_custom_target(platform-specific
         COMMENT "Build platform-specific: None"
         COMMAND echo Done
     )
-    add_dependencies(platform-specific
-        flatcc-parser)
 endif()
