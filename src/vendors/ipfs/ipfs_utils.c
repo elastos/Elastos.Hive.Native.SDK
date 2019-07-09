@@ -11,7 +11,7 @@
 #include "hive_error.h"
 #include "http_status.h"
 
-static int ipfs_resolve(ipfs_token_t *token, const char *peerid, char **result)
+static int ipfs_resolve(ipfs_rpc_t *rpc, const char *peerid, char **result)
 {
     char url[MAX_URL_LEN] = {0};
     http_client_t *httpc;
@@ -20,7 +20,7 @@ static int ipfs_resolve(ipfs_token_t *token, const char *peerid, char **result)
     int rc;
 
     rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/name/resolve",
-                  ipfs_token_get_current_node(token), NODE_API_PORT);
+                  ipfs_rpc_get_current_node(rpc), NODE_API_PORT);
     if (rc < 0 || rc >= sizeof(url)) {
         vlogE("IpfsUtils: URL too long.");
         return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
@@ -73,7 +73,7 @@ error_exit:
     return rc;
 }
 
-static int ipfs_login(ipfs_token_t *token, const char *hash)
+static int ipfs_login(ipfs_rpc_t *rpc, const char *hash)
 {
     char url[MAX_URL_LEN] = {0};
     http_client_t *httpc;
@@ -81,7 +81,7 @@ static int ipfs_login(ipfs_token_t *token, const char *hash)
     int rc;
 
     rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/uid/login",
-                  ipfs_token_get_current_node(token), NODE_API_PORT);
+                  ipfs_rpc_get_current_node(rpc), NODE_API_PORT);
     if (rc < 0 || rc >= sizeof(url)) {
         vlogE("IpfsUtils: URL too long.");
         return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
@@ -94,7 +94,7 @@ static int ipfs_login(ipfs_token_t *token, const char *hash)
     }
 
     http_client_set_url(httpc, url);
-    http_client_set_query(httpc, "uid", ipfs_token_get_uid(token));
+    http_client_set_query(httpc, "uid", ipfs_rpc_get_uid(rpc));
     http_client_set_query(httpc, "hash", hash);
     http_client_set_method(httpc, HTTP_METHOD_POST);
     http_client_set_request_body_instant(httpc, NULL, 0);
@@ -126,7 +126,7 @@ error_exit:
     return rc;
 }
 
-int ipfs_synchronize(ipfs_token_t *token)
+int ipfs_synchronize(ipfs_rpc_t *rpc)
 {
     char *resp;
     cJSON *json = NULL;
@@ -134,9 +134,9 @@ int ipfs_synchronize(ipfs_token_t *token)
     cJSON *hash;
     int rc;
 
-    assert(token);
+    assert(rpc);
 
-    rc = ipfs_token_get_uid_info(token, &resp);
+    rc = ipfs_rpc_get_uid_info(rpc, &resp);
     if (rc < 0) {
         vlogE("IpfsUtils: get uid info failure.");
         return rc;
@@ -156,7 +156,7 @@ int ipfs_synchronize(ipfs_token_t *token)
         return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
     }
 
-    rc = ipfs_resolve(token, peer_id->valuestring, &resp);
+    rc = ipfs_resolve(rpc, peer_id->valuestring, &resp);
     cJSON_Delete(json);
     if (rc < 0) {
         vlogE("IpfsUtils: failed to resolve uid hash.");
@@ -177,7 +177,7 @@ int ipfs_synchronize(ipfs_token_t *token)
         return HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
     }
 
-    rc = ipfs_login(token, hash->valuestring);
+    rc = ipfs_login(rpc, hash->valuestring);
     cJSON_Delete(json);
     if (rc < 0) {
         vlogE("IpfsUtils: failed to call login api.");
@@ -187,7 +187,7 @@ int ipfs_synchronize(ipfs_token_t *token)
     return 0;
 }
 
-static int get_last_root_hash(ipfs_token_t *token,
+static int get_last_root_hash(ipfs_rpc_t *rpc,
                               char *buf,    // buf used for generating url.
                               size_t bufsz,
                               char *hash,   // to store hash value.
@@ -200,13 +200,13 @@ static int get_last_root_hash(ipfs_token_t *token,
     char *p;
     int rc;
 
-    assert(token);
+    assert(rpc);
     assert(buf);
     assert(hash);
     assert(bufsz >= MAX_URL_LEN);
 
     sprintf(buf, "http://%s:%d/api/v0/files/stat",
-            ipfs_token_get_current_node(token), NODE_API_PORT);
+            ipfs_rpc_get_current_node(rpc), NODE_API_PORT);
 
     httpc = http_client_new();
     if (!httpc) {
@@ -215,7 +215,7 @@ static int get_last_root_hash(ipfs_token_t *token,
     }
 
     http_client_set_url(httpc, buf);
-    http_client_set_query(httpc, "uid", ipfs_token_get_uid(token));
+    http_client_set_query(httpc, "uid", ipfs_rpc_get_uid(rpc));
     http_client_set_query(httpc, "path", "/");
     http_client_set_method(httpc, HTTP_METHOD_POST);
     http_client_set_request_body_instant(httpc, NULL, 0);
@@ -282,7 +282,7 @@ error_exit:
     return rc;
 }
 
-static int pub_last_root_hash(ipfs_token_t *token,
+static int pub_last_root_hash(ipfs_rpc_t *rpc,
                               char *buf,    // buf used for generating url.
                               size_t bufsz, // the length of 'buf'
                               const char *hash)   // the root hash value.
@@ -291,13 +291,13 @@ static int pub_last_root_hash(ipfs_token_t *token,
     long resp_code = 0;
     int rc;
 
-    assert(token);
+    assert(rpc);
     assert(buf);
     assert(hash);
     assert(bufsz >= MAX_URL_LEN);
 
     sprintf(buf, "http://%s:%d/api/v0/name/publish",
-            ipfs_token_get_current_node(token), NODE_API_PORT);
+            ipfs_rpc_get_current_node(rpc), NODE_API_PORT);
 
     httpc = http_client_new();
     if (!httpc) {
@@ -306,7 +306,7 @@ static int pub_last_root_hash(ipfs_token_t *token,
     }
 
     http_client_set_url(httpc, buf);
-    http_client_set_query(httpc, "uid", ipfs_token_get_uid(token));
+    http_client_set_query(httpc, "uid", ipfs_rpc_get_uid(rpc));
     http_client_set_query(httpc, "path", hash);
     http_client_set_method(httpc, HTTP_METHOD_POST);
     http_client_set_request_body_instant(httpc, NULL, 0);
@@ -337,22 +337,22 @@ error_exit:
     return rc;
 }
 
-int publish_root_hash(ipfs_token_t *token, char *buf, size_t length)
+int publish_root_hash(ipfs_rpc_t *rpc, char *buf, size_t length)
 {
     char hash[128] = {0};
     int rc;
 
-    assert(token);
+    assert(rpc);
     assert(buf);
     assert(length >= MAX_URL_LEN);
 
     memset(buf, 0, length);
-    rc = get_last_root_hash(token, buf, length, hash, sizeof(hash));
+    rc = get_last_root_hash(rpc, buf, length, hash, sizeof(hash));
     if (rc < 0) {
         vlogE("IpfsUtils: get root hash error.");
         return rc;
     }
 
     memset(buf, 0, length);
-    return pub_last_root_hash(token, buf, length, hash);
+    return pub_last_root_hash(rpc, buf, length, hash);
 }

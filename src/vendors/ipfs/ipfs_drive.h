@@ -6,9 +6,9 @@ extern "C" {
 #endif
 
 #include "ela_hive.h"
-#include "ipfs_token.h"
+#include "ipfs_rpc.h"
 
-HiveDrive *ipfs_drive_open(ipfs_token_t *token);
+HiveDrive *ipfs_drive_open(ipfs_rpc_t *rpc);
 
 #ifdef __cplusplus
 }

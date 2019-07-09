@@ -8,7 +8,7 @@
 
 #include "ipfs_drive.h"
 #include "ipfs_file.h"
-#include "ipfs_token.h"
+#include "ipfs_rpc.h"
 #include "ipfs_constants.h"
 #include "ipfs_utils.h"
 #include "http_client.h"
@@ -18,7 +18,7 @@
 
 typedef struct IPFSDrive {
     HiveDrive base;
-    ipfs_token_t *token;
+    ipfs_rpc_t *rpc;
 } IPFSDrive;
 
 static int ipfs_drive_get_info(HiveDrive *base, HiveDriveInfo *info)
@@ -51,18 +51,18 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *path,
     char *p;
     int rc;
 
-    assert(drive->token);
+    assert(drive->rpc);
     assert(path);
     assert(info);
 
-    rc = ipfs_token_check_reachable(drive->token);
+    rc = ipfs_rpc_check_reachable(drive->rpc);
     if (rc < 0) {
         vlogE("IpfsDrive: failed to check node's connectivity.");
         return rc;
     }
 
     sprintf(buf, "http://%s:%d/api/v0/files/stat",
-            ipfs_token_get_current_node(drive->token), NODE_API_PORT);
+            ipfs_rpc_get_current_node(drive->rpc), NODE_API_PORT);
 
     httpc = http_client_new();
     if (!httpc) {
@@ -71,7 +71,7 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *path,
     }
 
     http_client_set_url(httpc, buf);
-    http_client_set_query(httpc, "uid", ipfs_token_get_uid(drive->token));
+    http_client_set_query(httpc, "uid", ipfs_rpc_get_uid(drive->rpc));
     http_client_set_query(httpc, "path", path);
     http_client_set_method(httpc, HTTP_METHOD_POST);
     http_client_set_request_body_instant(httpc, NULL, 0);
@@ -83,7 +83,7 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *path,
         if (RC_NODE_UNREACHABLE(rc)) {
             vlogE("IpfsDrive: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
-            ipfs_token_mark_node_unreachable(drive->token);
+            ipfs_rpc_mark_node_unreachable(drive->rpc);
         } else
             vlogE("IpfsDrive: failed to perform http request.");
         goto error_exit;
@@ -257,14 +257,14 @@ static int ipfs_drive_list_files(HiveDrive *base, const char *path,
 
     vlogD("IpfsDrive: Calling ipfs_drive_list_files().");
 
-    rc = ipfs_token_check_reachable(drive->token);
+    rc = ipfs_rpc_check_reachable(drive->rpc);
     if (rc < 0) {
         vlogE("IpfsDrive: failed to check node's connectivity.");
         return rc;
     }
 
     sprintf(url, "http://%s:%d/api/v0/files/ls",
-           ipfs_token_get_current_node(drive->token), NODE_API_PORT);
+            ipfs_rpc_get_current_node(drive->rpc), NODE_API_PORT);
 
     httpc = http_client_new();
     if (!httpc) {
@@ -273,7 +273,7 @@ static int ipfs_drive_list_files(HiveDrive *base, const char *path,
     }
 
     http_client_set_url(httpc, url);
-    http_client_set_query(httpc, "uid", ipfs_token_get_uid(drive->token));
+    http_client_set_query(httpc, "uid", ipfs_rpc_get_uid(drive->rpc));
     http_client_set_query(httpc, "path", path);
     http_client_set_method(httpc, HTTP_METHOD_POST);
     http_client_set_request_body_instant(httpc, NULL, 0);
@@ -285,7 +285,7 @@ static int ipfs_drive_list_files(HiveDrive *base, const char *path,
         if (RC_NODE_UNREACHABLE(rc)) {
             vlogE("IpfsDrive: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
-            ipfs_token_mark_node_unreachable(drive->token);
+            ipfs_rpc_mark_node_unreachable(drive->rpc);
         } else
             vlogE("IpfsDrive: failed to perform http request.");
         goto error_exit;
@@ -337,14 +337,14 @@ static int ipfs_drive_make_dir(HiveDrive *base, const char *path)
     long resp_code;
     int rc;
 
-    rc = ipfs_token_check_reachable(drive->token);
+    rc = ipfs_rpc_check_reachable(drive->rpc);
     if (rc < 0) {
         vlogE("IpfsDrive: failed to check node's connectivity.");
         return rc;
     }
 
     sprintf(url, "http://%s:%d/api/v0/files/mkdir",
-            ipfs_token_get_current_node(drive->token), NODE_API_PORT);
+            ipfs_rpc_get_current_node(drive->rpc), NODE_API_PORT);
 
     httpc = http_client_new();
     if (!httpc) {
@@ -353,7 +353,7 @@ static int ipfs_drive_make_dir(HiveDrive *base, const char *path)
     }
 
     http_client_set_url(httpc, url);
-    http_client_set_query(httpc, "uid", ipfs_token_get_uid(drive->token));
+    http_client_set_query(httpc, "uid", ipfs_rpc_get_uid(drive->rpc));
     http_client_set_query(httpc, "path", path);
     http_client_set_query(httpc, "parents", "true");
     http_client_set_method(httpc, HTTP_METHOD_POST);
@@ -365,7 +365,7 @@ static int ipfs_drive_make_dir(HiveDrive *base, const char *path)
         if (RC_NODE_UNREACHABLE(rc)) {
             vlogE("IpfsDrive: current node is not reachable.");
             HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
-            ipfs_token_mark_node_unreachable(drive->token);
+            ipfs_rpc_mark_node_unreachable(drive->rpc);
         } else
             vlogE("IpfsDrive: failed to perform http request.");
         goto error_exit;
@@ -383,12 +383,12 @@ static int ipfs_drive_make_dir(HiveDrive *base, const char *path)
         return HIVE_HTTP_STATUS_ERROR(resp_code);
     }
 
-    rc = publish_root_hash(drive->token, url, sizeof(url));
+    rc = publish_root_hash(drive->rpc, url, sizeof(url));
     if (rc < 0) {
         if (RC_NODE_UNREACHABLE(rc)) {
             vlogE("IpfsDrive: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
-            ipfs_token_mark_node_unreachable(drive->token);
+            ipfs_rpc_mark_node_unreachable(drive->rpc);
         } else
             vlogE("IpfsDrive: failed to publish root hash.");
         return rc;
@@ -409,14 +409,14 @@ static int ipfs_drive_move_file(HiveDrive *base, const char *old, const char *ne
     long resp_code;
     int rc;
 
-    rc = ipfs_token_check_reachable(drive->token);
+    rc = ipfs_rpc_check_reachable(drive->rpc);
     if (rc < 0) {
         vlogE("IpfsDrive: failed to check node's connectivity.");
         return rc;
     }
 
     sprintf(url, "http://%s:%d/api/v0/files/mv",
-             ipfs_token_get_current_node(drive->token), NODE_API_PORT);
+            ipfs_rpc_get_current_node(drive->rpc), NODE_API_PORT);
 
     httpc = http_client_new();
     if (!httpc) {
@@ -425,7 +425,7 @@ static int ipfs_drive_move_file(HiveDrive *base, const char *old, const char *ne
     }
 
     http_client_set_url(httpc, url);
-    http_client_set_query(httpc, "uid", ipfs_token_get_uid(drive->token));
+    http_client_set_query(httpc, "uid", ipfs_rpc_get_uid(drive->rpc));
     http_client_set_query(httpc, "source", old);
     http_client_set_query(httpc, "dest", new);
     http_client_set_method(httpc, HTTP_METHOD_POST);
@@ -437,7 +437,7 @@ static int ipfs_drive_move_file(HiveDrive *base, const char *old, const char *ne
         if (RC_NODE_UNREACHABLE(rc)) {
             vlogE("IpfsDrive: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
-            ipfs_token_mark_node_unreachable(drive->token);
+            ipfs_rpc_mark_node_unreachable(drive->rpc);
         } else
             vlogE("IpfsDrive: failed to perform http request.");
         goto error_exit;
@@ -455,12 +455,12 @@ static int ipfs_drive_move_file(HiveDrive *base, const char *old, const char *ne
         return HIVE_HTTP_STATUS_ERROR(resp_code);
     }
 
-    rc = publish_root_hash(drive->token, url, sizeof(url));
+    rc = publish_root_hash(drive->rpc, url, sizeof(url));
     if (rc < 0) {
         if (RC_NODE_UNREACHABLE(rc)) {
             vlogE("IpfsDrive: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
-            ipfs_token_mark_node_unreachable(drive->token);
+            ipfs_rpc_mark_node_unreachable(drive->rpc);
         } else
             vlogE("IpfsDrive: failed to publish root hash.");
         return rc;
@@ -482,7 +482,7 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
     HiveFileInfo src_info;
     int rc;
 
-    rc = ipfs_token_check_reachable(drive->token);
+    rc = ipfs_rpc_check_reachable(drive->rpc);
     if (rc < 0) {
         vlogE("IpfsDrive: failed to check node's connectivity.");
         return rc;
@@ -495,7 +495,7 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
     }
 
     sprintf(url, "http://%s:%d/api/v0/files/cp",
-             ipfs_token_get_current_node(drive->token), NODE_API_PORT);
+            ipfs_rpc_get_current_node(drive->rpc), NODE_API_PORT);
 
     httpc = http_client_new();
     if (!httpc) {
@@ -504,7 +504,7 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
     }
 
     http_client_set_url(httpc, url);
-    http_client_set_query(httpc, "uid", ipfs_token_get_uid(drive->token));
+    http_client_set_query(httpc, "uid", ipfs_rpc_get_uid(drive->rpc));
     http_client_set_query(httpc, "source", src_info.fileid);
     http_client_set_query(httpc, "dest", dest_path);
     http_client_set_method(httpc, HTTP_METHOD_POST);
@@ -516,7 +516,7 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
         if (RC_NODE_UNREACHABLE(rc)) {
             vlogE("IpfsDrive: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
-            ipfs_token_mark_node_unreachable(drive->token);
+            ipfs_rpc_mark_node_unreachable(drive->rpc);
         } else
             vlogE("IpfsDrive: failed to perform http request.");
         goto error_exit;
@@ -534,12 +534,12 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
         return HIVE_HTTP_STATUS_ERROR(resp_code);
     }
 
-    rc = publish_root_hash(drive->token, url, sizeof(url));
+    rc = publish_root_hash(drive->rpc, url, sizeof(url));
     if (rc < 0) {
         if (RC_NODE_UNREACHABLE(rc)) {
             vlogE("IpfsDrive: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
-            ipfs_token_mark_node_unreachable(drive->token);
+            ipfs_rpc_mark_node_unreachable(drive->rpc);
         } else
             vlogE("IpfsDrive: failed to publish root hash.");
         return rc;
@@ -560,14 +560,14 @@ static int ipfs_drive_delete_file(HiveDrive *base, const char *path)
     long resp_code;
     int rc;
 
-    rc = ipfs_token_check_reachable(drive->token);
+    rc = ipfs_rpc_check_reachable(drive->rpc);
     if (rc < 0) {
         vlogE("IpfsDrive: failed to check node's connectivity.");
         return rc;
     }
 
     sprintf(url, "http://%s:%d/api/v0/files/rm",
-             ipfs_token_get_current_node(drive->token), NODE_API_PORT);
+            ipfs_rpc_get_current_node(drive->rpc), NODE_API_PORT);
 
     httpc = http_client_new();
     if (!httpc) {
@@ -576,7 +576,7 @@ static int ipfs_drive_delete_file(HiveDrive *base, const char *path)
     }
 
     http_client_set_url(httpc, url);
-    http_client_set_query(httpc, "uid", ipfs_token_get_uid(drive->token));
+    http_client_set_query(httpc, "uid", ipfs_rpc_get_uid(drive->rpc));
     http_client_set_query(httpc, "path", path);
     http_client_set_query(httpc, "recursive", "true");
     http_client_set_method(httpc, HTTP_METHOD_POST);
@@ -588,7 +588,7 @@ static int ipfs_drive_delete_file(HiveDrive *base, const char *path)
         if (RC_NODE_UNREACHABLE(rc)) {
             vlogE("IpfsDrive: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
-            ipfs_token_mark_node_unreachable(drive->token);
+            ipfs_rpc_mark_node_unreachable(drive->rpc);
         } else
             vlogE("IpfsDrive: failed to peform http request.");
         goto error_exit;
@@ -606,12 +606,12 @@ static int ipfs_drive_delete_file(HiveDrive *base, const char *path)
         return HIVE_HTTP_STATUS_ERROR(resp_code);
     }
 
-    rc = publish_root_hash(drive->token, url, sizeof(url));
+    rc = publish_root_hash(drive->rpc, url, sizeof(url));
     if (rc < 0) {
         if (RC_NODE_UNREACHABLE(rc)) {
             vlogE("IpfsDrive: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
-            ipfs_token_mark_node_unreachable(drive->token);
+            ipfs_rpc_mark_node_unreachable(drive->rpc);
         } else
             vlogE("IpfsDrive: failed to publish root hash.");
 
@@ -634,8 +634,8 @@ static void ipfs_drive_destructor(void *obj)
 {
     IPFSDrive *drive = (IPFSDrive *)obj;
 
-    if (drive->token)
-        ipfs_token_close(drive->token);
+    if (drive->rpc)
+        ipfs_rpc_close(drive->rpc);
 }
 
 int ipfs_drive_open_file(HiveDrive *base, const char *path, int flags, HiveFile **file)
@@ -643,7 +643,7 @@ int ipfs_drive_open_file(HiveDrive *base, const char *path, int flags, HiveFile 
     IPFSDrive *drive = (IPFSDrive *)base;
     int rc;
 
-    rc = ipfs_file_open(drive->token, path, flags, file);
+    rc = ipfs_file_open(drive->rpc, path, flags, file);
     if (rc < 0) {
         vlogE("IpfsDrive: Failed to open file.");
         return rc;
@@ -652,11 +652,11 @@ int ipfs_drive_open_file(HiveDrive *base, const char *path, int flags, HiveFile 
     return 0;
 }
 
-HiveDrive *ipfs_drive_open(ipfs_token_t *token)
+HiveDrive *ipfs_drive_open(ipfs_rpc_t *rpc)
 {
     IPFSDrive *drive;
 
-    assert(token);
+    assert(rpc);
 
     drive = (IPFSDrive *)rc_zalloc(sizeof(IPFSDrive), ipfs_drive_destructor);
     if (!drive) {
@@ -674,7 +674,7 @@ HiveDrive *ipfs_drive_open(ipfs_token_t *token)
     drive->base.open_file   = &ipfs_drive_open_file;
     drive->base.close       = &ipfs_drive_close;
 
-    drive->token            = ref(token);
+    drive->rpc              = ref(rpc);
 
     return &drive->base;
 }

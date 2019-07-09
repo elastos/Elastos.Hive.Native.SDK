@@ -5,7 +5,7 @@
 #include <crystal.h>
 
 #include "ipfs_file.h"
-#include "ipfs_token.h"
+#include "ipfs_rpc.h"
 #include "ipfs_utils.h"
 #include "hive_client.h"
 #include "http_client.h"
@@ -13,11 +13,11 @@
 
 typedef struct IPFSFile {
     HiveFile base;
-    ipfs_token_t *token;
+    ipfs_rpc_t *rpc;
     size_t lpos;
 } IPFSFile;
 
-static int get_file_stat(ipfs_token_t *token, const char *path, size_t *fsz)
+static int get_file_stat(ipfs_rpc_t *rpc, const char *path, size_t *fsz)
 {
     char buf[MAX_URL_LEN] = {0};
     http_client_t *httpc;
@@ -27,18 +27,18 @@ static int get_file_stat(ipfs_token_t *token, const char *path, size_t *fsz)
     char *p;
     int rc;
 
-    assert(token);
+    assert(rpc);
     assert(path);
     assert(fsz);
 
-    rc = ipfs_token_check_reachable(token);
+    rc = ipfs_rpc_check_reachable(rpc);
     if (rc < 0) {
         vlogE("IpfsFile: failed to check node connectivity.");
         return rc;
     }
 
     sprintf(buf, "http://%s:%d/api/v0/files/stat",
-            ipfs_token_get_current_node(token), NODE_API_PORT);
+            ipfs_rpc_get_current_node(rpc), NODE_API_PORT);
 
     httpc = http_client_new();
     if (!httpc) {
@@ -47,7 +47,7 @@ static int get_file_stat(ipfs_token_t *token, const char *path, size_t *fsz)
     }
 
     http_client_set_url(httpc, buf);
-    http_client_set_query(httpc, "uid", ipfs_token_get_uid(token));
+    http_client_set_query(httpc, "uid", ipfs_rpc_get_uid(rpc));
     http_client_set_query(httpc, "path", path);
     http_client_set_method(httpc, HTTP_METHOD_POST);
     http_client_set_request_body_instant(httpc, NULL, 0);
@@ -59,7 +59,7 @@ static int get_file_stat(ipfs_token_t *token, const char *path, size_t *fsz)
         if (RC_NODE_UNREACHABLE(rc)) {
             vlogE("IpfsFile: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
-            ipfs_token_mark_node_unreachable(token);
+            ipfs_rpc_mark_node_unreachable(rpc);
         } else
             vlogE("IpfsFile: failed to perform http request.");
         goto error_exit;
@@ -125,7 +125,7 @@ static ssize_t ipfs_file_lseek(HiveFile *base, ssize_t offset, int whence)
         file->lpos = offset > 0 ? offset : 0;
         return file->lpos;
     case HiveSeek_End:
-        rc = get_file_stat(file->token, file->base.path, &fsz);
+        rc = get_file_stat(file->rpc, file->base.path, &fsz);
         if (rc < 0) {
             vlogE("IpfsFile: failed to get file status.");
             return rc;
@@ -168,14 +168,14 @@ static ssize_t ipfs_file_read(HiveFile *base, char *buffer, size_t bufsz)
     void *user_data[] = {buffer, &bufsz, &nrd};
     int rc;
 
-    rc = ipfs_token_check_reachable(file->token);
+    rc = ipfs_rpc_check_reachable(file->rpc);
     if (rc < 0) {
         vlogE("IpfsFile: failed to check node connectivity.");
         return rc;
     }
 
     sprintf(buf, "http://%s:%d/api/v0/files/read",
-            ipfs_token_get_current_node(file->token), NODE_API_PORT);
+            ipfs_rpc_get_current_node(file->rpc), NODE_API_PORT);
 
     httpc = http_client_new();
     if (!httpc) {
@@ -184,7 +184,7 @@ static ssize_t ipfs_file_read(HiveFile *base, char *buffer, size_t bufsz)
     }
 
     http_client_set_url(httpc, buf);
-    http_client_set_query(httpc, "uid", ipfs_token_get_uid(file->token));
+    http_client_set_query(httpc, "uid", ipfs_rpc_get_uid(file->rpc));
     http_client_set_query(httpc, "path", file->base.path);
     sprintf(header, "%zu", file->lpos);
     http_client_set_query(httpc, "offset", header);
@@ -200,7 +200,7 @@ static ssize_t ipfs_file_read(HiveFile *base, char *buffer, size_t bufsz)
         if (RC_NODE_UNREACHABLE(rc)) {
             vlogE("IpfsFile: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
-            ipfs_token_mark_node_unreachable(file->token);
+            ipfs_rpc_mark_node_unreachable(file->rpc);
         } else
             vlogE("IpfsFile: failed to perform http request.");
         goto error_exit;
@@ -235,14 +235,14 @@ static ssize_t ipfs_file_write(HiveFile *base, const char *buffer, size_t bufsz)
     long resp_code = 0;
     int rc;
 
-    rc = ipfs_token_check_reachable(file->token);
+    rc = ipfs_rpc_check_reachable(file->rpc);
     if (rc < 0) {
         vlogE("IpfsFile: failed to check node connectivity.");
         return rc;
     }
 
     sprintf(buf, "http://%s:%d/api/v0/files/write",
-            ipfs_token_get_current_node(file->token), NODE_API_PORT);
+            ipfs_rpc_get_current_node(file->rpc), NODE_API_PORT);
 
     httpc = http_client_new();
     if (!httpc) {
@@ -251,7 +251,7 @@ static ssize_t ipfs_file_write(HiveFile *base, const char *buffer, size_t bufsz)
     }
 
     http_client_set_url(httpc, buf);
-    http_client_set_query(httpc, "uid", ipfs_token_get_uid(file->token));
+    http_client_set_query(httpc, "uid", ipfs_rpc_get_uid(file->rpc));
     http_client_set_query(httpc, "path", file->base.path);
     sprintf(header, "%zu", file->lpos);
     http_client_set_query(httpc, "offset", header);
@@ -270,7 +270,7 @@ static ssize_t ipfs_file_write(HiveFile *base, const char *buffer, size_t bufsz)
         if (RC_NODE_UNREACHABLE(rc)) {
             vlogE("IpfsFile: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
-            ipfs_token_mark_node_unreachable(file->token);
+            ipfs_rpc_mark_node_unreachable(file->rpc);
         } else
             vlogE("IpfsFile: failed to perform http request.");
         goto error_exit;
@@ -288,12 +288,12 @@ static ssize_t ipfs_file_write(HiveFile *base, const char *buffer, size_t bufsz)
         return HIVE_HTTP_STATUS_ERROR(resp_code);
     }
 
-    rc = publish_root_hash(file->token, buf, sizeof(buf));
+    rc = publish_root_hash(file->rpc, buf, sizeof(buf));
     if (rc < 0) {
         if (RC_NODE_UNREACHABLE(rc)) {
             vlogE("IpfsFile: current node is not reachable.");
             rc = HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
-            ipfs_token_mark_node_unreachable(file->token);
+            ipfs_rpc_mark_node_unreachable(file->rpc);
         } else
             vlogE("IpfsFile: failed to publish root hash.");
         return rc;
@@ -319,18 +319,18 @@ static void ipfs_file_destructor(void *obj)
 {
     IPFSFile *file = (IPFSFile *)obj;
 
-    if (file->token)
-        ipfs_token_close(file->token);
+    if (file->rpc)
+        ipfs_rpc_close(file->rpc);
 }
 
-int ipfs_file_open(ipfs_token_t *token, const char *path, int flags, HiveFile **file)
+int ipfs_file_open(ipfs_rpc_t *rpc, const char *path, int flags, HiveFile **file)
 {
     IPFSFile *tmp;
     int rc;
     size_t fsz;
     bool file_exists;
 
-    rc = get_file_stat(token, path, &fsz);
+    rc = get_file_stat(rpc, path, &fsz);
     if (rc < 0 && rc != HIVE_HTTP_STATUS_ERROR(HttpStatus_InternalServerError)) {
         vlogE("IpfsFile: failed to get file status.");
         return rc;
@@ -362,7 +362,7 @@ int ipfs_file_open(ipfs_token_t *token, const char *path, int flags, HiveFile **
     tmp->base.write   = ipfs_file_write;
     tmp->base.close   = ipfs_file_close;
 
-    tmp->token        = ref(token);
+    tmp->rpc          = ref(rpc);
     if (file_exists && HIVE_F_IS_SET(flags, HIVE_F_APPEND))
         tmp->lpos = fsz;
 
