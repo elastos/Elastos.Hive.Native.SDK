@@ -6,50 +6,6 @@ set(__external_configure_args_included TRUE)
 include(HiveDefaults)
 
 if(${CMAKE_CROSSCOMPILING})
-    if(ANDROID)
-        # Cross compilation toolchains
-        set(XDK_TOOLCHAIN "${CMAKE_BINARY_DIR}/.android_toolchain")
-        set(XDK_HOST ${CMAKE_ANDROID_ARCH_HEADER_TRIPLE})
-        set(XDK_SYSROOT "${XDK_TOOLCHAIN}/sysroot")
-        set(XDK_CC  "${XDK_TOOLCHAIN}/bin/clang")
-        set(XDK_CXX "${XDK_TOOLCHAIN}/bin/clang++")
-        set(XDK_CPP "${XDK_TOOLCHAIN}/bin/clang -E")
-        set(XDK_LD  "${XDK_TOOLCHAIN}/bin/clang")
-        set(XDK_AR  "${XDK_TOOLCHAIN}/bin/llvm-ar")
-        set(XDK_RANLIB "${XDK_TOOLCHAIN}/bin/${XDK_HOST}-ranlib")
-        set(XDK_STRIP "${XDK_TOOLCHAIN}/bin/${XDK_HOST}-ranlib")
-
-        # Cross-compilation flags
-        set(XDK_CPP_FLAGS
-            "${CMAKE_CPP_FLAGS} -D__${CMAKE_ANDROID_ARCH}__ --sysroot=${XDK_SYSROOT}")
-        set(XDK_C_FLAGS "${CMAKE_C_FLAGS}")
-        set(XDK_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-        set(XDK_C_LINK_FLAGS "${CMAKE_STATIC_LINKER_FLAGS}")
-    endif()
-
-    if(IOS)
-        execute_process(COMMAND gcc -dumpmachine
-            OUTPUT_VARIABLE _XDK_HOST
-            ERROR_QUIET
-            OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-        # Cross compilation toolchains
-        set(XDK_HOST ${_XDK_HOST})
-        set(XDK_SYSROOT ${CMAKE_OSX_SYSROOT})
-        set(XDK_CC  ${CMAKE_C_COMPILER})
-        set(XDK_CXX ${CMAKE_CXX_COMPILER})
-        set(XDK_CPP "${CMAKE_C_COMPILER} -E")
-        set(XDK_AR  ${CMAKE_AR})
-        set(XDK_RANLIB ${CMAKE_RANLIB})
-        set(XDK_STRIP ${CMAKE_STRIP})
-
-        # Cross compilation flags
-        set(XDK_CPP_FLAGS "-isysroot ${CMAKE_OSX_SYSROOT} ${IOS_ARCH_FLAGS}")
-        set(XDK_C_FLAGS "${CMAKE_C_FLAGS}")
-        set(XDK_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-        set(XDK_C_LINK_FLAGS "${CMAKE_STATIC_LINKER_FLAGS}")
-    endif()
-
     if(RASPBERRYPI)
         # Cross compilation toolchains
         set(XDK_HOST "arm-linux-gnueabihf")

@@ -21,7 +21,7 @@ else()
     set(CMAKE_C_FLAGS
         "${CMAKE_C_FLAGS} -fPIC -fvisibility=hidden")
 
-    if(NOT (DARWIN OR IOS))
+    if(NOT DARWIN)
         set(CMAKE_SHARED_LINKER_FLAGS
             "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--exclude-libs,ALL")
     endif()
