@@ -55,7 +55,7 @@ static ssize_t onedrive_file_lseek(HiveFile *base, ssize_t offset, int whence)
         return HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED);
     }
 
-    rc = lseek(file->fd, offset, whence_sys);
+    rc = lseek(file->fd, (long)offset, whence_sys);
     if (rc < 0) {
         vlogE("OneDriveFile: failed to call lseek() (%d).", errno);
         return HIVE_SYS_ERROR(errno);
@@ -69,7 +69,7 @@ static ssize_t onedrive_file_read(HiveFile *base, char *buf, size_t bufsz)
     OneDriveFile *file = (OneDriveFile *)base;
     ssize_t rc;
 
-    rc = read(file->fd, buf, bufsz);
+    rc = read(file->fd, buf, (unsigned)bufsz);
     if (rc < 0) {
         vlogE("OneDriveFile: failed to call read().");
         return HIVE_SYS_ERROR(errno);
@@ -83,7 +83,7 @@ static ssize_t onedrive_file_write(HiveFile *base, const char *buf, size_t bufsz
     OneDriveFile *file = (OneDriveFile *)base;
     ssize_t nwr;
 
-    nwr = write(file->fd, buf, bufsz);
+    nwr = write(file->fd, buf, (unsigned)bufsz);
     if (nwr < 0) {
         vlogE("OneDriveFile: failed to read: failed to call write().");
         return HIVE_SYS_ERROR(errno);
@@ -184,7 +184,7 @@ static size_t upload_to_session_request_body_cb(char *buffer,
         return 0;
 
     sz2ul = MIN(*ul_sz - *uled_sz, size * nitems);
-    nrd = read(fd, buffer, sz2ul);
+    nrd = read(fd, buffer, (unsigned)sz2ul);
     if (nrd < 0) {
         vlogE("OneDriveFile: failed to call read().");
         return HTTP_CLIENT_REQBODY_ABORT;
@@ -433,11 +433,11 @@ error_exit:
 static size_t response_body_callback(char *buffer, size_t size,
                                      size_t nitems, void *userdata)
 {
-    int fd = *(size_t *)userdata;
+    int fd = *(int *)userdata;
     size_t total_sz = size * nitems;
     ssize_t nwr;
 
-    nwr = write(fd, buffer, total_sz);
+    nwr = write(fd, buffer, (unsigned)total_sz);
     if (nwr < 0) {
         vlogE("OneDriveFile: calling write() failure.");
         return 0;

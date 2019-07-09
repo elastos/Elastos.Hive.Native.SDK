@@ -712,7 +712,7 @@ char *http_client_escape(http_client_t *client, const char *data, size_t len)
     assert(data);
     assert(len);
 
-    escaped_data = curl_easy_escape(client->curl, data, len);
+    escaped_data = curl_easy_escape(client->curl, data, (int)len);
     if (!escaped_data) {
         vlogE("HttpClient: Escape data error");
         return NULL;
@@ -732,7 +732,7 @@ char *http_client_unescape(http_client_t *client, const char *data, size_t len,
     assert(len);
     assert(outlen);
 
-    unescaped_data = curl_easy_unescape(client->curl, data, len, &_outlen);
+    unescaped_data = curl_easy_unescape(client->curl, data, (int)len, &_outlen);
     if (!unescaped_data) {
         vlogE("HttpClient: Unescape data error");
         return NULL;
