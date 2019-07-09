@@ -13,6 +13,7 @@ extern "C" {
 #include <sys/types.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdarg.h>
 
 #if defined(_WIN32) || defined(_WIN64)
 typedef ptrdiff_t ssize_t;
@@ -125,6 +126,84 @@ enum HiveDriveType {
  * Drive File type max length.
  */
 #define HIVE_MAX_FILE_TYPE_LEN          127
+
+/******************************************************************************
+ * Log configuration.
+ *****************************************************************************/
+
+/**
+ * \~English
+ * Hive log level to control or filter log output.
+ */
+typedef enum ElaLogLevel {
+    /**
+     * \~English
+     * Log level None
+     * Indicate disable log output.
+     */
+    ElaLogLevel_None = 0,
+    /**
+     * \~English
+     * Log level fatal.
+     * Indicate output log with level 'Fatal' only.
+     */
+    ElaLogLevel_Fatal = 1,
+    /**
+     * \~English
+     * Log level error.
+     * Indicate output log above 'Error' level.
+     */
+    ElaLogLevel_Error = 2,
+    /**
+     * \~English
+     * Log level warning.
+     * Indicate output log above 'Warning' level.
+     */
+    ElaLogLevel_Warning = 3,
+    /**
+     * \~English
+     * Log level info.
+     * Indicate output log above 'Info' level.
+     */
+    ElaLogLevel_Info = 4,
+    /*
+     * \~English
+     * Log level debug.
+     * Indicate output log above 'Debug' level.
+     */
+    ElaLogLevel_Debug = 5,
+    /*
+     * \~English
+     * Log level trace.
+     * Indicate output log above 'Trace' level.
+     */
+    ElaLogLevel_Trace = 6,
+    /*
+     * \~English
+     * Log level verbose.
+     * Indicate output log above 'Verbose' level.
+     */
+    ElaLogLevel_Verbose = 7
+} ElaLogLevel;
+
+/**
+ * \~English
+ * Initialize log options for Hive.
+ * If this API is never called, the default log level is 'Info'; The default log
+ * file is stdout.
+ *
+ * @param
+ *      level       [in] The log level to control internal log output.
+ * @param
+ *      log_file    [in] the log file name.
+ *                       If the log_file is NULL, Hive will not write
+ *                       log to file.
+ * @param
+ *      log_printer [in] the user defined log printer. Can be NULL.
+ */
+HIVE_API
+void ela_log_init(ElaLogLevel level, const char *log_file,
+                  void (*log_printer)(const char *format, va_list args));
 
 /******************************************************************************
  * Type definitions of all options.
@@ -421,6 +500,7 @@ int hive_client_get_info(HiveClient *client, HiveClientInfo *client_info);
 /******************************************************************************
  * Drive APIs
  *****************************************************************************/
+
 /**
  * \~English
  *
@@ -653,6 +733,7 @@ int hive_drive_file_stat(HiveDrive *drive, const char *path,
 /******************************************************************************
  * File APIs
  *****************************************************************************/
+
 /**
  * \~English
  *

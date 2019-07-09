@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <errno.h>
 
 #include <crystal.h>
 
@@ -23,6 +24,14 @@ static FactoryMethod factory_methods[] = {
     { HiveDriveType_Butt,      NULL }
 };
 
+void ela_log_init(ElaLogLevel level, const char *log_file,
+                  void (*log_printer)(const char *format, va_list args))
+{
+#if !defined(__ANDROID__)
+    vlog_init(level, log_file, log_printer);
+#endif
+}
+
 HiveClient *hive_client_new(const HiveOptions *options)
 {
     FactoryMethod *method = &factory_methods[0];
@@ -38,6 +47,7 @@ HiveClient *hive_client_new(const HiveOptions *options)
 
     rc = stat(options->persistent_location, &st);
     if (rc < 0|| !S_ISDIR(st.st_mode)) {
+        vlogE("Client: failed to call stat() (%d).", errno);
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return NULL;
     }
@@ -50,6 +60,7 @@ HiveClient *hive_client_new(const HiveOptions *options)
     }
 
     if (!method->create_client) {
+        vlogE("Client: unsupported client type.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED));
         return NULL;
     }
@@ -103,6 +114,7 @@ int hive_client_login(HiveClient *client,
     if (client->login) {
         rc = client->login(client, callback, context);
         if (rc < 0) {
+            vlogE("Client: Failed to login.");
             // recover back to 'RAW' state.
             _test_and_swap(&client->state, LOGINING, RAW);
             hive_set_error(rc);
@@ -157,11 +169,13 @@ int hive_client_get_info(HiveClient *client, HiveClientInfo *info)
     }
 
     if (!has_valid_token(client))  {
+        vlogE("Client: client not in valid state.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_READY));
         return -1;
     }
 
     if (!client->get_info) {
+        vlogE("Client: client type does not support this method.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED));
         return -1;
     }
@@ -186,17 +200,20 @@ HiveDrive *hive_drive_open(HiveClient *client)
     }
 
     if (!has_valid_token(client))  {
+        vlogE("Client: client is not in valid state.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_READY));
         return NULL;
     }
 
     if (!client->get_drive) {
+        vlogE("Client: client type does not support this method.");
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED));
         return NULL;
     }
 
     rc = client->get_drive(client, &drive);
     if (rc < 0) {
+        vlogE("Client: Failed to open drive.");
         hive_set_error(rc);
         return NULL;
     }

@@ -24,3 +24,4 @@ _hive_file_discard
 _hive_get_error
 _hive_clear_error
 _hive_get_strerror
+_ela_log_init
