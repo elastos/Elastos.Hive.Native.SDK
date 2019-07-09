@@ -856,7 +856,13 @@ int main(int argc, char *argv[])
 
     ela_log_init(cfg->loglevel, cfg->logfile, logging);
     demo.cfg = cfg;
-    mkdir(cfg->persistent_location, S_IRUSR | S_IWUSR | S_IXUSR);
+
+    rc = mkdir(cfg->persistent_location, S_IRWXU);
+    if (rc < 0 && errno != EEXIST) {
+        fprintf(stderr, "failed to create directory %s\n", cfg->persistent_location);
+        return -1;
+    }
+
     if (cfg->client->vendor == HiveDriveType_OneDrive) {
         onedrive_client_t *copts = (onedrive_client_t *)cfg->client;
 

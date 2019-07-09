@@ -55,6 +55,7 @@ set(SRC
     hive_drive.c
     hive_client.c
     http_status.c
+    mkdirs.c
     sandbird/sandbird.c
     http/http_client.c
     oauth/oauth_token.c

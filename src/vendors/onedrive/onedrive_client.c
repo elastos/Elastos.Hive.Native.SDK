@@ -24,6 +24,7 @@
 #include "onedrive_constants.h"
 #include "http_client.h"
 #include "http_status.h"
+#include "mkdirs.h"
 
 typedef struct OneDriveClient {
     HiveClient base;
@@ -325,7 +326,7 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
     }
 
     strcpy(path_tmp, client->keystore_path);
-    rc = mkdir(dirname(path_tmp), S_IRUSR | S_IWUSR | S_IXUSR);
+    rc = mkdirs(dirname(path_tmp), S_IRWXU);
     if (rc < 0 && errno != EEXIST) {
         vlogE("OneDriveClient: failed to create directory (%d).", errno);
         hive_set_error(HIVE_SYS_ERROR(errno));
@@ -343,16 +344,7 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
     }
 
     strcpy(path_tmp, client->tmp_template);
-    rc = mkdir(dirname(dirname(path_tmp)), S_IRUSR | S_IWUSR | S_IXUSR);
-    if (rc < 0 && errno != EEXIST) {
-        vlogE("OneDriveClient: failed to create directory (%d).", errno);
-        hive_set_error(HIVE_SYS_ERROR(errno));
-        deref(client);
-        return NULL;
-    }
-
-    strcpy(path_tmp, client->tmp_template);
-    rc = mkdir(dirname(path_tmp), S_IRUSR | S_IWUSR | S_IXUSR);
+    rc = mkdirs(dirname(path_tmp), S_IRWXU);
     if (rc < 0 && errno != EEXIST) {
         vlogE("OneDriveClient: failed to create directory (%d).", errno);
         hive_set_error(HIVE_SYS_ERROR(errno));

@@ -43,6 +43,7 @@
 #include "http_client.h"
 #include "hive_error.h"
 #include "hive_client.h"
+#include "mkdirs.h"
 
 typedef struct IPFSClient {
     HiveClient base;
@@ -360,7 +361,7 @@ HiveClient *ipfs_client_new(const HiveOptions *options)
     }
 
     strcpy(path_tmp, token_cookie);
-    rc = mkdir(dirname(path_tmp), S_IRUSR | S_IWUSR | S_IXUSR);
+    rc = mkdirs(dirname(path_tmp), S_IRWXU);
     if (rc < 0 && errno != EEXIST) {
         vlogE("IpfsClient: failed to create directory (%d).", errno);
         hive_set_error(HIVE_SYS_ERROR(errno));
