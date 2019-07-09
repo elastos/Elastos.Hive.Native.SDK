@@ -1,4 +1,4 @@
-project(demo C)
+project(cmd C)
 
 include(HiveDefaults)
 include(CheckIncludeFile)
@@ -60,7 +60,7 @@ if(HAVE_SYS_PARAM_H)
 endif()
 
 set(SRC
-    demo.c
+    cmd.c
     config.c)
 
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
@@ -106,15 +106,15 @@ else()
         config)
 endif()
 
-add_executable(hivedemo ${SRC})
+add_executable(hivecmd ${SRC})
 
-target_link_libraries(hivedemo ${LIBS} ${SYSTEM_LIBS})
+target_link_libraries(hivecmd ${LIBS} ${SYSTEM_LIBS})
 
-install(TARGETS hivedemo
+install(TARGETS hivecmd
     RUNTIME DESTINATION "bin"
     ARCHIVE DESTINATION "lib"
     LIBRARY DESTINATION "lib")
 
-install(FILES demo.conf
+install(FILES cmd.conf
     DESTINATION "etc/hive"
-    RENAME "hivedemo.conf")
+    RENAME "hivecmd.conf")

@@ -18,7 +18,7 @@
 
 static void config_destructor(void *p)
 {
-    demo_cfg_t *config = (demo_cfg_t *)p;
+    cmd_cfg_t *config = (cmd_cfg_t *)p;
 
     if (!config)
         return;
@@ -115,9 +115,9 @@ static void rpc_node_destructor(void *obj)
         free((void *)node->port);
 }
 
-demo_cfg_t *load_config(const char *config_file)
+cmd_cfg_t *load_config(const char *config_file)
 {
-    demo_cfg_t *config;
+    cmd_cfg_t *config;
     config_t cfg;
     config_setting_t *client;
     const char *stropt;
@@ -138,7 +138,7 @@ demo_cfg_t *load_config(const char *config_file)
         return NULL;
     }
 
-    config = (demo_cfg_t *)rc_zalloc(sizeof(demo_cfg_t), config_destructor);
+    config = (cmd_cfg_t *)rc_zalloc(sizeof(cmd_cfg_t), config_destructor);
     if (!config) {
         fprintf(stderr, "Load configuration failed, out of memory.\n");
         config_destroy(&cfg);

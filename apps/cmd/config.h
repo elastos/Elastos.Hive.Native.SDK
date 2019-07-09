@@ -35,8 +35,8 @@ typedef struct {
     char *persistent_location;
 
     client_base_t *client;
-} demo_cfg_t;
+} cmd_cfg_t;
 
-demo_cfg_t *load_config(const char *config_file);
+cmd_cfg_t *load_config(const char *config_file);
 
 #endif // __CONFIG_H__
