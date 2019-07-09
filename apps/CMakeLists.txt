@@ -5,6 +5,6 @@ set(DEPEND_MODULES
     libconfig
     ela-hive)
 
-add_submodule(hivedemo
-    DIRECTORY demo
+add_submodule(hivecmd
+    DIRECTORY cmd
     DEPENDS ${DEPEND_MODULES})
