@@ -27,9 +27,7 @@ static FactoryMethod factory_methods[] = {
 void ela_log_init(ElaLogLevel level, const char *log_file,
                   void (*log_printer)(const char *format, va_list args))
 {
-#if !defined(__ANDROID__)
     vlog_init(level, log_file, log_printer);
-#endif
 }
 
 HiveClient *hive_client_new(const HiveOptions *options)
