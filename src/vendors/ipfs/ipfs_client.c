@@ -22,6 +22,9 @@
 #ifdef HAVE_ALLOCA_H
 #include <alloca.h>
 #endif
+#ifdef HAVE_LIBGEN_H
+#include <libgen.h>
+#endif
 #if defined(_WIN32) || defined(_WIN64)
 #include <io.h>
 #include <winsock2.h>
@@ -277,6 +280,7 @@ HiveClient *ipfs_client_new(const HiveOptions *options)
     size_t token_options_sz;
     char token_cookie[MAXPATHLEN + 1];
     cJSON *token_cookie_json = NULL;
+    char path_tmp[PATH_MAX];
     IPFSClient *client;
     int rc;
     size_t i;
@@ -350,8 +354,18 @@ HiveClient *ipfs_client_new(const HiveOptions *options)
     // check token cookie
     rc = snprintf(token_cookie, sizeof(token_cookie), "%s/.data/ipfs.json",
                   opts->base.persistent_location);
-    if (rc < 0 || rc >= sizeof(token_cookie))
+    if (rc < 0 || rc >= sizeof(token_cookie)) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL));
         return NULL;
+    }
+
+    strcpy(path_tmp, token_cookie);
+    rc = mkdir(dirname(path_tmp), S_IRUSR | S_IWUSR | S_IXUSR);
+    if (rc < 0 && errno != EEXIST) {
+        vlogE("IpfsClient: failed to create directory (%d).", errno);
+        hive_set_error(HIVE_SYS_ERROR(errno));
+        return NULL;
+    }
 
     if (!access(token_cookie, F_OK)) {
         token_cookie_json = load_ipfs_token_cookie(token_cookie);
