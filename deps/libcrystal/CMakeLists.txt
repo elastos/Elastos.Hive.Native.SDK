@@ -20,6 +20,7 @@ ExternalProject_Add(
         -DENABLE_CRYPTO=FALSE
         -DENABLE_TESTS=FALSE
         ${CMAKE_ARGS_INIT}
+        -DCMAKE_BUILD_TYPE=DEBUG
 )
 
 if(ENABLE_SHARED)

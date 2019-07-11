@@ -13,9 +13,13 @@ add_submodule(curl
     DEPENDS platform-specific zlib libressl)
 add_submodule(libconfig
     DEPENDS platform-specific)
+add_submodule(CUnit
+    DEPENDS platform-specific)
 
 if(WIN32)
     add_submodule(pthreads-w32
+        DEPENDS platform-specific)
+    add_submodule(PDCurses
         DEPENDS platform-specific)
     add_dependencies(libcrystal pthreads-w32)
 endif()
