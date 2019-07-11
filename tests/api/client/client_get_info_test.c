@@ -5,40 +5,29 @@
 #include "test_context.h"
 #include "test_helper.h"
 
-static void test_login(void)
+static void test_client_get_info(void)
 {
     int rc;
-
-    rc = hive_client_logout(test_ctx.client);
-    CU_ASSERT_EQUAL(rc, HIVEOK);
-
-    rc = hive_client_login(test_ctx.client, open_authorization_url, NULL);
-    CU_ASSERT_EQUAL(rc, HIVEOK);
-}
-
-static void test_dup_login(void)
-{
-    int rc;
+    HiveClientInfo info;
 
     rc = hive_client_login(test_ctx.client, open_authorization_url, NULL);
     CU_ASSERT_EQUAL(rc, HIVEOK);
 
-    rc = hive_client_login(test_ctx.client, open_authorization_url, NULL);
+    rc = hive_client_get_info(test_ctx.client, &info);
     CU_ASSERT_EQUAL(rc, HIVEOK);
 }
 
 static CU_TestInfo cases[] = {
-    { "test_login",     test_login     },
-    { "test_dup_login", test_dup_login },
+    { "test_client_get_info",     test_client_get_info },
     { NULL, NULL }
 };
 
-CU_TestInfo *login_test_get_cases(void)
+CU_TestInfo *client_get_info_test_get_cases(void)
 {
     return cases;
 }
 
-int onedrive_login_test_suite_init(void)
+int onedrive_client_get_info_test_suite_init(void)
 {
     test_ctx.client = onedrive_client_new();
     if (!test_ctx.client) {
@@ -49,14 +38,14 @@ int onedrive_login_test_suite_init(void)
     return 0;
 }
 
-int onedrive_login_test_suite_cleanup(void)
+int onedrive_client_get_info_test_suite_cleanup(void)
 {
     test_context_cleanup();
 
     return 0;
 }
 
-int ipfs_login_test_suite_init(void)
+int ipfs_client_get_info_test_suite_init(void)
 {
     test_ctx.client = ipfs_client_new();
     if (!test_ctx.client) {
@@ -67,7 +56,7 @@ int ipfs_login_test_suite_init(void)
     return 0;
 }
 
-int ipfs_login_test_suite_cleanup(void)
+int ipfs_client_get_info_test_suite_cleanup(void)
 {
     test_context_cleanup();
 

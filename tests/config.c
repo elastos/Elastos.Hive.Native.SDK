@@ -123,7 +123,7 @@ test_cfg_t *load_config(const char *config_file)
     }
 
     global_config.shuffle = 0;
-    config_lookup_int(&cfg, "shffule", &global_config.shuffle);
+    config_lookup_int(&cfg, "shuffle", &global_config.shuffle);
 
     rpc_nodes = config_lookup(&cfg, "ipfs_rpc_nodes");
     if (!rpc_nodes || !config_setting_is_list(rpc_nodes)) {
