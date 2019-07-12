@@ -3,13 +3,11 @@
 
 DECL_TESTSUITE_PER_BACKEND(client_new_test)
 DECL_TESTSUITE_PER_BACKEND(login_test)
-DECL_TESTSUITE_PER_BACKEND(logout_test)
 DECL_TESTSUITE_PER_BACKEND(client_get_info_test)
 
 #define DEFINE_CLIENT_TESTSUITES \
     DEFINE_TESTSUITE_PER_BACKEND(client_new_test), \
     DEFINE_TESTSUITE_PER_BACKEND(login_test), \
-    DEFINE_TESTSUITE_PER_BACKEND(logout_test), \
     DEFINE_TESTSUITE_PER_BACKEND(client_get_info_test)
 
 #endif /* __API_CLIENT_TEST_SUITES_H__ */
