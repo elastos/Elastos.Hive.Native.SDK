@@ -3,9 +3,6 @@
 #include <limits.h>
 #include <stdbool.h>
 
-#ifdef HAVE_PROCESS_H
-#include <process.h>
-#endif
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -38,13 +35,6 @@ int sys_coredump_set(bool enable)
 }
 #endif
 
-void wait_for_debugger_attach(void)
-{
-    printf("\nWait for debugger attaching, process id is: %d.\n", getpid());
-    printf("After debugger attached, press any key to continue......");
-    getchar();
-}
-
 static void usage(void)
 {
     printf("Hive API unit tests.\n");
@@ -63,7 +53,6 @@ static void usage(void)
 int main(int argc, char *argv[])
 {
     int rc;
-    int debug = 0;
     char buffer[PATH_MAX];
 
     int opt;
@@ -90,9 +79,6 @@ int main(int argc, char *argv[])
             break;
 
         case 2:
-            debug = 1;
-            break;
-
         case 3:
         case 4:
         case 5:
@@ -109,9 +95,6 @@ int main(int argc, char *argv[])
     optind = 0;
     opterr = 0;
     optopt = 0;
-
-    if (debug)
-        wait_for_debugger_attach();
 
     switch (mode) {
     case MODE_CASES:

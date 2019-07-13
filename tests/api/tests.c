@@ -4,6 +4,9 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
+#ifdef HAVE_PROCESS_H
+#include <process.h>
+#endif
 #ifdef HAVE_IO_H
 #include <io.h>
 #endif
@@ -128,11 +131,19 @@ void shuffle(int *order, int count)
     }
 }
 
+void wait_for_debugger_attach(void)
+{
+    fprintf(stderr, "\nWait for debugger attaching, process id is: %d.\n", getpid());
+    fprintf(stderr, "After debugger attached, press any key to continue......\n");
+    getchar();
+}
+
 int test_main(int argc, char *argv[])
 {
     int rc;
     int retry_count = 1;
     int i, j;
+    int debug = 0;
     CU_pSuite pSuite;
     CU_TestInfo *ti;
     int suites_cnt, cases_cnt, fail_cnt;
@@ -148,6 +159,7 @@ int test_main(int argc, char *argv[])
         { "log-level", required_argument, NULL, 1 },
         { "log-file",  required_argument, NULL, 2 },
         { "data-dir",  required_argument, NULL, 3 },
+        { "debug",     no_argument,       NULL, 4 },
         { NULL,        0,                 NULL, 0 }
     };
 
@@ -164,6 +176,10 @@ int test_main(int argc, char *argv[])
         case 3:
             break;
 
+        case 4:
+            debug = 1;
+            break;
+
         case 'c':
             config_file = optarg;
             break;
@@ -176,6 +192,9 @@ int test_main(int argc, char *argv[])
             break;
         }
     }
+
+    if (debug)
+        wait_for_debugger_attach();
 
     // The primary job: load configuration file
     config_file = get_config_file(config_file, default_config_files);
