@@ -50,6 +50,7 @@
 #include <ela_hive.h>
 
 #include "config.h"
+#include "constants.h"
 
 typedef struct {
     cmd_cfg_t *cfg;
@@ -112,12 +113,103 @@ static int open_url(const char *url, void *context)
 #endif
 }
 
+static void client_new(cmd_t *ctx, int argc, char *argv[])
+{
+    if (argc != 2) {
+        console("Error: invalid command syntax.");
+        return;
+    }
+
+    if (ctx->client) {
+        console("Error: a client instance already exists.");
+        return;
+    }
+
+    if (!strcmp(argv[1], "onedrive")) {
+        OneDriveOptions opts = {
+            .base.drive_type          = HiveDriveType_OneDrive,
+            .base.persistent_location = ctx->cfg->persistent_location,
+            .redirect_url             = HIVETEST_REDIRECT_URL,
+            .scope                    = HIVETEST_SCOPE,
+            .client_id                = HIVETEST_ONEDRIVE_CLIENT_ID
+        };
+
+        ctx->client = hive_client_new((HiveOptions *)&opts);
+        if (!ctx->client) {
+            console("create hive client instance failure.\n");
+            return;
+        }
+    } else if (!strcmp(argv[1], "ipfs")) {
+        cmd_cfg_t *cfg = ctx->cfg;
+        int i;
+
+        HiveRpcNode *nodes = calloc(1, sizeof(HiveRpcNode) * cfg->ipfs_rpc_nodes_sz);
+        if (!nodes) {
+            console("create hive client instance failure.\n");
+            return;
+        }
+
+        for (i = 0; i < cfg->ipfs_rpc_nodes_sz; ++i) {
+            HiveRpcNode *node = nodes + i;
+
+            node->ipv4 = cfg->ipfs_rpc_nodes[i]->ipv4;
+            node->ipv6 = cfg->ipfs_rpc_nodes[i]->ipv6;
+            node->port = cfg->ipfs_rpc_nodes[i]->port;
+        }
+
+        IPFSOptions opts = {
+            .base.persistent_location = cfg->persistent_location,
+            .base.drive_type = HiveDriveType_IPFS,
+            .uid = cfg->uid,
+            .rpc_node_count = cfg->ipfs_rpc_nodes_sz,
+            .rpcNodes = nodes
+        };
+
+        ctx->client = hive_client_new((HiveOptions *)&opts);
+        free(nodes);
+        if (!cmd_ctx.client) {
+            console("create hive client instance failure.\n");
+            return;
+        }
+    } else {
+        console("Error: unsupported backend type.");
+    }
+}
+
+static void client_close(cmd_t *ctx, int argc, char *argv[])
+{
+    if (argc != 1) {
+        console("Error: invalid command syntax.");
+        return;
+    }
+
+    if (ctx->file) {
+        hive_file_close(ctx->file);
+        ctx->file = NULL;
+    }
+
+    if (ctx->drive) {
+        hive_drive_close(ctx->drive);
+        ctx->drive = NULL;
+    }
+
+    if (ctx->client) {
+        hive_client_close(ctx->client);
+        ctx->client = NULL;
+    }
+}
+
 static void login(cmd_t *ctx, int argc, char *argv[])
 {
     int rc;
 
     if (argc != 1) {
         console("Error: invalid command syntax.");
+        return;
+    }
+
+    if (!ctx->client) {
+        console("Error: No client instance created.");
         return;
     }
 
@@ -143,6 +235,11 @@ static void logout(cmd_t *ctx, int argc, char *argv[])
         return;
     }
 
+    if (!ctx->client) {
+        console("Error: No client instance created.");
+        return;
+    }
+
     rc = hive_client_logout(ctx->client);
     if (rc < 0)
         console("Error: logout failed. Reason: %s.",
@@ -156,6 +253,11 @@ static void client_info(cmd_t *ctx, int argc, char *argv[])
 
     if (argc != 1) {
         console("Error: invalid command syntax.");
+        return;
+    }
+
+    if (!ctx->client) {
+        console("Error: No client instance created.");
         return;
     }
 
@@ -568,26 +670,28 @@ static struct command {
     void (*cmd_cb)(cmd_t *, int argc, char *argv[]);
     const char *help;
 } commands[] = {
-        { "help"       , help        , "help [cmd]"       },
-        { "login"      , login       , "login"            },
-        { "logout"     , logout      , "logout"           },
-        { "client_info", client_info , "client_info"      },
-        { "drive_info" , drive_info  , "drive_info"       },
-        { "file_info"  , file_info   , "file_info path"   },
-        { "ls"         , ls          , "ls path"          },
-        { "mkdir"      , makedir     , "mkdir directory"  },
-        { "mv"         , mv          , "mv source target" },
-        { "cp"         , cp          , "cp source target" },
-        { "rm"         , rm          , "rm path"          },
-        { "fopen"      , file_open   , "fopen path mode"  },
-        { "fclose"     , file_close  , "fclose"           },
-        { "fseek"      , file_seek   , "fseek offset whence(set, cur, end)" },
-        { "fread"      , file_read   , "fread size"       },
-        { "fwrite"     , file_write  , "fwrite data"      },
-        { "fcommit"    , file_commit , "fcommit"          },
-        { "fdiscard"   , file_discard, "fdiscard"         },
-        { "exit"       , exit_app    , "exit"             },
-        { NULL         , NULL        , NULL               }
+        { "help"        , help        , "help [cmd]"       },
+        { "client_open" , client_new  , "client_open type" },
+        { "client_close", client_close, "client_close"     },
+        { "login"       , login       , "login"            },
+        { "logout"      , logout      , "logout"           },
+        { "client_info" , client_info , "client_info"      },
+        { "drive_info"  , drive_info  , "drive_info"       },
+        { "file_info"   , file_info   , "file_info path"   },
+        { "ls"          , ls          , "ls path"          },
+        { "mkdir"       , makedir     , "mkdir directory"  },
+        { "mv"          , mv          , "mv source target" },
+        { "cp"          , cp          , "cp source target" },
+        { "rm"          , rm          , "rm path"          },
+        { "fopen"       , file_open   , "fopen path mode"  },
+        { "fclose"      , file_close  , "fclose"           },
+        { "fseek"       , file_seek   , "fseek offset whence(set, cur, end)" },
+        { "fread"       , file_read   , "fread size"       },
+        { "fwrite"      , file_write  , "fwrite data"      },
+        { "fcommit"     , file_commit , "fcommit"          },
+        { "fdiscard"    , file_discard, "fdiscard"         },
+        { "exit"        , exit_app    , "exit"             },
+        { NULL          , NULL        , NULL               }
 };
 
 static void help(cmd_t *ctx, int argc, char *argv[])
@@ -807,59 +911,6 @@ int main(int argc, char *argv[])
     if (rc < 0 && errno != EEXIST) {
         fprintf(stderr, "failed to create directory %s\n", cfg->persistent_location);
         return -1;
-    }
-
-    if (cfg->client->vendor == HiveDriveType_OneDrive) {
-        onedrive_client_t *copts = (onedrive_client_t *)cfg->client;
-
-        OneDriveOptions opts = {
-            .base.persistent_location = cfg->persistent_location,
-            .base.drive_type = HiveDriveType_OneDrive,
-            .client_id = copts->client_id,
-            .scope = copts->scope,
-            .redirect_url = copts->redirect_url
-        };
-
-        cmd_ctx.client = hive_client_new((HiveOptions *)&opts);
-        if (!cmd_ctx.client) {
-            fprintf(stderr, "create hive client instance failure.\n");
-            deinit();
-            return -1;
-        }
-    } else if (cfg->client->vendor == HiveDriveType_IPFS) {
-        ipfs_client_t *copts = (ipfs_client_t *)cfg->client;
-        int i;
-
-        HiveRpcNode *nodes = calloc(1, sizeof(HiveRpcNode) * copts->rpc_nodes_sz);
-        if (!nodes) {
-            fprintf(stderr, "out of memory.\n");
-            deinit();
-            return -1;
-        }
-
-        for (i = 0; i < copts->rpc_nodes_sz; ++i) {
-            HiveRpcNode *node = nodes + i;
-
-            node->ipv4 = copts->rpc_nodes[i]->ipv4;
-            node->ipv6 = copts->rpc_nodes[i]->ipv6;
-            node->port = copts->rpc_nodes[i]->port;
-        }
-
-        IPFSOptions opts = {
-            .base.persistent_location = cfg->persistent_location,
-            .base.drive_type = HiveDriveType_IPFS,
-            .uid = copts->uid,
-            .rpc_node_count = copts->rpc_nodes_sz,
-            .rpcNodes = nodes
-        };
-
-        cmd_ctx.client = hive_client_new((HiveOptions *)&opts);
-        free(nodes);
-        if (!cmd_ctx.client) {
-            fprintf(stderr, "out of memory.\n");
-            deinit();
-            return -1;
-        }
     }
 
     console_prompt();
