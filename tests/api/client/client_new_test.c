@@ -1,7 +1,7 @@
 #include <CUnit/Basic.h>
 #include <ela_hive.h>
-#include <config.h>
 
+#include "config.h"
 #include "test_context.h"
 #include "test_helper.h"
 
