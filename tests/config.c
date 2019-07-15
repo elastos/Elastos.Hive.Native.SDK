@@ -30,7 +30,7 @@ void qualified_path(const char *path, const char *ref, char *qualified)
             if (!p) p = ref;
 
             if (p - ref > 0)
-                strncpy(qualified, ref, p - ref);
+                snprintf(qualified, p - ref + 1, "%s", ref);
             else
                 *qualified = 0;
         } else {
@@ -104,8 +104,11 @@ test_cfg_t *load_config(const char *config_file)
     config_lookup_int(&cfg, "loglevel", &global_config.loglevel);
 
     rc = config_lookup_string(&cfg, "logfile", &stropt);
-    if (rc && *stropt)
-        global_config.logfile = strdup(stropt);
+    if (rc && *stropt) {
+        char path[PATH_MAX];
+        qualified_path(stropt, config_file, path);
+        global_config.logfile = strdup(path);
+    }
 
     global_config.log2file = 0;
     config_lookup_int(&cfg, "log2file", &global_config.log2file);

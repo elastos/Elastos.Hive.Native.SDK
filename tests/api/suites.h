@@ -56,7 +56,7 @@ typedef struct TestSuite {
 
 TestSuite suites[] = {
     DEFINE_CLIENT_TESTSUITES,
-    // DEFINE_DRIVE_TESTSUITES,
+    DEFINE_DRIVE_TESTSUITES,
     // DEFINE_FILE_TESTSUITES,
     DEFINE_TESTSUITE_NULL
 };

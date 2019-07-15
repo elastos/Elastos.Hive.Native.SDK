@@ -11,10 +11,10 @@ static void test_client_get_info(void)
     HiveClientInfo info;
 
     rc = hive_client_login(test_ctx.client, open_authorization_url, NULL);
-    CU_ASSERT_EQUAL(rc, HIVEOK);
+    CU_ASSERT_FATAL(rc == HIVEOK);
 
     rc = hive_client_get_info(test_ctx.client, &info);
-    CU_ASSERT_EQUAL(rc, HIVEOK);
+    CU_ASSERT_FATAL(rc == HIVEOK);
 }
 
 static CU_TestInfo cases[] = {

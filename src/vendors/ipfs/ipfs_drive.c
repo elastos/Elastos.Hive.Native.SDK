@@ -255,8 +255,6 @@ static int ipfs_drive_list_files(HiveDrive *base, const char *path,
     char *p;
     int rc;
 
-    vlogD("IpfsDrive: Calling ipfs_drive_list_files().");
-
     rc = ipfs_rpc_check_reachable(drive->rpc);
     if (rc < 0) {
         vlogE("IpfsDrive: failed to check node's connectivity.");

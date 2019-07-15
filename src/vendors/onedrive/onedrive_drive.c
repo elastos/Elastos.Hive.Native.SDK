@@ -512,7 +512,7 @@ char *create_mkdir_request_body(const char *path)
     p = basename((char *)path);
     if (!cJSON_AddStringToObject(body, "name", p) ||
         !cJSON_AddObjectToObject(body, "folder") ||
-        !cJSON_AddStringToObject(body, "@microsoft.graph.conflictBehavior", "rename")) {
+        !cJSON_AddStringToObject(body, "@microsoft.graph.conflictBehavior", "fail")) {
         vlogE("OneDriveDrive: failed to create json object.");
         cJSON_Delete(body);
         return NULL;
@@ -563,7 +563,7 @@ int onedrive_drive_mkdir(HiveDrive *base, const char *path)
     if (!strcmp(dir, "/"))
         sprintf(url, "%s/root/children", MY_DRIVE);
     else
-        sprintf(url, "%s/root:%s:/chidlren", MY_DRIVE, dir);
+        sprintf(url, "%s/root:%s:/children", MY_DRIVE, dir);
 
     body = create_mkdir_request_body(path);
     if (!body) {
@@ -642,9 +642,13 @@ static char *create_cp_mv_request_body(const char *path)
         goto error_exit;
     }
 
-
     if (!cJSON_AddStringToObject(body, "name", basename((char *)path))) {
         vlogE("OneDriveDrive: failed to add name json object.");
+        goto error_exit;
+    }
+
+    if (!cJSON_AddStringToObject(body, "@microsoft.graph.conflictBehavior", "replace")) {
+        vlogE("OneDriveDrive: failed to add conflictBehavior json object.");
         goto error_exit;
     }
 
