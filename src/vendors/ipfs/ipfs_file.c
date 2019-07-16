@@ -132,7 +132,7 @@ static ssize_t ipfs_file_lseek(HiveFile *base, ssize_t offset, int whence)
         }
 
         file->lpos = offset + fsz < 0 ? 0 : offset + fsz;
-        return 0;
+        return file->lpos;
     default:
         assert(0);
         vlogE("IpfsFile: unrecognizable whence parameter.");

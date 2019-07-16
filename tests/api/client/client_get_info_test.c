@@ -1,7 +1,7 @@
 #include <CUnit/Basic.h>
 #include <ela_hive.h>
-#include <config.h>
 
+#include "config.h"
 #include "test_context.h"
 #include "test_helper.h"
 
@@ -30,10 +30,8 @@ CU_TestInfo *client_get_info_test_get_cases(void)
 int onedrive_client_get_info_test_suite_init(void)
 {
     test_ctx.client = onedrive_client_new();
-    if (!test_ctx.client) {
-        CU_FAIL("Error: test suite initialize error");
+    if (!test_ctx.client)
         return -1;
-    }
 
     return 0;
 }
@@ -48,10 +46,8 @@ int onedrive_client_get_info_test_suite_cleanup(void)
 int ipfs_client_get_info_test_suite_init(void)
 {
     test_ctx.client = ipfs_client_new();
-    if (!test_ctx.client) {
-        CU_FAIL("Error: test suite initialize error");
+    if (!test_ctx.client)
         return -1;
-    }
 
     return 0;
 }

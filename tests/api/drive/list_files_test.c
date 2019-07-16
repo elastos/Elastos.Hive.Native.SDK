@@ -1,12 +1,13 @@
-#include <CUnit/Basic.h>
-#include <ela_hive.h>
-#include <config.h>
 #include <limits.h>
 
 #if defined(_WIN32) || defined(_WIN64)
 #include <crystal.h>
 #endif
 
+#include <CUnit/Basic.h>
+#include <ela_hive.h>
+
+#include "config.h"
 #include "test_context.h"
 #include "test_helper.h"
 
@@ -74,30 +75,22 @@ int onedrive_list_files_test_suite_init(void)
     test_ctx.ext = &onedrive_dir_entry;
 
     test_ctx.client = onedrive_client_new();
-    if (!test_ctx.client) {
-        CU_FAIL("Error: test suite initialize error");
+    if (!test_ctx.client)
         return -1;
-    }
 
     rc = hive_client_login(test_ctx.client, open_authorization_url, NULL);
-    if (rc < 0) {
-        CU_FAIL("Error: test suite initialize error");
+    if (rc < 0)
         return -1;
-    }
 
     test_ctx.drive = hive_drive_open(test_ctx.client);
-    if (!test_ctx.drive) {
-        CU_FAIL("Error: test suite initialize error");
+    if (!test_ctx.drive)
         return -1;
-    }
 
     strcpy(working_dir_name, get_random_file_name());
 
     rc = hive_drive_mkdir(test_ctx.drive, working_dir_name);
-    if (rc < 0) {
-        CU_FAIL("Error: test suite initialize error");
+    if (rc < 0)
         return -1;
-    }
 
     return 0;
 }
@@ -107,10 +100,8 @@ int onedrive_list_files_test_suite_cleanup(void)
     int rc;
 
     rc = hive_drive_delete_file(test_ctx.drive, working_dir_name);
-    if (rc < 0) {
-        CU_FAIL("Error: test suite initialize error");
+    if (rc < 0)
         return -1;
-    }
 
     test_context_cleanup();
 
@@ -124,30 +115,22 @@ int ipfs_list_files_test_suite_init(void)
     test_ctx.ext = &ipfs_dir_entry;
 
     test_ctx.client = ipfs_client_new();
-    if (!test_ctx.client) {
-        CU_FAIL("Error: test suite initialize error");
+    if (!test_ctx.client)
         return -1;
-    }
 
     rc = hive_client_login(test_ctx.client, NULL, NULL);
-    if (rc < 0) {
-        CU_FAIL("Error: test suite initialize error");
+    if (rc < 0)
         return -1;
-    }
 
     test_ctx.drive = hive_drive_open(test_ctx.client);
-    if (!test_ctx.drive) {
-        CU_FAIL("Error: test suite initialize error");
+    if (!test_ctx.drive)
         return -1;
-    }
 
     strcpy(working_dir_name, get_random_file_name());
 
     rc = hive_drive_mkdir(test_ctx.drive, working_dir_name);
-    if (rc < 0) {
-        CU_FAIL("Error: test suite initialize error");
+    if (rc < 0)
         return -1;
-    }
 
     return 0;
 }
@@ -157,10 +140,8 @@ int ipfs_list_files_test_suite_cleanup(void)
     int rc;
 
     rc = hive_drive_delete_file(test_ctx.drive, working_dir_name);
-    if (rc < 0) {
-        CU_FAIL("Error: test suite initialize error");
+    if (rc < 0)
         return -1;
-    }
 
     test_context_cleanup();
 
