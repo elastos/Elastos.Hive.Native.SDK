@@ -42,6 +42,10 @@ if(ENABLE_APPS)
     add_subdirectory(apps)
 endif()
 
+if(ENABLE_DOCS AND (${CMAKE_SYSTEM_NAME} STREQUAL "Linux"))
+    add_subdirectory(docs)
+endif()
+
 # Alias target for package. But it fix issue about making package
 # inrelevant to udpatation of cmake scripts.
 add_custom_target(dist
