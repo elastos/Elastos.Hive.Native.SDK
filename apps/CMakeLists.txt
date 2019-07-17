@@ -8,3 +8,7 @@ set(DEPEND_MODULES
 add_submodule(hivecmd
     DIRECTORY cmd
     DEPENDS ${DEPEND_MODULES})
+
+add_submodule(prober
+    DIRECTORY prober
+    DEPENDS curl libcrystal)

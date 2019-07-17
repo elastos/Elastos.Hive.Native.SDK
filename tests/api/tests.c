@@ -108,28 +108,28 @@ void config_update(int argc, char *argv[])
 
     while ((opt = getopt_long(argc, argv, "", cmd_options, &idx)) != -1) {
         switch (opt) {
-            case 1:
-                global_config.loglevel = atoi(optarg);
-                break;
+        case 1:
+            global_config.loglevel = atoi(optarg);
+            break;
 
-            case 2:
-                if (global_config.logfile)
-                    free(global_config.logfile);
+        case 2:
+            if (global_config.logfile)
+                free(global_config.logfile);
 
-                qualified_path(optarg, NULL, path);
-                global_config.logfile = strdup(path);
-                break;
+            qualified_path(optarg, NULL, path);
+            global_config.logfile = strdup(path);
+            break;
 
-            case 3:
-                if (global_config.data_dir)
-                    free(global_config.data_dir);
+        case 3:
+            if (global_config.data_dir)
+                free(global_config.data_dir);
 
-                qualified_path(optarg, NULL, path);
-                global_config.data_dir = strdup(path);
-                break;
+            qualified_path(optarg, NULL, path);
+            global_config.data_dir = strdup(path);
+            break;
 
-            default:
-                break;
+        default:
+            break;
         }
     }
 
