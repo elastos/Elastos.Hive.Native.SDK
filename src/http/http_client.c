@@ -264,10 +264,14 @@ http_client_t *http_client_new(void)
 {
     http_client_t *client;
 
-
     if (!initialized) {
-        vlogE("HttpClient: curl not initialized.");
-        return NULL;
+        int rc;
+        rc = curl_global_init(CURL_GLOBAL_ALL);
+        if (rc != CURLE_OK) {
+            vlogE("HttpClient: Initialize global curl error (%d)", rc);
+            return NULL;
+        }
+        initialized = true;
     }
 
     client = (http_client_t *)rc_zalloc(sizeof(http_client_t), http_client_destroy);

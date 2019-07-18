@@ -519,8 +519,8 @@ static void file_close(cmd_t *ctx, int argc, char *argv[])
 
 static void file_seek(cmd_t *ctx, int argc, char *argv[])
 {
-    int rc;
-    size_t offset;
+    ssize_t rc;
+    ssize_t offset;
     char *endptr;
     int whence;
 

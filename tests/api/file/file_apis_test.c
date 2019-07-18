@@ -480,7 +480,7 @@ static void test_file_seek(void)
         return;
     }
 
-    lpos = hive_file_seek(file, -strlen("world!"), HiveSeek_End);
+    lpos = hive_file_seek(file, -(ssize_t)strlen("world!"), HiveSeek_End);
     if (lpos != strlen("hello ")) {
         CU_FAIL("hive_file_seek() failed");
         hive_file_close(file);

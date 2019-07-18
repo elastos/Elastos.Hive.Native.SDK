@@ -99,9 +99,10 @@ ExternalProject_Add(
 set(CURL_DEPS
     curl
     ssl
-    crypto)
+    crypto
+    pthread)
 if(WIN32)
-    set(CURL_DEPS ${CURL_DEPS} zlib1)
+    set(CURL_DEPS ${CURL_DEPS} zlib1 Ws2_32 Iphlpapi)
 else()
     set(CURL_DEPS ${CURL_DEPS} z)
 endif()
