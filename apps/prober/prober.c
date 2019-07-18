@@ -89,7 +89,7 @@ void probe(const char *node)
         return;
     }
 
-    snprintf(url, sizeof(url), "http://%s:9094/version", node);
+    snprintf(url, sizeof(url), "http://%s:9095/version", node);
     rc = http_client_set_url(httpc, url);
     if (rc) {
         snprintf(url, sizeof(url), "http://%s/version", node);
@@ -117,7 +117,7 @@ void probe(const char *node)
         return;
     }
 
-    if (resp_code != HttpStatus_MethodNotAllowed) {
+    if (resp_code != HttpStatus_OK) {
         printf("unreachable.\n");
         return;
     }

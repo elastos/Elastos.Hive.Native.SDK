@@ -56,7 +56,7 @@ static int test_reachable(const char *ipaddr)
     int rc;
     long resp_code;
 
-    rc = snprintf(url, sizeof(url), "http://%s:%d/version", ipaddr, CLUSTER_API_PORT);
+    rc = snprintf(url, sizeof(url), "http://%s:%d/version", ipaddr, NODE_API_PORT);
     if (rc < 0 || rc >= sizeof(url)) {
         vlogE("IpfsToken: URL too long.");
         return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
@@ -88,7 +88,7 @@ static int test_reachable(const char *ipaddr)
         return HIVE_CURL_ERROR(rc);
     }
 
-    if (resp_code != HttpStatus_MethodNotAllowed) {
+    if (resp_code != HttpStatus_OK) {
         vlogE("IpfsToken: error from response (%d).", resp_code);
         return HIVE_HTTP_STATUS_ERROR(resp_code);
     }
