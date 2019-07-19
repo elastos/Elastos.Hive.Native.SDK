@@ -41,8 +41,9 @@ static int ipfs_resolve(ipfs_rpc_t *rpc, const char *peerid, char **result)
     char *p;
     int rc;
 
-    rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/name/resolve",
-                  ipfs_rpc_get_current_node(rpc), NODE_API_PORT);
+    rc = snprintf(url, sizeof(url), "http://%s:%u/api/v0/name/resolve",
+                  ipfs_rpc_get_current_node_ip(rpc),
+                  (unsigned)ipfs_rpc_get_current_node_port(rpc));
     if (rc < 0 || rc >= sizeof(url)) {
         vlogE("IpfsUtils: URL too long.");
         return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
@@ -102,8 +103,9 @@ static int ipfs_login(ipfs_rpc_t *rpc, const char *hash)
     long resp_code = 0;
     int rc;
 
-    rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/uid/login",
-                  ipfs_rpc_get_current_node(rpc), NODE_API_PORT);
+    rc = snprintf(url, sizeof(url), "http://%s:%u/api/v0/uid/login",
+                  ipfs_rpc_get_current_node_ip(rpc),
+                  (unsigned)ipfs_rpc_get_current_node_port(rpc));
     if (rc < 0 || rc >= sizeof(url)) {
         vlogE("IpfsUtils: URL too long.");
         return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
@@ -227,8 +229,9 @@ static int get_last_root_hash(ipfs_rpc_t *rpc,
     assert(hash);
     assert(bufsz >= MAX_URL_LEN);
 
-    sprintf(buf, "http://%s:%d/api/v0/files/stat",
-            ipfs_rpc_get_current_node(rpc), NODE_API_PORT);
+    sprintf(buf, "http://%s:%u/api/v0/files/stat",
+            ipfs_rpc_get_current_node_ip(rpc),
+            (unsigned)ipfs_rpc_get_current_node_port(rpc));
 
     httpc = http_client_new();
     if (!httpc) {
@@ -318,8 +321,9 @@ static int pub_last_root_hash(ipfs_rpc_t *rpc,
     assert(hash);
     assert(bufsz >= MAX_URL_LEN);
 
-    sprintf(buf, "http://%s:%d/api/v0/name/publish",
-            ipfs_rpc_get_current_node(rpc), NODE_API_PORT);
+    sprintf(buf, "http://%s:%u/api/v0/name/publish",
+            ipfs_rpc_get_current_node_ip(rpc),
+            (unsigned)ipfs_rpc_get_current_node_port(rpc));
 
     httpc = http_client_new();
     if (!httpc) {

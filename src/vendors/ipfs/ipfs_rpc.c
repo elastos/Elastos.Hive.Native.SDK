@@ -42,21 +42,22 @@
 
 struct ipfs_rpc {
     char uid[HIVE_MAX_IPFS_UID_LEN + 1];
-    char current_node[HIVE_MAX_IPV6_ADDRESS_LEN  + 1];
+    char current_node_ip[HIVE_MAX_IPV6_ADDRESS_LEN  + 1];
+    uint16_t current_node_port;
     ipfs_rpc_writeback_func_t *writeback_cb;
     void *user_data;
     size_t rpc_nodes_count;
     rpc_node_t rpc_nodes[0];
 };
 
-static int test_reachable(const char *ipaddr)
+static int test_reachable(const char *ipaddr, uint16_t port)
 {
     char url[MAXPATHLEN + 1];
     http_client_t *httpc;
     int rc;
     long resp_code;
 
-    rc = snprintf(url, sizeof(url), "http://%s:%d/version", ipaddr, NODE_API_PORT);
+    rc = snprintf(url, sizeof(url), "http://%s:%d/version", ipaddr, port);
     if (rc < 0 || rc >= sizeof(url)) {
         vlogE("IpfsToken: URL too long.");
         return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
@@ -101,6 +102,7 @@ error_exit:
 }
 
 static int _ipfs_token_get_uid_info(const char *node_ip,
+                                    uint16_t node_port,
                                     const char *uid,
                                     char **result)
 {
@@ -112,7 +114,7 @@ static int _ipfs_token_get_uid_info(const char *node_ip,
     vlogD("IpfsToken: Calling _ipfs_token_get_uid_info().");
 
     rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/uid/info",
-                  node_ip, NODE_API_PORT);
+                  node_ip, node_port);
     if (rc < 0 || rc >= sizeof(url)) {
         vlogE("IpfsToken: URL too long.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
@@ -176,10 +178,13 @@ int ipfs_rpc_get_uid_info(ipfs_rpc_t *rpc, char **result)
 {
     assert(rpc);
 
-    return _ipfs_token_get_uid_info(rpc->current_node, rpc->uid, result);
+    return _ipfs_token_get_uid_info(rpc->current_node_ip,
+                                    rpc->current_node_port,
+                                    rpc->uid, result);
 }
 
-static int select_bootstrap(rpc_node_t *rpc_nodes, size_t nodes_cnt, char *selected)
+static int select_bootstrap(rpc_node_t *rpc_nodes, size_t nodes_cnt,
+                            char *selected_ip, uint16_t *selected_port)
 {
     size_t i;
     size_t base;
@@ -191,19 +196,21 @@ static int select_bootstrap(rpc_node_t *rpc_nodes, size_t nodes_cnt, char *selec
 
     do {
         if (rpc_nodes[i].ipv4[0]) {
-            rc = test_reachable(rpc_nodes[i].ipv4);
+            rc = test_reachable(rpc_nodes[i].ipv4, rpc_nodes[i].port);
             if (!rc) {
-                strcpy(selected, rpc_nodes[i].ipv4);
-                vlogI("IpfsToken: node selected: %s.", selected);
+                strcpy(selected_ip, rpc_nodes[i].ipv4);
+                *selected_port = rpc_nodes[i].port;
+                vlogI("IpfsToken: node selected: %s.", selected_ip);
                 return 0;
             }
         }
 
         if (rpc_nodes[i].ipv6[0]) {
-            rc = test_reachable(rpc_nodes[i].ipv6);
+            rc = test_reachable(rpc_nodes[i].ipv6, rpc_nodes[i].port);
             if (!rc) {
-                strcpy(selected, rpc_nodes[i].ipv6);
-                vlogI("IpfsToken: node selected: %s.", selected);
+                strcpy(selected_ip, rpc_nodes[i].ipv6);
+                *selected_port = rpc_nodes[i].port;
+                vlogI("IpfsToken: node selected: %s.", selected_ip);
                 return 0;
             }
         }
@@ -219,11 +226,11 @@ int ipfs_rpc_check_reachable(ipfs_rpc_t *rpc)
 {
     int rc;
 
-    if (rpc->current_node[0])
+    if (rpc->current_node_ip[0])
         return 0;
 
     rc = select_bootstrap(rpc->rpc_nodes, rpc->rpc_nodes_count,
-                          rpc->current_node);
+                          rpc->current_node_ip, &rpc->current_node_port);
     if (rc < 0) {
         vlogE("IpfsToken: no node configured is reachable.");
         return rc;
@@ -231,17 +238,17 @@ int ipfs_rpc_check_reachable(ipfs_rpc_t *rpc)
 
     rc = ipfs_synchronize(rpc);
     if (rc < 0)
-        rpc->current_node[0] = '\0';
+        rpc->current_node_ip[0] = '\0';
 
     return rc;
 }
 
 void ipfs_rpc_mark_node_unreachable(ipfs_rpc_t *rpc)
 {
-    rpc->current_node[0] = '\0';
+    rpc->current_node_ip[0] = '\0';
 }
 
-static int uid_new(const char *node_ip, char *uid, size_t uid_len)
+static int uid_new(const char *node_ip, uint16_t node_port, char *uid, size_t uid_len)
 {
     char url[MAXPATHLEN + 1];
     http_client_t *httpc;
@@ -252,7 +259,7 @@ static int uid_new(const char *node_ip, char *uid, size_t uid_len)
     int rc;
 
     rc = snprintf(url, sizeof(url), "http://%s:%d/api/v0/uid/new",
-                  node_ip, NODE_API_PORT);
+                  node_ip, node_port);
     if (rc < 0 || rc >= sizeof(url)) {
         vlogE("IpfsToken: URL too long.");
         return HIVE_GENERAL_ERROR(HIVEERR_BUFFER_TOO_SMALL);
@@ -329,9 +336,14 @@ const char *ipfs_rpc_get_uid(ipfs_rpc_t *rpc)
     return rpc->uid;
 }
 
-const char *ipfs_rpc_get_current_node(ipfs_rpc_t *rpc)
+const char *ipfs_rpc_get_current_node_ip(ipfs_rpc_t *rpc)
 {
-    return rpc->current_node;
+    return rpc->current_node_ip;
+}
+
+uint16_t ipfs_rpc_get_current_node_port(ipfs_rpc_t *rpc)
+{
+    return rpc->current_node_port;
 }
 
 static int load_store(const cJSON *store, char *uid, size_t len)
@@ -408,7 +420,7 @@ ipfs_rpc_t *ipfs_rpc_new(ipfs_rpc_options_t *options,
     tmp->user_data       = user_data;
 
     rc = select_bootstrap(options->rpc_nodes, options->rpc_nodes_count,
-                          tmp->current_node);
+                          tmp->current_node_ip, &tmp->current_node_port);
     if (rc < 0) {
         vlogE("IpfsToken: No configured node is reachable.");
         hive_set_error(rc);
@@ -417,7 +429,9 @@ ipfs_rpc_t *ipfs_rpc_new(ipfs_rpc_options_t *options,
     }
 
     if (options->uid[0]) {
-        rc = _ipfs_token_get_uid_info(tmp->current_node, options->uid, NULL);
+        rc = _ipfs_token_get_uid_info(tmp->current_node_ip,
+                                      tmp->current_node_port,
+                                      options->uid, NULL);
         if (rc < 0) {
             vlogE("IpfsToken: failed to get info of configured uid.");
             hive_set_error(rc);
@@ -435,7 +449,9 @@ ipfs_rpc_t *ipfs_rpc_new(ipfs_rpc_options_t *options,
             return NULL;
         }
 
-        rc = _ipfs_token_get_uid_info(tmp->current_node, tmp->uid, NULL);
+        rc = _ipfs_token_get_uid_info(tmp->current_node_ip,
+                                      tmp->current_node_port,
+                                      tmp->uid, NULL);
         if (rc < 0) {
             vlogE("IpfsToken: failed to get info of cached uid.");
             hive_set_error(rc);
@@ -447,7 +463,8 @@ ipfs_rpc_t *ipfs_rpc_new(ipfs_rpc_options_t *options,
     } else {
         vlogI("IpfsToken: No uid configured or cache, create one for user.");
 
-        rc = uid_new(tmp->current_node, tmp->uid, sizeof(tmp->uid));
+        rc = uid_new(tmp->current_node_ip, tmp->current_node_port,
+                     tmp->uid, sizeof(tmp->uid));
         if (rc < 0) {
             vlogE("IpfsToken: failed to create uid.");
             hive_set_error(rc);

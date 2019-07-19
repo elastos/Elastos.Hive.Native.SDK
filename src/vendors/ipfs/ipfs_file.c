@@ -59,8 +59,9 @@ static int get_file_stat(ipfs_rpc_t *rpc, const char *path, size_t *fsz)
         return rc;
     }
 
-    sprintf(buf, "http://%s:%d/api/v0/files/stat",
-            ipfs_rpc_get_current_node(rpc), NODE_API_PORT);
+    sprintf(buf, "http://%s:%u/api/v0/files/stat",
+            ipfs_rpc_get_current_node_ip(rpc),
+            (unsigned)ipfs_rpc_get_current_node_port(rpc));
 
     httpc = http_client_new();
     if (!httpc) {
@@ -196,8 +197,9 @@ static ssize_t ipfs_file_read(HiveFile *base, char *buffer, size_t bufsz)
         return rc;
     }
 
-    sprintf(buf, "http://%s:%d/api/v0/files/read",
-            ipfs_rpc_get_current_node(file->rpc), NODE_API_PORT);
+    sprintf(buf, "http://%s:%u/api/v0/files/read",
+            ipfs_rpc_get_current_node_ip(file->rpc),
+            (unsigned)ipfs_rpc_get_current_node_port(file->rpc));
 
     httpc = http_client_new();
     if (!httpc) {
@@ -263,8 +265,9 @@ static ssize_t ipfs_file_write(HiveFile *base, const char *buffer, size_t bufsz)
         return rc;
     }
 
-    sprintf(buf, "http://%s:%d/api/v0/files/write",
-            ipfs_rpc_get_current_node(file->rpc), NODE_API_PORT);
+    sprintf(buf, "http://%s:%u/api/v0/files/write",
+            ipfs_rpc_get_current_node_ip(file->rpc),
+            (unsigned)ipfs_rpc_get_current_node_port(file->rpc));
 
     httpc = http_client_new();
     if (!httpc) {
