@@ -57,7 +57,8 @@ int ipfs_rpc_synchronize(ipfs_rpc_t *rpc);
 int ipfs_rpc_reset(ipfs_rpc_t *rpc);
 int ipfs_rpc_get_uid_info(ipfs_rpc_t *rpc, char **result);
 const char *ipfs_rpc_get_uid(ipfs_rpc_t *rpc);
-const char *ipfs_rpc_get_current_node(ipfs_rpc_t *rpc);
+const char *ipfs_rpc_get_current_node_ip(ipfs_rpc_t *rpc);
+uint16_t ipfs_rpc_get_current_node_port(ipfs_rpc_t *rpc);
 int ipfs_rpc_check_reachable(ipfs_rpc_t *rpc);
 void ipfs_rpc_mark_node_unreachable(ipfs_rpc_t *rpc);
 

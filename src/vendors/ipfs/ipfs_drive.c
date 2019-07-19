@@ -83,8 +83,9 @@ static int ipfs_drive_stat_file(HiveDrive *base, const char *path,
         return rc;
     }
 
-    sprintf(buf, "http://%s:%d/api/v0/files/stat",
-            ipfs_rpc_get_current_node(drive->rpc), NODE_API_PORT);
+    sprintf(buf, "http://%s:%u/api/v0/files/stat",
+            ipfs_rpc_get_current_node_ip(drive->rpc),
+            (unsigned)ipfs_rpc_get_current_node_port(drive->rpc));
 
     httpc = http_client_new();
     if (!httpc) {
@@ -283,8 +284,9 @@ static int ipfs_drive_list_files(HiveDrive *base, const char *path,
         return rc;
     }
 
-    sprintf(url, "http://%s:%d/api/v0/files/ls",
-            ipfs_rpc_get_current_node(drive->rpc), NODE_API_PORT);
+    sprintf(url, "http://%s:%u/api/v0/files/ls",
+            ipfs_rpc_get_current_node_ip(drive->rpc),
+            (unsigned)ipfs_rpc_get_current_node_port(drive->rpc));
 
     httpc = http_client_new();
     if (!httpc) {
@@ -363,8 +365,9 @@ static int ipfs_drive_make_dir(HiveDrive *base, const char *path)
         return rc;
     }
 
-    sprintf(url, "http://%s:%d/api/v0/files/mkdir",
-            ipfs_rpc_get_current_node(drive->rpc), NODE_API_PORT);
+    sprintf(url, "http://%s:%u/api/v0/files/mkdir",
+            ipfs_rpc_get_current_node_ip(drive->rpc),
+            (unsigned)ipfs_rpc_get_current_node_port(drive->rpc));
 
     httpc = http_client_new();
     if (!httpc) {
@@ -435,8 +438,9 @@ static int ipfs_drive_move_file(HiveDrive *base, const char *old, const char *ne
         return rc;
     }
 
-    sprintf(url, "http://%s:%d/api/v0/files/mv",
-            ipfs_rpc_get_current_node(drive->rpc), NODE_API_PORT);
+    sprintf(url, "http://%s:%u/api/v0/files/mv",
+            ipfs_rpc_get_current_node_ip(drive->rpc),
+            (unsigned)ipfs_rpc_get_current_node_port(drive->rpc));
 
     httpc = http_client_new();
     if (!httpc) {
@@ -514,8 +518,9 @@ static int ipfs_drive_copy_file(HiveDrive *base, const char *src_path, const cha
         return rc;
     }
 
-    sprintf(url, "http://%s:%d/api/v0/files/cp",
-            ipfs_rpc_get_current_node(drive->rpc), NODE_API_PORT);
+    sprintf(url, "http://%s:%u/api/v0/files/cp",
+            ipfs_rpc_get_current_node_ip(drive->rpc),
+            (unsigned)ipfs_rpc_get_current_node_port(drive->rpc));
 
     httpc = http_client_new();
     if (!httpc) {
@@ -586,8 +591,9 @@ static int ipfs_drive_delete_file(HiveDrive *base, const char *path)
         return rc;
     }
 
-    sprintf(url, "http://%s:%d/api/v0/files/rm",
-            ipfs_rpc_get_current_node(drive->rpc), NODE_API_PORT);
+    sprintf(url, "http://%s:%u/api/v0/files/rm",
+            ipfs_rpc_get_current_node_ip(drive->rpc),
+            (unsigned)ipfs_rpc_get_current_node_port(drive->rpc));
 
     httpc = http_client_new();
     if (!httpc) {
