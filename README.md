@@ -3,7 +3,7 @@ Elastos Hive Native SDK
 
 |Linux & mac|Windows|
 |:-:|:-:|
-|[![Build Status](https://travis-ci.org/elastos/Elastos.NET.Hive.Native.SDK.svg)](https://travis-ci.org/elastos/Elastos.NET.Hive.Native.SDK)|[![Build status](https://ci.appveyor.com/api/projects/status/at2povuwuw9soaxf?svg=true)](https://ci.appveyor.com/project/Elastos/elastos-net-hive-native-sdk)|
+|[![Build Status](https://travis-ci.com/elastos/Elastos.NET.Hive.Native.SDK.svg)](https://travis-ci.com/elastos/Elastos.NET.Hive.Native.SDK)|[![Build status](https://ci.appveyor.com/api/projects/status/at2povuwuw9soaxf?svg=true)](https://ci.appveyor.com/project/Elastos/elastos-net-hive-native-sdk)|
   
 ## Introduction  
   
