@@ -47,10 +47,14 @@
 static void usage(void)
 {
     printf("prober, a utility detecting connectivity of IPFS nodes.\n");
-    printf("Usage: prober [OPTION]... [NODE_ADDR]...\n");
+    printf("Usage: prober [OPTION]... [NODE_IP[:NODE_PORT]] ...\n");
+    printf("Description: prober tests connectivity of each IPFS nodes provided as command line"
+           " arguments and nodes listed in the file specified by -f option. Node address takes"
+           " the form NODE_IP[:NODE_PORT] where node port can be omitted to take the default port 9095.");
     printf("\n");
     printf("First run options:\n");
-    printf("  -f, --file=FILE_PATH          File containing addresses of nodes to be tested.\n");
+    printf("  -f, --file=FILE_PATH          File containing addresses of nodes to be tested."
+           " Nodes are separated by whitespaces or newlines.\n");
     printf("\n");
     printf("Debugging options:\n");
     printf("      --debug                   Wait for debugger attach after start.\n");
