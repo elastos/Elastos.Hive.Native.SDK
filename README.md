@@ -18,16 +18,16 @@ Elastos Hive Native SDK provides a set of APIs to enable SDK users to perform fi
    - [Build on Ubuntu / Debian / Linux Host](#build-on-ubuntu--debian--linux-host)  
       - [1. Install Pre-Requirements](#1-install-pre-requirements)  
       - [2. Build to run on host (Ubuntu / Debian / Linux)](#2-build-to-run-on-host-ubuntu--debian--linux)  
-      - [3. Run HiveDemo](#3-run-hivedemo)  
+      - [3. Run HiveCmd](#3-run-hivecmd)  
    - [Build on MacOS Host](#build-on-macos-host)  
       - [1. Install Pre-Requirements](#1-install-pre-requirements-1)  
       - [2. Build to run on host](#2-build-to-run-on-host)  
-      - [3. Run HiveDemo](#3-run-hivedemo-1)  
+      - [3. Run HiveCmd](#3-run-hivecmd-1)  
    - [Build on Windows Host](#build-on-windows-host)  
       - [1. Brief introduction](#1-brief-introduction)  
       - [2. Set up Environment](#2-set-up-environment)  
       - [3. Build to run on host](#3-build-to-run-on-host)  
-      - [4. Run HiveDemo](#4-run-hivedemo)  
+      - [4. Run HiveCmd](#4-run-hivecmd)  
    - [Build API Documentation](#build-api-documentation)  
       - [Build on Ubuntu / Debian / Linux Host](#build-on-ubuntu--debian--linux-host-1)  
          - [1. Install Pre-Requirements](#1-install-pre-requirements-2)  
@@ -129,20 +129,20 @@ Create distribution package:
 $ make dist  
 ```  
   
-#### 3. Run HiveDemo
+#### 3. Run HiveCmd
   
-HiveDemo is a fully functional, lightweight shell program that processes commands and returns the output to the terminal. Each Hive API has its corresponding command. This program is intended to familiarize users with the use of Hive APIs.
+HiveCmd is a fully functional, lightweight shell program that processes commands and returns the output to the terminal. Each Hive API has its corresponding command. This program is intended to familiarize users with the use of Hive APIs.
   
-To run HiveDemo, first extract the distribution package created previously and enter the extracted folder. Then, change directory to the 'bin' folder.  
+To run HiveCmd, first extract the distribution package created previously and enter the extracted folder. Then, change directory to the 'bin' folder.  
   
 ```shell  
 $ cd YOUR-DISTRIBUTION-PACKAGE-PATH/bin  
 ```  
   
-Run HiveDemo:  
+Run HiveCmd:  
   
 ```shell  
-$ ./hivedemo --config=YOUR-DISTRIBUTION-PACKAGE-PATH/etc/hive/hivedemo.conf
+$ ./hivecmd --config=YOUR-DISTRIBUTION-PACKAGE-PATH/etc/hive/hivecmd.conf
 ```  
   
 Available commands in the shell can be listed by using the command **help**. Specific command usage descriptions can be displayed by using **help [Command]** where [Command] must be replaced with the specific command name.
@@ -240,20 +240,20 @@ Create distribution package:
 $ make dist  
 ```  
   
-#### 3. Run HiveDemo
+#### 3. Run HiveCmd
   
-HiveDemo is a fully functional, lightweight shell program that processes commands and returns the output to the terminal. Each Hive API has its corresponding command. This program is intended to familiarize users with the use of Hive APIs.
+HiveCmd is a fully functional, lightweight shell program that processes commands and returns the output to the terminal. Each Hive API has its corresponding command. This program is intended to familiarize users with the use of Hive APIs.
   
-To run HiveDemo, first extract the distribution package created previously and enter the extracted folder. Then, change directory to the 'bin' folder.  
+To run HiveCmd, first extract the distribution package created previously and enter the extracted folder. Then, change directory to the 'bin' folder.  
   
 ```shell  
 $ cd YOUR-DISTRIBUTION-PACKAGE-PATH/bin  
 ```  
   
-Run HiveDemo:  
+Run HiveCmd:  
   
 ```shell  
-$ ./hivedemo --config=YOUR-DISTRIBUTION-PACKAGE-PATH/etc/hive/hivedemo.conf
+$ ./hivecmd --config=YOUR-DISTRIBUTION-PACKAGE-PATH/etc/hive/hivecmd.conf
 ```  
   
 Available commands in the shell can be listed by using the command **help**. Specific command usage descriptions can be displayed by using **help [Command]** where [Command] must be replaced with the specific command name.   
@@ -345,23 +345,23 @@ Create distribution package:
 $ nmake dist  
 ```  
   
-#### 4. Run HiveDemo
+#### 4. Run HiveCmd
   
 
-HiveDemo is a fully functional, lightweight shell program that processes commands and returns the output to the terminal. Each Hive API has its corresponding command. This program is intended to familiarize users with the use of Hive APIs.
+HiveCmd is a fully functional, lightweight shell program that processes commands and returns the output to the terminal. Each Hive API has its corresponding command. This program is intended to familiarize users with the use of Hive APIs.
   
-To run HiveDemo, first extract the distribution package created previously and enter the extracted folder. Then, change directory to the 'bin' folder.  
+To run HiveCmd, first extract the distribution package created previously and enter the extracted folder. Then, change directory to the 'bin' folder.  
 
 ```shell  
 $ cd YOUR-DISTRIBUTION-PACKAGE-PATH\bin  
 ```  
   
-Run HiveDemo:  
+Run HiveCmd:  
   
 *Make sure to replace 'YOUR-DISTRIBUTION-PACKAGE-PATH'.*  
   
 ```shell  
-$ hivedemo.exe --config=YOUR-DISTRIBUTION-PACKAGE-PATH\etc\hive\hivedemo.conf  
+$ hivecmd.exe --config=YOUR-DISTRIBUTION-PACKAGE-PATH\etc\hive\hivecmd.conf  
 ```  
   
 Available commands in the shell can be listed by using the command **help**. Specific command usage descriptions can be displayed by using **help [Command]** where [Command] must be replaced with the specific command name. 
