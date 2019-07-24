@@ -2,6 +2,8 @@
 #if !defined(__DMMESSAGE_H_)
 #define __DMMESSAGE_H_
 
+#include <vector>
+
 #include <hive/node.h>
 #include <string>
 
@@ -21,9 +23,15 @@ class DMessage {
   std::string content;
 };
 
+typedef struct dstore_node {
+  std::string ipv4;
+  std::string ipv6;
+  uint16_t port;
+} dstore_node;
+
 class DStore {
  public:
-  DStore(const std::string host, int port, bool log = false);
+  explicit DStore(std::vector<dstore_node> &&nodes, bool log = false);
 
   std::string get_peerId();
 
@@ -42,11 +50,20 @@ class DStore {
 
   bool remove_values(const std::string& key);
 
-  bool set_sender_UID(std::string& uid);
-
   void enable_log(bool enable);
 
  private:
+  bool set_sender_UID(std::string& uid);
+
+  std::shared_ptr<std::vector<std::shared_ptr<DMessage>>> get_values_internal(
+      const std::string& key);
+
+  bool add_value_internal(const std::string& key, std::shared_ptr<DMessage> message);
+
+  bool remove_values_internal(const std::string& key);
+
+  bool select_node();
+
   bool publish();
 
   bool resolve();
@@ -60,6 +77,7 @@ class DStore {
   bool needPublish;
   bool needResolve;
   bool debugLog;
+  std::vector<dstore_node> candidate_nodes;
 };
 
 #endif  // __DMMESSAGE_H_

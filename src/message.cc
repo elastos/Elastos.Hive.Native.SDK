@@ -2,16 +2,52 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <algorithm>
+#include <random>
 
 #include <hive/cluster.h>
 #include <hive/node.h>
 #include <hive/test/utils.h>
 #include "hive/message.h"
 
-DStore::DStore(const std::string host, int port, bool log) : node(host, port) {
+bool DStore::select_node() {
+  std::random_device rd;
+  std::mt19937 g(rd());
+  // Please replace this line
+  std::string uid = "uid-2041b18e-ca86-4962-9a21-d477f7f627ce";
+
+  std::shuffle(candidate_nodes.begin(), candidate_nodes.end(), g);
+
+  for (auto &nd : candidate_nodes) {
+    if (!nd.ipv4.empty()) {
+      node.set_addr(nd.ipv4, nd.port);
+      try {
+        ipfs::Json json;
+        node.Version(&json);
+        return set_sender_UID(uid);
+      } catch (...) {}
+    }
+
+    if (!nd.ipv6.empty()) {
+      node.set_addr(nd.ipv6, nd.port);
+      try {
+        ipfs::Json json;
+        node.Version(&json);
+        return set_sender_UID(uid);
+      } catch (...) {}
+    }
+  }
+
+  return false;
+}
+
+DStore::DStore(std::vector<dstore_node> &&nodes, bool log): candidate_nodes {nodes} {
   debugLog = log;
   needPublish = true;
   needResolve = true;
+
+  if (!select_node())
+    throw std::runtime_error("no IPFS node is reachable");
 }
 
 std::string DStore::get_peerId() { return peerId; }
@@ -90,6 +126,19 @@ std::shared_ptr<std::vector<std::string>> DStore::get_remote_keys(
 
 std::shared_ptr<std::vector<std::shared_ptr<DMessage>>> DStore::get_values(
     const std::string& key) {
+  auto dmsg = get_values_internal(key);
+
+  if (dmsg)
+    return dmsg;
+
+  if (!select_node())
+    return nullptr;
+
+  return get_values_internal(key);
+}
+
+std::shared_ptr<std::vector<std::shared_ptr<DMessage>>> DStore::get_values_internal(
+    const std::string &key) {
   // ipfs files ls /nodes/peerId/
   // ipfs files read /nodes/peerId/messages/key/001
   // ipfs files read /nodes/peerId/messages/key/002
@@ -136,7 +185,7 @@ std::shared_ptr<std::vector<std::shared_ptr<DMessage>>> DStore::get_values(
                 << " failed" << std::endl;
       std::cerr << e.what() << std::endl;
     }
-    return vm;
+    return nullptr;
   }
 
   if (debugLog) {
@@ -204,6 +253,17 @@ DStore::get_remote_values(const std::string& peerId, const std::string& key) {
 
 bool DStore::add_value(const std::string& key,
                        std::shared_ptr<DMessage> message) {
+  if (add_value_internal(key, message))
+    return true;
+
+  if (!select_node())
+    return false;
+
+  return add_value_internal(key, message);
+}
+
+bool DStore::add_value_internal(const std::string &key,
+                                std::shared_ptr<DMessage> message) {
   // > ipfs files write /nodes/peerId/messages/key/timestamp-xxxx
 
   // > ipfs files stat  /nodes/peerId
@@ -265,6 +325,16 @@ bool DStore::add_value(const std::string& key,
 }
 
 bool DStore::remove_values(const std::string& key) {
+  if (remove_values_internal(key))
+    return true;
+
+  if (!select_node())
+    return false;
+
+  return remove_values_internal(key);
+}
+
+bool DStore::remove_values_internal(const std::string& key) {
   // > ipfs files rm /nodes/peerId/messages/key/xxxxxxxx
 
   // > ipfs files stat /nodes/peerId
@@ -293,7 +363,7 @@ bool DStore::remove_values(const std::string& key) {
   return publish();
 }
 
-bool DStore::set_sender_UID(std::string& uid) {
+bool DStore::set_sender_UID(std::string &uid){
   ipfs::Json uidInfo;
 
   node.UidInfo(uid, &uidInfo);

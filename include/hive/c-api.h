@@ -15,9 +15,15 @@ const char* hive_generate_conf(const char* host, int port);
 const char* hive_refresh_conf(const char* defaultConf);
 const char* hive_random_host(const char* volatileConf);
 
+typedef struct dstorec_node {
+    char *ipv4;
+    char *ipv6;
+    uint16_t port;
+} dstorec_node;
+
 typedef void DStoreC;
 
-DStoreC *dstore_create(const char *hive_conf);
+DStoreC *dstore_create(dstorec_node *bootstraps, size_t sz);
 void dstore_destroy(DStoreC *dstore);
 int dstore_get_values(DStoreC *dstore, const char *key,
                       bool (*cb)(const char *key, const uint8_t *value,

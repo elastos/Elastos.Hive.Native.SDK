@@ -51,15 +51,17 @@ class Node {
    * @snippet generic.cc ipfs::Node::Node
    *
    * @since version 0.1.0 */
-  Node(
+  explicit Node(
       /** [in] Hostname or IP address of the server to connect to. */
-      const std::string& host,
+      const std::string& host = "localhost",
       /** [in] Port to connect to. */
-      long port);
+      long port = 9095);
 
   /** Destructor.
    * @since version 0.1.0 */
   ~Node();
+
+  void set_addr(const std::string& host, long port);
 
   /** Return the identity of the peer.
    *
