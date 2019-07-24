@@ -76,7 +76,7 @@ static void qualified_path(const char *path, const char *ref, char *qualified)
             if (!p) p = ref;
 
             if (p - ref > 0)
-                strncpy(qualified, ref, p - ref);
+                snprintf(qualified, p - ref + 1, "%s", ref);
             else
                 *qualified = 0;
         } else {
