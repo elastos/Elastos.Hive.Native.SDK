@@ -1,3 +1,9 @@
+2019/08/05 Li Fenxiang lifenxiang@elastos.org
+
+**Version 0.1.2**, main feature list:
+
+- Improve DStore performance
+
 2019/05/05 Li Fenxiang lifenxiang@elastos.org
 
 **Version 0.1.1**, main feature list:
