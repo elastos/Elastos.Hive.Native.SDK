@@ -68,14 +68,14 @@ $ cd build
 Generate the Makefile in the current directory:
 
 ```shell
-$ cmake ..
+$ cmake -DBUILD_TESTING=FALSE ..
 $ make
 ```
 
 To be able to build a distribution and install it to the customized location, run the following commands:
 
 ```shell
-$ cmake -DCMAKE_INSTALL_PREFIX=YOUR-INSTALL-PATH ..
+$ cmake -DBUILD_TESTING=FALSE -DCMAKE_INSTALL_PREFIX=YOUR-INSTALL-PATH ..
 $ make install
 ```
 # Run Tests
