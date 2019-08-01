@@ -44,6 +44,7 @@ typedef struct {
 
 HiveClient *onedrive_client_new();
 HiveClient *ipfs_client_new();
+int hive_set_access_token_expired(HiveClient *client);
 int open_authorization_url(const char *url, void *context);
 char *get_random_file_name();
 int list_files_test_scheme(HiveDrive *drive, const char *dir,

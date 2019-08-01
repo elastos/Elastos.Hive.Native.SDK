@@ -240,3 +240,29 @@ HiveDrive *hive_drive_open(HiveClient *client)
 
     return drive;
 }
+
+int hive_set_access_token_expired(HiveClient *client) {
+    int rc;
+
+    if (!client) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
+        return -1;
+    }
+
+    if (!has_valid_token(client)) {
+        vlogE("Client: client not in valid state.");
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_READY));
+        return -1;
+    }
+
+    if (!client->expire_token)
+        return 0;
+
+    rc = client->expire_token(client);
+    if (rc < 0) {
+        hive_set_error(rc);
+        return -1;
+    }
+
+    return 0;
+}

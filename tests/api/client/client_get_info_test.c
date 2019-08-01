@@ -27,7 +27,7 @@
 #include "test_context.h"
 #include "test_helper.h"
 
-static void test_client_get_info(void)
+static void test_client_get_info_with_expired_token(void)
 {
     int rc;
     HiveClientInfo info;
@@ -35,12 +35,15 @@ static void test_client_get_info(void)
     rc = hive_client_login(test_ctx.client, open_authorization_url, NULL);
     CU_ASSERT_FATAL(rc == HIVEOK);
 
+    rc = hive_set_access_token_expired(test_ctx.client);
+    CU_ASSERT_FATAL(rc == HIVEOK);
+
     rc = hive_client_get_info(test_ctx.client, &info);
     CU_ASSERT_FATAL(rc == HIVEOK);
 }
 
 static CU_TestInfo cases[] = {
-    { "test_client_get_info",     test_client_get_info },
+    { "test_client_get_info_with_expired_token", test_client_get_info_with_expired_token },
     { NULL, NULL }
 };
 
