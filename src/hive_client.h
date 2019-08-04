@@ -56,6 +56,7 @@ struct HiveClient {
     int (*get_info)     (HiveClient *, HiveClientInfo *);
     int (*get_drive)    (HiveClient *, HiveDrive **);
     int (*close)        (HiveClient *);
+    int (*expire_token) (HiveClient *);
 };
 
 struct HiveDrive {
@@ -163,6 +164,9 @@ inline static bool is_absolute_path(const char *path)
 {
     return (path && path[0] == '/');
 }
+
+HIVE_API
+int hive_set_access_token_expired(HiveClient *client);
 
 #ifdef __cplusplus
 }

@@ -313,6 +313,14 @@ static void onedrive_client_destructor(void *obj)
         oauth_token_delete(client->token);
 }
 
+static int onedrive_client_expire_token(HiveClient *obj)
+{
+    OneDriveClient *client = (OneDriveClient *)obj;
+
+    oauth_token_set_expired(client->token);
+    return 0;
+}
+
 HiveClient *onedrive_client_new(const HiveOptions *options)
 {
     OneDriveOptions *opts = (OneDriveOptions *)options;
@@ -401,11 +409,12 @@ HiveClient *onedrive_client_new(const HiveOptions *options)
         return NULL;
     }
 
-    client->base.login       = onedrive_client_login;
-    client->base.logout      = onedrive_client_logout;
-    client->base.get_info    = onedrive_client_get_info;
-    client->base.get_drive   = onedrive_client_drive_open;
-    client->base.close       = onedrive_client_close;
+    client->base.login        = onedrive_client_login;
+    client->base.logout       = onedrive_client_logout;
+    client->base.get_info     = onedrive_client_get_info;
+    client->base.get_drive    = onedrive_client_drive_open;
+    client->base.close        = onedrive_client_close;
+    client->base.expire_token = onedrive_client_expire_token;
 
     return &client->base;
 }
