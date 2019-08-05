@@ -25,7 +25,7 @@ add_definitions(-DCURL_STATICLIB)
 # Find "JSON for Modern C++" (nlohmann/json.hpp)
 include_directories("include/hive")
 
-include_directories("include")
+include_directories(BEFORE "include")
 
 # Targets
 # cpp-hive-api

@@ -5,20 +5,26 @@
 #include <fstream>
 #include <memory>
 #include <string>
+#include <vector>
+#include <utility>
 
 #include <hive/c-api.h>
 #include <hive/message.h>
 
-DStoreC *dstore_create(const char *hive_conf) {
+DStoreC *dstore_create(dstorec_node *bootstraps, size_t sz) {
   try {
-    auto host_rand = hive_random_host(hive_conf);
-    if (!host_rand) return nullptr;
+    std::vector<dstore_node> ds_bootstraps;
 
-    auto ds = new DStore{host_rand, 9095};
+    if (!bootstraps || !sz)
+      return nullptr;
 
-    // Please replace this line
-    std::string uid = "uid-2041b18e-ca86-4962-9a21-d477f7f627ce";
-    ds->set_sender_UID(uid);
+    for (size_t i = 0; i < sz; ++i) {
+      ds_bootstraps.push_back(dstore_node {bootstraps[i].ipv4,
+                                           bootstraps[i].ipv6,
+                                           bootstraps[i].port});
+    }
+
+    auto ds = new DStore{std::move(ds_bootstraps)};
 
     return reinterpret_cast<DStoreC *>(ds);
   } catch (...) {
@@ -39,7 +45,9 @@ int dstore_get_values(DStoreC *dstore, const char *key,
   if (!dstore || !key || !*key || !callback) return -1;
 
   try {
-    const auto &dmsgs = ds->get_values(key);
+    const auto dmsgs = ds->get_values(key);
+    if (!dmsgs)
+        return -1;
     for (auto &dmsg : *dmsgs) {
       auto value = dmsg->value();
       bool cont = callback(key, reinterpret_cast<const uint8_t *>(value.data()),

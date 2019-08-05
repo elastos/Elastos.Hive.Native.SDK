@@ -39,6 +39,10 @@ Node::~Node() { delete http_; }
 
 void Node::Id(Json* id) { FetchAndParseJson(MakeUrl("id"), id); }
 
+void Node::set_addr(const std::string& host, long port) {
+  url_prefix_ = "http://" + host + ":" + std::to_string(port) + "/api/v0";
+}
+
 void Node::Version(Json* version) {
   FetchAndParseJson(MakeUrl("version"), version);
 }

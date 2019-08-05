@@ -105,7 +105,7 @@ matrix:
         - BUILD_DIR="${TRAVIS_BUILD_DIR}/../build"
         - mkdir -p "${BUILD_DIR}"
         - cd "${BUILD_DIR}"
-        - CCC_CXX=clang++-3.8 scan-build-3.8 --status-bugs cmake -DJSON_FOR_MODERN_CXX_INCLUDE_DIR:PATH="${TRAVIS_BUILD_DIR}/../include" -DBUILD_SHARED_LIBS:BOOL=ON "${SOURCE_DIR}"
+        - CCC_CXX=clang++-3.8 scan-build-3.8 --status-bugs cmake -DBUILD_TESTING=FALSE -DJSON_FOR_MODERN_CXX_INCLUDE_DIR:PATH="${TRAVIS_BUILD_DIR}/../include" -DBUILD_SHARED_LIBS:BOOL=ON "${SOURCE_DIR}"
         - CCC_CXX=clang++-3.8 scan-build-3.8 --status-bugs make VERBOSE=1
     - os: linux
       before_install:
@@ -171,7 +171,7 @@ matrix:
         - mkdir -p "${BUILD_DIR}"
         - cd "${BUILD_DIR}"
         - echo "CXXFLAGS='${CXXFLAGS}' LDFLAGS='${LDFLAGS}'"
-        - cmake -DJSON_FOR_MODERN_CXX_INCLUDE_DIR:PATH="${TRAVIS_BUILD_DIR}/../include" -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_BUILD_TYPE=Debug "${SOURCE_DIR}"
+        - cmake -DBUILD_TESTING=FALSE -DJSON_FOR_MODERN_CXX_INCLUDE_DIR:PATH="${TRAVIS_BUILD_DIR}/../include" -DBUILD_SHARED_LIBS:BOOL=ON -DCMAKE_BUILD_TYPE=Debug "${SOURCE_DIR}"
         - make VERBOSE=1
         - "${TRAVIS_BUILD_DIR}/.travis/ipfs_daemon_start.sh"
         - OK="no"
@@ -199,5 +199,5 @@ script:
   - mkdir -p "${BUILD_DIR}"
   - cd "${BUILD_DIR}"
   - echo "CXXFLAGS='${CXXFLAGS}' LDFLAGS='${LDFLAGS}'"
-  - cmake -DJSON_FOR_MODERN_CXX_INCLUDE_DIR:PATH="${TRAVIS_BUILD_DIR}/../include" -DBUILD_SHARED_LIBS:BOOL=ON "${CMAKE_EXTRA_ARGS_}" "${SOURCE_DIR}"
+  - cmake -DBUILD_TESTING=FALSE -DJSON_FOR_MODERN_CXX_INCLUDE_DIR:PATH="${TRAVIS_BUILD_DIR}/../include" -DBUILD_SHARED_LIBS:BOOL=ON "${CMAKE_EXTRA_ARGS_}" "${SOURCE_DIR}"
   - make VERBOSE=1
