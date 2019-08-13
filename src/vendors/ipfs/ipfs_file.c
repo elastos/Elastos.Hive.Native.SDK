@@ -354,6 +354,7 @@ int ipfs_file_open(ipfs_rpc_t *rpc, const char *path, int flags, HiveFile **file
     int rc;
     size_t fsz;
     bool file_exists;
+    ssize_t nwr;
 
     rc = get_file_stat(rpc, path, &fsz);
     if (rc < 0 && rc != HIVE_HTTP_STATUS_ERROR(HttpStatus_InternalServerError)) {
@@ -388,6 +389,13 @@ int ipfs_file_open(ipfs_rpc_t *rpc, const char *path, int flags, HiveFile **file
     tmp->base.close   = ipfs_file_close;
 
     tmp->rpc          = ref(rpc);
+    if (!file_exists || HIVE_F_IS_SET(flags, HIVE_F_TRUNC)) {
+        nwr = ipfs_file_write(&tmp->base, NULL, 0);
+        if (nwr < 0)  {
+            deref(tmp);
+            return (int)nwr;
+        }
+    }
     if (file_exists && HIVE_F_IS_SET(flags, HIVE_F_APPEND))
         tmp->lpos = fsz;
 
