@@ -138,7 +138,7 @@ static int create_upload_session(OneDriveFile *file,
 
     rc = http_client_request(httpc);
     if (rc) {
-        vlogE("OneDriveFile: failed to create http client instance.");
+        vlogE("OneDriveFile: failed to perform http request.");
         return HIVE_CURL_ERROR(rc);
     }
 
@@ -273,11 +273,53 @@ static int upload_to_session(OneDriveFile *file, http_client_t *httpc,
     return 0;
 }
 
+static int upload_empty_file(OneDriveFile *file, http_client_t *httpc)
+{
+    char url[MAX_URL_LEN] = {0};
+    long resp_code = 0;
+    int rc;
+
+    sprintf(url, "%s/root:%s:/content", MY_DRIVE, file->base.path);
+
+    http_client_set_url(httpc, url);
+    http_client_set_method(httpc, HTTP_METHOD_PUT);
+    http_client_set_header(httpc, "Authorization", get_bearer_token(file->token));
+    http_client_set_request_body_instant(httpc, NULL, 0);
+    if (file->ctag[0])
+        http_client_set_header(httpc, "if-match", file->ctag);
+
+    rc = http_client_request(httpc);
+    if (rc) {
+        vlogE("OneDriveFile: failed to perform http request.");
+        return HIVE_CURL_ERROR(rc);
+    }
+
+    rc = http_client_get_response_code(httpc, &resp_code);
+    if (rc) {
+        vlogE("OneDriveFile: failed to get http response code.");
+        return HIVE_CURL_ERROR(rc);
+    }
+
+    if (resp_code == HttpStatus_Unauthorized) {
+        vlogE("OneDriveFile: access token expired.");
+        oauth_token_set_expired(file->token);
+        return HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
+    }
+
+    if (resp_code != HttpStatus_Created && resp_code != HttpStatus_OK) {
+        vlogE("OneDriveFile: error from http response (%d).", resp_code);
+        return HIVE_HTTP_STATUS_ERROR(resp_code);
+    }
+
+    return 0;
+}
+
 static int upload_file(OneDriveFile *file)
 {
     http_client_t *httpc;
     char upload_url[MAX_URL_LEN] = {0};
     int rc;
+    size_t fsize;
 
     rc = oauth_token_check_expire(file->token);
     if (rc < 0) {
@@ -289,6 +331,18 @@ static int upload_file(OneDriveFile *file)
     if (!httpc) {
         vlogE("OneDriveFile: failed to create http client instance.");
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
+    }
+
+    fsize = lseek(file->fd, 0, SEEK_END);
+
+    if (!fsize) {
+        rc = upload_empty_file(file, httpc);
+        http_client_close(httpc);
+        if (rc < 0)
+            vlogE("OneDriveFile: failed to upload 0-length file.");
+        else
+            vlogI("OneDriveFile: Susscessfully uploaded temporary file to onedrive.");
+        return rc;
     }
 
     rc = create_upload_session(file, httpc, upload_url, sizeof(upload_url));
