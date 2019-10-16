@@ -48,11 +48,8 @@ static void config_destructor(void *p)
     if (config->logfile)
         free(config->logfile);
 
-    if (config->persistent_location)
-        free(config->persistent_location);
-
-    if (config->uid)
-        free(config->uid);
+    if (config->data_location)
+        free(config->data_location);
 
     if (config->ipfs_rpc_nodes) {
         int i;
@@ -144,21 +141,16 @@ cmd_cfg_t *load_config(const char *config_file)
         config->logfile = strdup(stropt);
     }
 
-    rc = config_lookup_string(&cfg, "persistent_location", &stropt);
+    rc = config_lookup_string(&cfg, "data_location", &stropt);
     if (!rc || !*stropt) {
-        fprintf(stderr, "Missing datadir option.\n");
+        fprintf(stderr, "Missing data_location option.\n");
         config_destroy(&cfg);
         deref(config);
         return NULL;
     } else {
         char path[PATH_MAX];
         qualified_path(stropt, config_file, path);
-        config->persistent_location = strdup(path);
-    }
-
-    rc = config_lookup_string(&cfg, "ipfs_uid", &stropt);
-    if (rc && *stropt) {
-        config->uid = strdup(stropt);
+        config->data_location = strdup(path);
     }
 
     rpc_nodes = config_lookup(&cfg, "ipfs_rpc_nodes");

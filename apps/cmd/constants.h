@@ -24,7 +24,7 @@
 #define __CONSTANTS_H__
 
 #define HIVETEST_REDIRECT_URL "http://localhost:12345"
-#define HIVETEST_SCOPE "User.Read Files.ReadWrite.All offline_access"
+#define HIVETEST_SCOPE "Files.ReadWrite.AppFolder offline_access"
 #define HIVETEST_ONEDRIVE_CLIENT_ID "afd3d647-a8b7-4723-bf9d-1b832f43b881"
 
 #endif // __CONSTANTS_H__

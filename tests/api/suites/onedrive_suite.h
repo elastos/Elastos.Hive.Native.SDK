@@ -20,18 +20,12 @@
  * SOFTWARE.
  */
 
-#ifndef __API_DRIVE_TEST_SUITES_H__
-#define __API_DRIVE_TEST_SUITES_H__
+#ifndef __ONEDRIVE_SUITE_H__
+#define __ONEDRIVE_SUITE_H__
 
-DECL_TESTSUITE_PER_BACKEND(drive_open_test)
-DECL_TESTSUITE_PER_BACKEND(drive_get_info_test)
-DECL_TESTSUITE_PER_BACKEND(list_files_test)
-DECL_TESTSUITE_PER_BACKEND(file_ops_test)
+#include "suite.h"
 
-#define DEFINE_DRIVE_TESTSUITES \
-    DEFINE_TESTSUITE_PER_BACKEND(drive_open_test), \
-    DEFINE_TESTSUITE_PER_BACKEND(drive_get_info_test), \
-    DEFINE_TESTSUITE_PER_BACKEND(list_files_test), \
-    DEFINE_TESTSUITE_PER_BACKEND(file_ops_test)
+DECL_TESTSUITE(onedrive)
+#define DEFINE_ONEDRIVE_TESTSUITE DEFINE_TESTSUITE(onedrive)
 
-#endif /* __API_DRIVE_TEST_SUITES_H__ */
+#endif /* __ONEDRIVE_SUITE_H__ */

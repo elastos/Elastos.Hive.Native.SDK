@@ -20,80 +20,63 @@
  * SOFTWARE.
  */
 
+#include <stdlib.h>
+
 #include <CUnit/Basic.h>
 #include <ela_hive.h>
 
-#include "config.h"
-#include "test_context.h"
-#include "test_helper.h"
-
-static void test_drive_get_info(void)
-{
-    HiveDriveInfo info;
-    int rc;
-
-    rc = hive_drive_get_info(test_ctx.drive, &info);
-    CU_ASSERT_FATAL(rc == HIVEOK);
-}
+#include "../cases/case.h"
+#include "../cases/ipfs_file_apis_cases.h"
+#include "../test_context.h"
+#include "../../config.h"
 
 static CU_TestInfo cases[] = {
-    { "test_drive_get_info", test_drive_get_info },
-    { NULL, NULL }
+    DEFINE_IPFS_FILE_APIS_CASES,
+    DEFINE_TESTCASE_NULL
 };
 
-CU_TestInfo *drive_get_info_test_get_cases(void)
+CU_TestInfo* ipfs_get_cases()
 {
     return cases;
 }
 
-int onedrive_drive_get_info_test_suite_init(void)
+int ipfs_suite_init()
 {
-    int rc;
+    int i;
 
-    test_ctx.client = onedrive_client_new();
-    if (!test_ctx.client)
+    HiveRpcNode *nodes = calloc(1, sizeof(HiveRpcNode) * global_config.ipfs_rpc_nodes_sz);
+    if (!nodes) {
+        CU_FAIL("Error: test suite initialize error");
         return -1;
+    }
 
-    rc = hive_client_login(test_ctx.client, open_authorization_url, NULL);
-    if (rc < 0)
-        return -1;
+    for (i = 0; i < global_config.ipfs_rpc_nodes_sz; ++i) {
+        HiveRpcNode *node = nodes + i;
 
-    test_ctx.drive = hive_drive_open(test_ctx.client);
-    if (!test_ctx.drive)
+        node->ipv4 = global_config.ipfs_rpc_nodes[i]->ipv4;
+        node->ipv6 = global_config.ipfs_rpc_nodes[i]->ipv6;
+        node->port = global_config.ipfs_rpc_nodes[i]->port;
+    }
+
+    IPFSConnectOptions opts = {
+        .backendType    = HiveBackendType_IPFS,
+        .rpc_node_count = global_config.ipfs_rpc_nodes_sz,
+        .rpcNodes       = nodes
+    };
+
+    test_ctx.connect = hive_client_connect(test_ctx.client, (HiveConnectOptions *)&opts);
+    free(nodes);
+    if (!test_ctx.connect) {
+        CU_FAIL("Error: test suite initialize error");
         return -1;
+    }
 
     return 0;
 }
 
-int onedrive_drive_get_info_test_suite_cleanup(void)
+int ipfs_suite_cleanup()
 {
-    test_context_cleanup();
-
-    return 0;
-}
-
-int ipfs_drive_get_info_test_suite_init(void)
-{
-    int rc;
-
-    test_ctx.client = ipfs_client_new();
-    if (!test_ctx.client)
-        return -1;
-
-    rc = hive_client_login(test_ctx.client, NULL, NULL);
-    if (rc < 0)
-        return -1;
-
-    test_ctx.drive = hive_drive_open(test_ctx.client);
-    if (!test_ctx.drive)
-        return -1;
-
-    return 0;
-}
-
-int ipfs_drive_get_info_test_suite_cleanup(void)
-{
-    test_context_cleanup();
+    test_context_reset();
 
     return 0;
 }

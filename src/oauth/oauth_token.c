@@ -564,7 +564,7 @@ static int decode_access_token(oauth_token_t *token, const char *json_str)
 
     // Parse 'expires_in' item.
     item = cJSON_GetObjectItemCaseSensitive(json, "expires_in");
-    if (!cJSON_IsNumber(item) || item->valuedouble < 0) {
+    if (!cJSON_IsNumber(item) || (long)item->valuedouble < 0) {
         vlogE("OauthToken: Json object named expires_in doesn't exist.");
         rc = HIVE_GENERAL_ERROR(HIVEERR_BAD_JSON_FORMAT);
         free(token_type);
@@ -849,15 +849,11 @@ int oauth_token_check_expire(oauth_token_t *token)
     if (!oauth_token_is_expired(token))
         return 0;
 
-    vlogI("OauthToken: Access token expired.");
 
     rc = refresh_access_token(token);
-    if (rc < 0) {
-        vlogE("OauthToken: Failed to refresh access token.");
+    if (rc < 0)
         return rc;
-    }
 
-    vlogI("OauthToken: Successfully refreshed access token.");
     return 0;
 }
 

@@ -41,17 +41,11 @@ typedef struct rpc_node {
 } rpc_node_t;
 
 typedef struct ipfs_rpc_options {
-    cJSON *store;
-    char uid[HIVE_MAX_IPFS_UID_LEN + 1];
     size_t rpc_nodes_count;
     rpc_node_t rpc_nodes[0];
 } ipfs_rpc_options_t;
 
-typedef int ipfs_rpc_writeback_func_t(const cJSON *json, void *user_data);
-
-ipfs_rpc_t *ipfs_rpc_new(ipfs_rpc_options_t *options,
-                         ipfs_rpc_writeback_func_t cb,
-                         void *user_data);
+ipfs_rpc_t *ipfs_rpc_new(ipfs_rpc_options_t *options, void *user_data);
 int ipfs_rpc_close(ipfs_rpc_t *rpc);
 int ipfs_rpc_synchronize(ipfs_rpc_t *rpc);
 int ipfs_rpc_reset(ipfs_rpc_t *rpc);

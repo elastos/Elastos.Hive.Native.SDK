@@ -27,7 +27,7 @@
 extern "C" {
 #endif
 
-HiveClient *onedrive_client_new(const HiveOptions *options);
+HiveConnect *onedrive_client_connect(HiveClient *, const HiveConnectOptions *);
 
 #ifdef __cplusplus
 }

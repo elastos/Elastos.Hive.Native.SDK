@@ -20,11 +20,16 @@
  * SOFTWARE.
  */
 
-#ifndef __HIVE_IPFS_FILE_H__
-#define __HIVE_IPFS_FILE_H__
+#ifndef __IPFS_FILE_APIS_CASES_H__
+#define __IPFS_FILE_APIS_CASES_H__
 
-#include "ipfs_rpc.h"
+#include "case.h"
 
-int ipfs_file_open(ipfs_rpc_t *rpc, const char *path, int flags, HiveFile **file);
+DECL_TESTCASE(ipfs_put_file_test)
+DECL_TESTCASE(ipfs_put_file_from_buffer_test)
 
-#endif // __HIVE_IPFS_FILE_H__
+#define DEFINE_IPFS_FILE_APIS_CASES      \
+    DEFINE_TESTCASE(ipfs_put_file_test), \
+    DEFINE_TESTCASE(ipfs_put_file_from_buffer_test)
+
+#endif /* __IPFS_FILE_APIS_CASES_H__ */

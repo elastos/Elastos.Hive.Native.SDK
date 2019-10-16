@@ -20,11 +20,17 @@
  * SOFTWARE.
  */
 
-#ifndef __CONSTANTS_H__
-#define __CONSTANTS_H__
+#ifndef __SUITES_H__
+#define __SUITES_H__
 
-#define HIVETEST_REDIRECT_URL "http://localhost:12345"
-#define HIVETEST_SCOPE "User.Read Files.ReadWrite.All offline_access"
-#define HIVETEST_ONEDRIVE_CLIENT_ID "afd3d647-a8b7-4723-bf9d-1b832f43b881"
+#include "suite.h"
+#include "ipfs_suite.h"
+#include "onedrive_suite.h"
 
-#endif // __CONSTANTS_H__
+TestSuite suites[] = {
+    DEFINE_ONEDRIVE_TESTSUITE,
+    DEFINE_IPFS_TESTSUITE,
+    DEFINE_TESTSUITE_NULL
+};
+
+#endif /* __SUITES_H__ */

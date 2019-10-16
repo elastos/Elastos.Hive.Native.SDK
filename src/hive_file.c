@@ -20,156 +20,439 @@
  * SOFTWARE.
  */
 
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#if defined(_WIN32) || defined(_WIN64)
+#include <io.h>
+#endif
+
+#include <stdlib.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <sys/stat.h>
+
 #include <crystal.h>
 
-#include "ela_hive.h"
-#include "hive_client.h"
 #include "hive_error.h"
+#include "hive_client.h"
 
-ssize_t hive_file_seek(HiveFile *file, ssize_t offset, Whence whence)
+int hive_put_file(HiveConnect *connect, const char *from, bool encrypt,
+                  const char *filename)
 {
-    ssize_t rc;
+    ssize_t nrd;
+    void *buf;
+    size_t fsize;
+    int rc;
+    int fd;
 
-    if (!file || (whence < HiveSeek_Set || whence > HiveSeek_End)) {
-        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
-        return (ssize_t)-1;
-    }
-
-    if (!file->lseek) {
-        vlogE("File: file type does not support this method.");
-        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED));
-        return (ssize_t)-1;
-    }
-
-    rc = file->lseek(file, offset, whence);
-    if (rc < 0) {
-        vlogE("File: failed to set file position.");
-        hive_set_error((int)rc);
-        return (ssize_t)-1;
-    }
-
-    return rc;
-}
-
-ssize_t hive_file_read(HiveFile *file, char *buf, size_t bufsz)
-{
-    ssize_t rc;
-
-    if (!file || !buf || !bufsz || HIVE_F_IS_SET(file->flags, HIVE_F_WRONLY)) {
+    if (!connect || !from || !*from || !filename || !*filename) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
     }
 
-    if (!file->read) {
-        vlogE("File: file type does not support this method.");
-        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED));
+    fd = open(from, O_RDONLY);
+    if (fd < 0) {
+        hive_set_error(HIVE_SYS_ERROR(errno));
         return -1;
     }
 
-    rc = file->read(file, buf, bufsz);
-    if (rc < 0) {
-        vlogE("File: Failed to read from file.");
-        hive_set_error((int)rc);
+    fsize = lseek(fd, 0, SEEK_END);
+    lseek(fd, 0, SEEK_SET);
+
+    if (fsize > HIVE_MAX_FILE_SIZE) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_LIMIT_EXCEEDED));
+        close(fd);
         return -1;
     }
+
+    buf = (uint8_t *)calloc(1, fsize);
+    if (!buf) {
+        close(fd);
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY));
+        return -1;
+    }
+
+    nrd = read(fd, buf,
+#if defined(_WIN32) || defined(_WIN64)
+               (unsigned)
+#endif
+               fsize);
+    close(fd);
+
+    if (nrd != fsize) {
+        free(buf);
+        hive_set_error(HIVE_SYS_ERROR(errno));
+        return -1;
+    }
+
+    rc = hive_put_file_from_buffer(connect, buf, fsize, encrypt, filename);
+    free(buf);
 
     return rc;
 }
 
-ssize_t hive_file_write(HiveFile *file, const char *buf, size_t bufsz)
-{
-    ssize_t rc;
-
-    if (!file || !buf || !bufsz ||
-        (!HIVE_F_IS_SET(file->flags, HIVE_F_WRONLY) &&
-         !HIVE_F_IS_SET(file->flags, HIVE_F_RDWR))) {
-        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
-        return -1;
-    }
-
-    if (!file->write) {
-        vlogE("File: file type does not support this method.");
-        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED));
-        return -1;
-    }
-
-    rc = file->write(file, buf, bufsz);
-    if (rc < 0) {
-        vlogE("File: Failed to write to file.");
-        hive_set_error((int)rc);
-        return -1;
-    }
-
-    return rc;
-}
-
-int hive_file_close(HiveFile *file)
+int hive_put_file_from_buffer(HiveConnect *connect, const void *from, size_t length,
+                              bool encrypt, const char *filename)
 {
     int rc;
 
-    if (!file)
-        return HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS);
+    if (!connect || (!from && length) || length > HIVE_MAX_FILE_SIZE ||
+        !filename || !*filename) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
+        return -1;
+    }
 
-    rc = file->close(file);
+    if (!connect->put_file_from_buffer) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED));
+        return -1;
+    }
+
+    rc = connect->put_file_from_buffer(connect, from, length, encrypt, filename);
     if (rc < 0) {
-        vlogE("File: Failed to close file.");
         hive_set_error(rc);
         return -1;
     }
 
-    return rc;
+    return 0;
 }
 
-int hive_file_commit(HiveFile *file)
+ssize_t hive_get_file_length(HiveConnect *connect, const char *filename)
 {
-    int rc;
+    ssize_t rc;
 
-    if (!file || (!HIVE_F_IS_SET(file->flags, HIVE_F_WRONLY) &&
-                  !HIVE_F_IS_SET(file->flags, HIVE_F_RDWR))) {
+    if (!connect || !filename || !*filename) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
     }
 
-    if (!file->commit) {
-        vlogE("File: file type does not support this method.");
+    if (!connect->get_file_length) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED));
         return -1;
     }
 
-    rc = file->commit(file);
+    rc = connect->get_file_length(connect, filename);
     if (rc < 0) {
-        vlogE("File: Failed to commit file (%d).", rc);
-        hive_set_error(rc);
+        hive_set_error((int)rc);
         return -1;
     }
 
     return rc;
 }
 
-int hive_file_discard(HiveFile *file)
+ssize_t hive_get_file_to_buffer(HiveConnect *connect, const char *filename,
+                                  bool decrypt, void *to, size_t buflen)
 {
-    int rc;
+    ssize_t rc;
 
-    vlogD("File: Calling hive_file_discard().");
-
-    if (!file || (!HIVE_F_IS_SET(file->flags, HIVE_F_WRONLY) &&
-                  !HIVE_F_IS_SET(file->flags, HIVE_F_RDWR))) {
+    if (!connect || !filename || !*filename || !to || !buflen) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
         return -1;
     }
 
-    if (!file->discard) {
-        vlogE("File: file type does not support this method.");
+    if (!connect->get_file_to_buffer) {
         hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED));
         return -1;
     }
 
-    rc = file->discard(file);
+    rc = connect->get_file_to_buffer(connect, filename, decrypt, to, buflen);
     if (rc < 0) {
-        vlogE("File: Failed to discard file (%d).", rc);
-        hive_set_error(rc);
+        hive_set_error((int)rc);
         return -1;
     }
 
     return rc;
 }
+
+ssize_t hive_get_file(HiveConnect *connect, const char *filename, bool decrypt,
+                      const char *to)
+{
+    ssize_t fsize;
+    uint8_t *buf;
+    ssize_t nwr;
+    int fd;
+
+    if (!connect || !filename || !*filename || !to || !*to) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
+        return -1;
+    }
+
+    fsize = hive_get_file_length(connect, filename);
+    if (fsize < 0)
+        return -1;
+
+    fd = open(to, O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+    if (fd < 0) {
+        hive_set_error(HIVE_SYS_ERROR(errno));
+        return -1;
+    }
+
+    if (!fsize) {
+        close(fd);
+        return 0;
+    }
+
+    buf = (uint8_t *)calloc(1, fsize);
+    if (!buf) {
+        close(fd);
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY));
+        return -1;
+    }
+
+    fsize = hive_get_file_to_buffer(connect, filename, decrypt, buf, (size_t)fsize);
+    if (fsize < 0) {
+        close(fd);
+        free(buf);
+        return -1;
+    }
+
+    nwr = write(fd, buf,
+#if defined(_WIN32) || defined(_WIN64)
+                (unsigned)
+#endif
+                fsize);
+    free(buf);
+    close(fd);
+
+    if (nwr != fsize) {
+        unlink(filename);
+        hive_set_error(HIVE_SYS_ERROR(errno));
+        return -1;
+    }
+
+    return fsize;
+}
+
+int hive_ipfs_put_file(HiveConnect *connect, const char *from, bool encrypt,
+                       IPFSCid *cid)
+{
+    ssize_t nrd;
+    uint8_t *buf;
+    size_t fsize;
+    int rc;
+    int fd;
+
+    if (!connect || !from || !*from || !cid) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
+        return -1;
+    }
+
+    fd = open(from, O_RDONLY);
+    if (fd < 0) {
+        hive_set_error(HIVE_SYS_ERROR(errno));
+        return -1;
+    }
+
+    fsize = lseek(fd, 0, SEEK_END);
+    lseek(fd, 0, SEEK_SET);
+
+    if (fsize > HIVE_MAX_FILE_SIZE) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_LIMIT_EXCEEDED));
+        close(fd);
+        return -1;
+    }
+
+    buf = (uint8_t *)calloc(1, fsize);
+    if (!buf) {
+        close(fd);
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY));
+        return -1;
+    }
+
+    nrd = read(fd, buf,
+#if defined(_WIN32) || defined(_WIN64)
+               (unsigned)
+#endif
+               fsize);
+    close(fd);
+
+    if (nrd != fsize) {
+        free(buf);
+        hive_set_error(HIVE_SYS_ERROR(errno));
+        return -1;
+    }
+
+    rc = hive_ipfs_put_file_from_buffer(connect, buf, fsize, encrypt, cid);
+    free(buf);
+
+    return rc;
+}
+
+int hive_ipfs_put_file_from_buffer(HiveConnect *connect, const void *from,
+                                   size_t length, bool encrypt, IPFSCid *cid)
+{
+    int rc;
+
+    if (!connect || (!from && length) || length > HIVE_MAX_FILE_SIZE || !cid) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
+        return -1;
+    }
+
+    if (!connect->ipfs_put_file_from_buffer) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED));
+        return -1;
+    }
+
+    rc = connect->ipfs_put_file_from_buffer(connect, from, length, encrypt, cid);
+    if (rc < 0) {
+        hive_set_error(rc);
+        return -1;
+    }
+
+    return 0;
+}
+
+ssize_t hive_ipfs_get_file_length(HiveConnect *connect, const IPFSCid *cid)
+{
+    ssize_t rc;
+
+    if (!connect || !cid || !cid->content[0]) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
+        return -1;
+    }
+
+    if (!connect->ipfs_get_file_length) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED));
+        return -1;
+    }
+
+    rc = connect->ipfs_get_file_length(connect, cid);
+    if (rc < 0) {
+        hive_set_error((int)rc);
+        return -1;
+    }
+
+    return rc;
+}
+
+ssize_t hive_ipfs_get_file_to_buffer(HiveConnect *connect, const IPFSCid *cid,
+                                     bool decrypt, void *to, size_t buflen)
+{
+    ssize_t rc;
+
+    if (!connect || !cid || !cid->content[0] || !to || !buflen) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
+        return -1;
+    }
+
+    if (!connect->ipfs_get_file_to_buffer) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED));
+        return -1;
+    }
+
+    rc = connect->ipfs_get_file_to_buffer(connect, cid, decrypt, to, buflen);
+    if (rc < 0) {
+        hive_set_error((int)rc);
+        return -1;
+    }
+
+    return rc;
+}
+
+ssize_t hive_ipfs_get_file(HiveConnect *connect, const IPFSCid *cid, bool decrypt,
+                           const char *to)
+{
+    ssize_t fsize;
+    uint8_t *buf;
+    ssize_t nwr;
+    int fd;
+
+    if (!connect || !cid || !cid->content[0] || !to || !*to) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
+        return -1;
+    }
+
+    fsize = hive_ipfs_get_file_length(connect, cid);
+    if (fsize < 0)
+        return -1;
+
+    fd = open(to, O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+    if (fd < 0) {
+        hive_set_error(HIVE_SYS_ERROR(errno));
+        return -1;
+    }
+
+    if (!fsize) {
+        close(fd);
+        return 0;
+    }
+
+    buf = (uint8_t *)calloc(1, fsize);
+    if (!buf) {
+        close(fd);
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY));
+        return -1;
+    }
+
+    fsize = connect->ipfs_get_file_to_buffer(connect, cid, decrypt, buf, fsize);
+    if (fsize < 0) {
+        close(fd);
+        free(buf);
+        hive_set_error((int)fsize);
+        return -1;
+    }
+
+    nwr = write(fd, buf,
+#if defined(_WIN32) || defined(_WIN64)
+                (unsigned)
+#endif
+                fsize);
+    free(buf);
+    close(fd);
+
+    if (nwr != fsize) {
+        hive_set_error(HIVE_SYS_ERROR(errno));
+        unlink(to);
+        return -1;
+    }
+
+    return fsize;
+}
+
+int hive_delete_file(HiveConnect *connect, const char *filename)
+{
+    int rc;
+
+    if (!connect || !filename || !*filename) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
+        return -1;
+    }
+
+    if (!connect->delete_file) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED));
+        return -1;
+    }
+
+    rc = connect->delete_file(connect, filename);
+    if (rc < 0) {
+        hive_set_error(rc);
+        return -1;
+    }
+
+    return 0;
+}
+
+int hive_list_files(HiveConnect *connect, HiveFilesIterateCallback *callback,
+                    void *context)
+{
+    int rc;
+
+    if (!connect || !callback) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_INVALID_ARGS));
+        return -1;
+    }
+
+    if (!connect->list_files) {
+        hive_set_error(HIVE_GENERAL_ERROR(HIVEERR_NOT_SUPPORTED));
+        return -1;
+    }
+
+    rc = connect->list_files(connect, callback, context);
+    if (rc < 0) {
+        hive_set_error(rc);
+        return -1;
+    }
+
+    return 0;
+}
+

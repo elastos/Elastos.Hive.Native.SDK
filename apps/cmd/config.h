@@ -31,9 +31,7 @@ typedef struct {
     int loglevel;
     char *logfile;
 
-    char *persistent_location;
-
-    char *uid;
+    char *data_location;
 
     int ipfs_rpc_nodes_sz;
     HiveRpcNode **ipfs_rpc_nodes;

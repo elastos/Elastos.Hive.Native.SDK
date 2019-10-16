@@ -43,18 +43,19 @@
 #include <CUnit/Basic.h>
 
 #include "config.h"
-#include "suites.h"
+#include "suites/suites.h"
+#include "test_context.h"
 
 #define CONFIG_NAME   "tests.conf"
 
 static const char *default_config_files[] = {
-        "./"CONFIG_NAME,
-        "../etc/hive/"CONFIG_NAME,
+    "./"CONFIG_NAME,
+    "../etc/hive/"CONFIG_NAME,
 #if !defined(_WIN32) && !defined(_WIN64)
-        "/usr/local/etc/hive/"CONFIG_NAME,
-        "/etc/hive/"CONFIG_NAME,
+    "/usr/local/etc/hive/"CONFIG_NAME,
+    "/etc/hive/"CONFIG_NAME,
 #endif
-        NULL
+    NULL
 };
 
 static void signal_handler(int signum)
@@ -96,10 +97,10 @@ void config_update(int argc, char *argv[])
     int opt;
     int idx;
     struct option cmd_options[] = {
-            { "log-level",      required_argument,  NULL, 1 },
-            { "log-file",       required_argument,  NULL, 2 },
-            { "data-dir",       required_argument,  NULL, 3 },
-            { NULL,             0,                  NULL, 0 }
+        { "log-level",      required_argument,  NULL, 1 },
+        { "log-file",       required_argument,  NULL, 2 },
+        { "data-location",       required_argument,  NULL, 3 },
+        { NULL,             0,                  NULL, 0 }
     };
 
     optind = 0;
@@ -121,11 +122,11 @@ void config_update(int argc, char *argv[])
             break;
 
         case 3:
-            if (global_config.data_dir)
-                free(global_config.data_dir);
+            if (global_config.data_location)
+                free(global_config.data_location);
 
             qualified_path(optarg, NULL, path);
-            global_config.data_dir = strdup(path);
+            global_config.data_location = strdup(path);
             break;
 
         default:
@@ -180,7 +181,7 @@ int test_main(int argc, char *argv[])
         { "config",    required_argument, NULL, 'c' },
         { "log-level", required_argument, NULL, 1 },
         { "log-file",  required_argument, NULL, 2 },
-        { "data-dir",  required_argument, NULL, 3 },
+        { "data-location",  required_argument, NULL, 3 },
         { "debug",     no_argument,       NULL, 4 },
         { NULL,        0,                 NULL, 0 }
     };
@@ -232,18 +233,17 @@ int test_main(int argc, char *argv[])
 
     config_update(argc, argv);
 
-    rc = mkdir(global_config.data_dir, S_IRWXU);
-    if (rc < 0 && errno != EEXIST) {
-        fprintf(stderr, "Creating data dir failed !\n");
-        config_deinit();
-        return -1;
-    }
-
-    ela_log_init(global_config.loglevel,
-                 global_config.log2file ? global_config.logfile : NULL,
-                 NULL);
+    hive_log_init(global_config.loglevel,
+                  global_config.log2file ? global_config.logfile : NULL,
+                  NULL);
 
     if (CUE_SUCCESS != CU_initialize_registry()) {
+        config_deinit();
+        return CU_get_error();
+    }
+
+    rc = test_context_init();
+    if (rc < 0) {
         config_deinit();
         return CU_get_error();
     }
@@ -263,6 +263,7 @@ int test_main(int argc, char *argv[])
                               suites[suite_idx].pClean);
         if (NULL == pSuite) {
             config_deinit();
+            test_context_deinit();
             CU_cleanup_registry();
             return CU_get_error();
         }
@@ -279,6 +280,7 @@ int test_main(int argc, char *argv[])
                             ti[cases_order[j]].pTestFunc) == NULL) {
                 CU_cleanup_registry();
                 config_deinit();
+                test_context_deinit();
                 return CU_get_error();
             }
         }
@@ -295,6 +297,7 @@ int test_main(int argc, char *argv[])
 
     CU_cleanup_registry();
     config_deinit();
+    test_context_deinit();
     return fail_cnt;
 }
 

@@ -26,14 +26,17 @@
 #include <ela_hive.h>
 
 typedef struct {
-    HiveClient *client;
-    HiveDrive  *drive;
-    HiveFile   *file;
-    void       *ext;
+    HiveClient  *client;
+    HiveConnect *connect;
+    void        *ext;
 } test_context;
 
 extern test_context test_ctx;
 
-void test_context_cleanup();
+void test_context_reset();
+
+int test_context_init();
+
+void test_context_deinit();
 
 #endif // __TEST_CONTEXT_H__

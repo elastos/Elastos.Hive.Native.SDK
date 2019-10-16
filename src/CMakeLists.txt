@@ -51,24 +51,17 @@ endif()
 
 set(SRC
     hive_error.c
-    hive_file.c
-    hive_drive.c
     hive_client.c
+    hive_file.c
+    hive_key.c
     http_status.c
     mkdirs.c
     sandbird/sandbird.c
     http/http_client.c
     oauth/oauth_token.c
-    vendors/ipfs/ipfs_client.c
-    vendors/ipfs/ipfs_drive.c
-    vendors/ipfs/ipfs_file.c
+    vendors/ipfs/ipfs.c
     vendors/ipfs/ipfs_rpc.c
-    vendors/ipfs/ipfs_utils.c
-    vendors/onedrive/onedrive_client.c
-    vendors/onedrive/onedrive_drive.c
-    vendors/onedrive/onedrive_file.c
-    vendors/native/native_client.c
-    vendors/owncloud/owncloud.c)
+    vendors/onedrive/onedrive.c)
 
 set(HEADERS
     ela_hive.h)
