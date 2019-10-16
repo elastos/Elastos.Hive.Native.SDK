@@ -22,21 +22,41 @@
 
 #include <string.h>
 
+#include <ela_hive.h>
+
 #include "test_context.h"
+#include "../config.h"
 
 test_context test_ctx;
 
-void test_context_cleanup()
+void test_context_reset()
 {
-    if (test_ctx.file)
-        hive_file_close(test_ctx.file);
+    HiveClient *client = test_ctx.client;
 
-    if (test_ctx.drive)
-        hive_drive_close(test_ctx.drive);
+    if (test_ctx.connect)
+        hive_client_disconnect(test_ctx.connect);
+
+    memset(&test_ctx, 0, sizeof(test_ctx));
+
+    test_ctx.client = client;
+}
+
+int test_context_init()
+{
+    HiveOptions opts = {
+        .data_location = global_config.data_location
+    };
+
+    test_ctx.client = hive_client_new(&opts);
+
+    return test_ctx.client ? 0 : -1;
+}
+
+void test_context_deinit()
+{
+    if (test_ctx.connect)
+        hive_client_disconnect(test_ctx.connect);
 
     if (test_ctx.client)
         hive_client_close(test_ctx.client);
-
-    memset(&test_ctx, 0, sizeof(test_ctx));
 }
-

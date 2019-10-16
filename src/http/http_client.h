@@ -75,6 +75,7 @@ int http_client_get_scheme(http_client_t *, char **scheme);
 int http_client_get_host(http_client_t *, char **host);
 int http_client_get_port(http_client_t *, char **port);
 int http_client_get_path(http_client_t *, char **path);
+int http_client_get_query(http_client_t *, char **query);
 
 /*
  * Http client request/response body.
@@ -90,7 +91,7 @@ typedef size_t (*http_client_response_body_callback_t)(char *buffer,
 typedef size_t (*http_client_response_header_callback_t)(char *buffer,
     size_t size, size_t nitems, void *userdata);
 
-int http_client_set_request_body_instant(http_client_t *, void *data, size_t len);
+int http_client_set_request_body_instant(http_client_t *, const void *data, size_t len);
 int http_client_set_request_body(http_client_t *,
     http_client_request_body_callback_t cb, void *userdata);
 int http_client_set_response_header(http_client_t *client,

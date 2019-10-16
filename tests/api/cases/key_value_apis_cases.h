@@ -20,19 +20,14 @@
  * SOFTWARE.
  */
 
-#ifndef __OWNCLOUD_CLIENT_H__
-#define __OWNCLOUD_CLIENT_H__
+#ifndef __KEY_VALUE_APIS_CASES_H__
+#define __KEY_VALUE_APIS_CASES_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "case.h"
 
-#include "ela_hive.h"
+DECL_TESTCASE(key_value_apis_test)
 
-HiveClient *owncloud_client_new(const  HiveOptions *);
+#define DEFINE_KEY_APIS_CASES \
+    DEFINE_TESTCASE(key_value_apis_test)
 
-#ifdef __cplusplus
-}
-#endif
-
-#endif // __OWNCLOUD_CLIENT_H__
+#endif /* __KEY_VALUE_APIS_CASES_H__ */

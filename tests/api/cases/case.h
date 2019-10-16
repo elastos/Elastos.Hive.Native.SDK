@@ -20,20 +20,24 @@
  * SOFTWARE.
  */
 
-#ifndef __HIVEIPFS_DRIVE_H__
-#define __HIVEIPFS_DRIVE_H__
+#ifndef __CASE_H__
+#define __CASE_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <CUnit/Basic.h>
 
-#include "ela_hive.h"
-#include "ipfs_rpc.h"
+#define DECL_TESTCASE(name) \
+    void name(void);
 
-HiveDrive *ipfs_drive_open(ipfs_rpc_t *rpc);
+#define DEFINE_TESTCASE(name) \
+    {                         \
+        .pName     = #name,   \
+        .pTestFunc = name     \
+    }
 
-#ifdef __cplusplus
-}
-#endif
+#define DEFINE_TESTCASE_NULL \
+    {                        \
+        .pName     = NULL,   \
+        .pTestFunc = NULL    \
+    }
 
-#endif // __HIVEIPFS_DRIVE_H__
+#endif /* __CASE_H__ */

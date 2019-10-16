@@ -53,15 +53,13 @@ if(HAVE_SIGACTION_H)
     add_definitions(-DHAVE_SIGACTION=1)
 endif()
 
-aux_source_directory(api/client CLIENT_CASES)
-aux_source_directory(api/drive DRIVE_CASES)
-aux_source_directory(api/file FILE_CASES)
+aux_source_directory(api/cases CASES)
+aux_source_directory(api/suites SUITES)
 
 set(SRC
     main.c
     config.c
     launcher.c
-    test_helper.c
     api/tests.c
     api/test_context.c)
 
@@ -122,9 +120,8 @@ link_directories(
 
 add_executable(hivetests
     ${SRC}
-    ${CLIENT_CASES}
-    ${DRIVE_CASES}
-    ${FILE_CASES})
+    ${CASES}
+    ${SUITES})
 
 add_dependencies(hivetests ${DEPS})
 target_link_libraries(hivetests ${LIBS})

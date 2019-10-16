@@ -84,7 +84,7 @@ int main(int argc, char *argv[])
         { "debug",     no_argument,       NULL, 2 },
         { "log-level", required_argument, NULL, 3 },
         { "log-file",  required_argument, NULL, 4 },
-        { "data-dir",  required_argument, NULL, 5 },
+        { "data-location",  required_argument, NULL, 5 },
         { "help",      no_argument,       NULL, 'h' },
         { "config",    required_argument, NULL, 'c' },
         { NULL,        0,                 NULL, 0 }

@@ -55,16 +55,16 @@ HIVE_MAX_FILE_TYPE_LEN
 Data types
 ----------
 
-ElaLogLevel
+HiveLogLevel
 ###########
 
-.. doxygenenum:: ElaLogLevel
+.. doxygenenum:: HiveLogLevel
    :project: HiveAPI
 
-HiveDriveType
+HiveBackendType
 #############
 
-.. doxygenenum:: HiveDriveType
+.. doxygenenum:: HiveBackendType
    :project: HiveAPI
 
 HiveOptions
@@ -74,10 +74,10 @@ HiveOptions
    :project: HiveAPI
    :members:
 
-OneDriveOptions
+OneDriveConnectOptions
 ###############
 
-.. doxygenstruct:: OneDriveOptions
+.. doxygenstruct:: OneDriveConnectOptions
    :project: HiveAPI
    :members:
 
@@ -88,10 +88,10 @@ HiveRpcNode
    :project: HiveAPI
    :members:
 
-IPFSOptions
+IPFSConnectOptions
 ###########
 
-.. doxygenstruct:: IPFSOptions
+.. doxygenstruct:: IPFSConnectOptions
    :project: HiveAPI
    :members:
 
@@ -282,10 +282,10 @@ hive_file_discard
 Utility functions
 #################
 
-ela_log_init
+hive_log_init
 ~~~~~~~~~~~~
 
-.. doxygenfunction:: ela_log_init
+.. doxygenfunction:: hive_log_init
    :project: HiveAPI
 
 hive_get_error

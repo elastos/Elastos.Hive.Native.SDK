@@ -88,8 +88,8 @@ void config_deinit()
     if (global_config.logfile)
         free(global_config.logfile);
 
-    if (global_config.data_dir)
-        free(global_config.data_dir);
+    if (global_config.data_location)
+        free(global_config.data_location);
 
     if (global_config.ipfs_rpc_nodes) {
         int i;
@@ -135,7 +135,7 @@ test_cfg_t *load_config(const char *config_file)
     global_config.log2file = 0;
     config_lookup_int(&cfg, "log2file", &global_config.log2file);
 
-    rc = config_lookup_string(&cfg, "data-dir", &stropt);
+    rc = config_lookup_string(&cfg, "data-location", &stropt);
     if (!rc || !*stropt) {
         fprintf(stderr, "Missing datadir option.\n");
         config_destroy(&cfg);
@@ -144,7 +144,7 @@ test_cfg_t *load_config(const char *config_file)
     } else {
         char path[PATH_MAX];
         qualified_path(stropt, config_file, path);
-        global_config.data_dir = strdup(path);
+        global_config.data_location = strdup(path);
     }
 
     global_config.shuffle = 0;

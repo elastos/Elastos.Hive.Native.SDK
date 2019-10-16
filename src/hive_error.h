@@ -27,6 +27,10 @@
 extern "C" {
 #endif
 
+#if defined(_WIN32) || defined(_WIN64)
+#include <crystal.h>
+#endif
+
 void hive_set_error(int err);
 
 typedef int strerror_func_t(int errnum, char *, size_t);

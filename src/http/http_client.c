@@ -483,6 +483,22 @@ int http_client_get_path(http_client_t *client, char **path)
     return 0;
 }
 
+int http_client_get_query(http_client_t *client, char **query)
+{
+    CURLUcode code;
+
+    assert(client);
+    assert(query);
+
+    code = curl_url_get(client->url, CURLUPART_QUERY, query, CURLU_URLDECODE);
+    if (code != CURLUE_OK)  {
+        vlogE("HttpClient: Get url from curl error (%d)", code);
+        return code;
+    }
+
+    return 0;
+}
+
 int http_client_set_path(http_client_t *client, const char *path)
 {
     CURLUcode code;
@@ -576,7 +592,7 @@ int http_client_set_version(http_client_t *client, http_version_t version)
 }
 
 int http_client_set_request_body_instant(http_client_t *client,
-                                         void *data, size_t len)
+                                         const void *data, size_t len)
 {
     assert(client);
 
@@ -798,7 +814,7 @@ int http_client_set_mime_instant(http_client_t *client, const char *name,
     part = curl_mime_addpart(client->mime);
     curl_mime_name(part, name);
     curl_mime_filename(part, filename);
-    curl_mime_type(part,type);
+    curl_mime_type(part, type);
     curl_mime_data(part, buffer, bufsz);
 
     return 0;

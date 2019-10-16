@@ -20,16 +20,30 @@
  * SOFTWARE.
  */
 
-#include <stdlib.h>
-#include <assert.h>
+#ifndef __FILE_APIS_CASES_H__
+#define __FILE_APIS_CASES_H__
 
-#include "owncloud.h"
+#include "case.h"
 
-HiveClient *owncloud_client_new(const HiveOptions *options)
-{
-    assert(options);
-    (void)options;
+DECL_TESTCASE(put_file_test)
+DECL_TESTCASE(double_put_file_test)
+DECL_TESTCASE(put_file_from_buffer_test)
+DECL_TESTCASE(double_put_file_from_buffer_test)
+DECL_TESTCASE(get_nonexist_file_length_test)
+DECL_TESTCASE(get_nonexist_file_to_buffer_test)
+DECL_TESTCASE(get_file_test)
+DECL_TESTCASE(get_nonexist_file_test)
+DECL_TESTCASE(delete_nonexist_file_test)
 
-    // TODO;
-    return NULL;
-}
+#define DEFINE_FILE_APIS_CASES                         \
+    DEFINE_TESTCASE(put_file_test),                    \
+    DEFINE_TESTCASE(double_put_file_test),             \
+    DEFINE_TESTCASE(put_file_from_buffer_test),        \
+    DEFINE_TESTCASE(double_put_file_from_buffer_test), \
+    DEFINE_TESTCASE(get_nonexist_file_length_test),    \
+    DEFINE_TESTCASE(get_nonexist_file_to_buffer_test), \
+    DEFINE_TESTCASE(get_file_test),                    \
+    DEFINE_TESTCASE(get_nonexist_file_test),           \
+    DEFINE_TESTCASE(delete_nonexist_file_test)
+
+#endif /* __FILE_APIS_CASES_H__ */

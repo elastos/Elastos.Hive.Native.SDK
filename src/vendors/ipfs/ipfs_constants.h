@@ -35,12 +35,11 @@ extern "C" {
 
 #define HIVE_MAX_IPV4_ADDRESS_LEN (15)
 #define HIVE_MAX_IPV6_ADDRESS_LEN (47)
-#define HIVE_MAX_IPFS_UID_LEN     (127)
 
-#define RC_NODE_UNREACHABLE(rc)                             \
-    ((rc) == HIVE_CURL_ERROR(CURLE_COULDNT_CONNECT)      || \
-     (rc) == HIVE_CURL_ERROR(CURLE_REMOTE_ACCESS_DENIED) || \
-     (rc) == HIVE_CURL_ERROR(CURLE_OPERATION_TIMEDOUT))
+#define RC_NODE_UNREACHABLE(rc)            \
+    ((rc) == CURLE_COULDNT_CONNECT      || \
+     (rc) == CURLE_REMOTE_ACCESS_DENIED || \
+     (rc) == CURLE_OPERATION_TIMEDOUT)
 
 #ifdef __cplusplus
 }

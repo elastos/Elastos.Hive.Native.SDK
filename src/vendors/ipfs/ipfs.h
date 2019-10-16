@@ -20,12 +20,20 @@
  * SOFTWARE.
  */
 
-#ifndef __API_FILE_TEST_SUITES_H__
-#define __API_FILE_TEST_SUITES_H__
+#ifndef __IPFS_CLIENT_H__
+#define __IPFS_CLIENT_H__
 
-DECL_TESTSUITE_PER_BACKEND(file_apis_test)
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#define DEFINE_FILE_TESTSUITES \
-    DEFINE_TESTSUITE_PER_BACKEND(file_apis_test)
+#include "ela_hive.h"
+#include "http_client.h"
 
-#endif /* __API_FILE_TEST_SUITES_H__ */
+HiveConnect *ipfs_client_connect(HiveClient *client, const HiveConnectOptions *options_base);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // __IPFS_CLIENT_H__
