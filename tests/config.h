@@ -34,7 +34,7 @@ typedef struct {
     char *data_location;
     int shuffle;
     int ipfs_rpc_nodes_sz;
-    HiveRpcNode **ipfs_rpc_nodes;
+    IPFSNode **ipfs_rpc_nodes;
 } test_cfg_t;
 
 extern test_cfg_t global_config;

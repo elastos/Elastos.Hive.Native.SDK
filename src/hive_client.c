@@ -40,7 +40,7 @@ typedef struct FactoryMethod {
 static FactoryMethod factory_methods[] = {
     {HiveBackendType_IPFS,     ipfs_client_connect     },
     {HiveBackendType_OneDrive, onedrive_client_connect },
-    {HiveDriveType_Butt,      NULL }
+    {HiveBackendType_Butt,     NULL }
 };
 
 void hive_log_init(HiveLogLevel level, const char *log_file,

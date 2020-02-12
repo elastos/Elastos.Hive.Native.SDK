@@ -44,14 +44,14 @@ int ipfs_suite_init()
 {
     int i;
 
-    HiveRpcNode *nodes = calloc(1, sizeof(HiveRpcNode) * global_config.ipfs_rpc_nodes_sz);
+    IPFSNode *nodes = calloc(1, sizeof(IPFSNode) * global_config.ipfs_rpc_nodes_sz);
     if (!nodes) {
         CU_FAIL("Error: test suite initialize error");
         return -1;
     }
 
     for (i = 0; i < global_config.ipfs_rpc_nodes_sz; ++i) {
-        HiveRpcNode *node = nodes + i;
+        IPFSNode *node = nodes + i;
 
         node->ipv4 = global_config.ipfs_rpc_nodes[i]->ipv4;
         node->ipv6 = global_config.ipfs_rpc_nodes[i]->ipv6;
