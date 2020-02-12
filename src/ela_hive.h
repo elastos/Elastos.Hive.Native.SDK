@@ -61,134 +61,712 @@ typedef ptrdiff_t ssize_t;
     #define HIVE_API
 #endif
 
-#define HIVE_MAX_FILE_SIZE (32U * 1024 * 1024)
-#define HIVE_MAX_IPFS_CID_LEN (64)
-
 typedef struct HiveClient HiveClient;
 typedef struct HiveConnect HiveConnect;
-typedef struct IPFSCid {
-    char content[HIVE_MAX_IPFS_CID_LEN + 1];
-} IPFSCid;
 
+/**
+ * \~English
+ * Various backends supported.
+ */
 enum HiveBackendType {
+    /**
+     * \~English
+     * IPFS.
+     */
     HiveBackendType_IPFS      = 0x01,
+
+    /**
+     * \~English
+     * OneDrive.
+     */
     HiveBackendType_OneDrive  = 0x10,
+
+    /**
+     * \~English
+     * OwnCloud(not implemented).
+     */
     HiveBackendType_ownCloud  = 0x51,
-    HiveDriveType_Butt        = 0x99
+
+    /**
+     * \~English
+     * End of backend types(not a valid type).
+     */
+    HiveBackendType_Butt        = 0x99
 };
 
+/**
+ * \~English
+ * Max single value length in a key:value(s) pair.
+ */
+#define HIVE_MAX_VALUE_LEN (32U * 1024)
+
+/**
+ * \~English
+ * Max file size to be stored in the backend.
+ */
+#define HIVE_MAX_FILE_SIZE (32U * 1024 * 1024)
+
+/**
+ * \~English
+ * Max IPFS CID length.
+ */
+#define HIVE_MAX_IPFS_CID_LEN (64)
+
+/******************************************************************************
+ * Log configuration.
+ *****************************************************************************/
+
+/**
+ * \~English
+ * Hive log level to control or filter log output.
+ */
 typedef enum HiveLogLevel {
-    HiveLogLevel_None    = 0,
-    HiveLogLevel_Fatal   = 1,
-    HiveLogLevel_Error   = 2,
+    /**
+     * \~English
+     * Log level None
+     * Indicate disable log output.
+     */
+    HiveLogLevel_None = 0,
+    /**
+     * \~English
+     * Log level fatal.
+     * Indicate output log with level 'Fatal' only.
+     */
+    HiveLogLevel_Fatal = 1,
+    /**
+     * \~English
+     * Log level error.
+     * Indicate output log above 'Error' level.
+     */
+    HiveLogLevel_Error = 2,
+    /**
+     * \~English
+     * Log level warning.
+     * Indicate output log above 'Warning' level.
+     */
     HiveLogLevel_Warning = 3,
-    HiveLogLevel_Info    = 4,
-    HiveLogLevel_Debug   = 5,
-    HiveLogLevel_Trace   = 6,
+    /**
+     * \~English
+     * Log level info.
+     * Indicate output log above 'Info' level.
+     */
+    HiveLogLevel_Info = 4,
+    /**
+     * \~English
+     * Log level debug.
+     * Indicate output log above 'Debug' level.
+     */
+    HiveLogLevel_Debug = 5,
+    /**
+     * \~English
+     * Log level trace.
+     * Indicate output log above 'Trace' level.
+     */
+    HiveLogLevel_Trace = 6,
+    /**
+     * \~English
+     * Log level verbose.
+     * Indicate output log above 'Verbose' level.
+     */
     HiveLogLevel_Verbose = 7
 } HiveLogLevel;
 
-#define HIVE_MAX_VALUE_LEN (32U * 1024)
-
+/**
+ * \~English
+ * Initialize log options for Hive.
+ * If this API is never called, the default log level is 'Info'; The default log
+ * file is stdout.
+ *
+ * @param
+ *      level       [in] The log level to control internal log output.
+ * @param
+ *      log_file    [in] the log file name.
+ *                       If the log_file is NULL, Hive will not write
+ *                       log to file.
+ * @param
+ *      log_printer [in] the user defined log printer. Can be NULL.
+ */
 HIVE_API
 void hive_log_init(HiveLogLevel level, const char *log_file,
                    void (*log_printer)(const char *format, va_list args));
 
+/******************************************************************************
+ * Type definitions of all options.
+ *****************************************************************************/
+
+/**
+ * \~English
+ * Global options.
+ */
 typedef struct HiveOptions {
+    /**
+     * \~English
+     * The path to a directory where persistent data stores.
+     */
     char *data_location;
 } HiveOptions;
 
+/**
+ * \~English
+ * Common part of options that all types of connections share.
+ */
 typedef struct HiveConnectOptions {
+    /**
+     * \~English
+     * Specifies the backend type of the connection.
+     */
     int backendType;
 } HiveConnectOptions;
 
+/**
+ * \~English
+ * User defined function to open authentication URL during Oauth2 authorization process.
+ *
+ * @param
+ *      url         [in] Authentication URL to be opened.
+ * @param
+ *      context     [in] User data.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1.
+ */
 typedef int HiveRequestAuthenticationCallback(const char *url, void *context);
 
+/**
+ * \~English
+ * The OneDrive connection options.
+ */
 typedef struct OneDriveConnectOptions {
+    /**
+     * \~English
+     * Specifies the backend type of the connection.
+     */
     int backendType;
+
+    /**
+     * \~English
+     * The Client ID OneDrive assigns to the app.
+     */
     const char *client_id;
+
+    /**
+     * \~English
+     * The scope the app acquires from the delegated user.
+     * Hive APIs require Files.ReadWrite.AppFolder scope.
+     */
     const char *scope;
+
+    /**
+     * \~English
+     * The redirect URL where the client gets the authorization code.
+     */
     const char *redirect_url;
 
+    /**
+     * \~English
+     * Callback to open Oauth2 authorization URL.
+     */
     HiveRequestAuthenticationCallback *callback;
+
+    /**
+     * \~English
+     * User data to be passed as context parameter to callback.
+     */
     void *context;
 } OneDriveConnectOptions;
 
-typedef struct HiveRpcNode {
+/**
+ * \~English
+ * The IPFS node.
+ */
+typedef struct IPFSNode {
+    /**
+     * \~English
+     * The ipv4 address.
+     */
     const char *ipv4;
-    const char *ipv6;
-    const char *port;
-} HiveRpcNode;
 
+    /**
+     * \~English
+     * The ipv6 address.
+     */
+    const char *ipv6;
+
+    /**
+     * \~English
+     * TCP service port.
+     */
+    const char *port;
+} IPFSNode;
+
+/**
+ * \~English
+ * The IPFS connection options.
+ */
 typedef struct IPFSConnectOptions {
+    /**
+     * \~English
+     * Specifies the backend type of the connection.
+     */
     int backendType;
+
+    /**
+     * \~English
+     * The count of IPFS RPC nodes.
+     */
     size_t rpc_node_count;
-    HiveRpcNode *rpcNodes;
+
+    /**
+     * \~English
+     * The array of addresses of IPFS RPC nodes.
+     */
+    IPFSNode *rpcNodes;
 } IPFSConnectOptions;
 
+/******************************************************************************
+ * Client APIs
+ *****************************************************************************/
+
+/**
+ * \~English
+ * Create a Hive client instance where all connection instances are created.
+ *
+ * @param
+ *      options     [in] A pointer to a valid Options structure.
+ *
+ * @return
+ *      If no error occurs, return the pointer of Hive client instance.
+ *      Otherwise, return NULL, and a specific error code can be
+ *      retrieved by calling hive_get_error().
+ */
 HIVE_API
 HiveClient *hive_client_new(const HiveOptions *options);
 
+/**
+ * \~English
+ * Close the Hive client instance.
+ *
+ * @param
+ *      client      [in] A handle identifying the Hive client instance.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 int hive_client_close(HiveClient *client);
 
+/******************************************************************************
+ * Connection APIs
+ *****************************************************************************/
+
+/**
+ * \~English
+ * Connect to a specific backend. Credentials are loaded from persistent location
+ * configured to the client instance passed.
+ *
+ * @param
+ *      client      [in] A client instance.
+ * @param
+ *      options     [in] A pointer to a valid Options structure of the backend.
+ *
+ * @return
+ *      If no error occurs, return the pointer of Hive connect instance.
+ *      Otherwise, return NULL, and a specific error code can be
+ *      retrieved by calling hive_get_error().
+ */
 HIVE_API
 HiveConnect *hive_client_connect(HiveClient *client, HiveConnectOptions *options);
 
+/**
+ * \~English
+ * Disconnect from the backend.
+ *
+ * @param
+ *      connect     [in] A connect instance.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 int hive_client_disconnect(HiveConnect *connect);
 
+/**
+ * \~English
+ * Set the encrypt key.
+ *
+ * @param
+ *      connect     [in] A connect instance.
+ * @param
+ *      encrypt_key [in] Encrypt key.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 int hive_set_encrypt_key(HiveConnect *connect, const char *encrypt_key);
 
+/**
+ * \~English
+ * Upload a file to the backend.
+ *
+ * @param
+ *      connect     [in] A connect instance.
+ * @param
+ *      from        [in] Source file path.
+ * @param
+ *      encrypt     [in] Whether to encrypt the file.
+ * @param
+ *      filename    [in] Destination file name.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 int hive_put_file(HiveConnect *connect, const char *from, bool encrypt, const char *filename);
 
+/**
+ * \~English
+ * Upload buffer content to a file in the backend.
+ *
+ * @param
+ *      connect     [in] A connect instance.
+ * @param
+ *      from        [in] A pointer to buffer.
+ * @param
+ *      length      [in] Length of the buffer.
+ * @param
+ *      encrypt     [in] Whether to encrypt the buffer content.
+ * @param
+ *      filename    [in] Destination file name.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 int hive_put_file_from_buffer(HiveConnect *connect, const void *from, size_t length, bool encrypt, const char *filename);
 
+/**
+ * \~English
+ * Get the length of a file in the backend.
+ *
+ * @param
+ *      connect    [in] A connect instance.
+ * @param
+ *      filename   [in] File name.
+ *
+ * @return
+ *      If no error occurs, return the length of the file. Otherwise, return -1, and a
+ *      specific error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 ssize_t hive_get_file_length(HiveConnect *connect, const char *filename);
 
+/**
+ * \~English
+ * Download a file in the backend to buffer.
+ *
+ * @param
+ *      connect    [in] A connect instance.
+ * @param
+ *      filename   [in] File name.
+ * @param
+ *      decrypt    [in] Whether to decrypt file content.
+ * @param
+ *      to         [in] A pointer to buffer.
+ * @param
+ *      buflen     [in] Length of the buffer.
+ *
+ * @return
+ *      If no error occurs, return the length of the file. Otherwise, return -1,
+ *      and a specific error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 ssize_t hive_get_file_to_buffer(HiveConnect *connect, const char *filename, bool decrypt, void *to, size_t buflen);
 
+/**
+ * \~English
+ * Download a file in the backend.
+ *
+ * @param
+ *      connect    [in] A connect instance.
+ * @param
+ *      filename   [in] Source file name.
+ * @param
+ *      decrypt    [in] Whether to decrypt file content.
+ * @param
+ *      to         [in] Destination file path.
+ *
+ * @return
+ *      If no error occurs, return the length of the file. Otherwise, return -1,
+ *      and a specific error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 ssize_t hive_get_file(HiveConnect *connect, const char *filename, bool decrypt, const char *to);
 
+/**
+ * \~English
+ * Delete a file from the backend.
+ *
+ * @param
+ *      connect    [in] A connect instance.
+ * @param
+ *      filename   [in] file name.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 int hive_delete_file(HiveConnect *connect, const char *filename);
 
+/**
+ * \~English
+ * An application-defined function that iterate the each file in the backend.
+ *
+ * @param
+ *      filename    [in] File name.
+ * @param
+ *      context     [in] The application-defined context data.
+ *
+ * @return
+ *      Return true to continue iteration, false to abort from iteration
+ *      immediately.
+ */
 typedef bool HiveFilesIterateCallback(const char *filename, void *context);
+
+/**
+ * \~English
+ * List all files in the backend.
+ *
+ * @param
+ *      connect    [in] A connect instance.
+ * @param
+ *      callback   [in] An application-defined function to iterate each file.
+ * @param
+ *      context    [in] The application defined context data.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 int hive_list_files(HiveConnect *connect, HiveFilesIterateCallback *callback, void *context);
 
+/**
+ * \~English
+ * IPFS CID type.
+ */
+typedef struct IPFSCid {
+    /**
+     * \~English
+     * CID string.
+     */
+    char content[HIVE_MAX_IPFS_CID_LEN + 1];
+} IPFSCid;
+
+/**
+ * \~English
+ * Upload a file to IPFS.
+ *
+ * @param
+ *      connect     [in] A connect instance.
+ * @param
+ *      from        [in] Source file path.
+ * @param
+ *      encrypt     [in] Whether to encrypt file content.
+ * @param
+ *      cid         [in] CID of uploaded file.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 int hive_ipfs_put_file(HiveConnect *connect, const char *from, bool encrypt, IPFSCid *cid);
 
+/**
+ * \~English
+ * Upload buffer content to IPFS.
+ *
+ * @param
+ *      connect     [in] A connect instance.
+ * @param
+ *      from        [in] A pointer to buffer.
+ * @param
+ *      length      [in] Length of the buffer.
+ * @param
+ *      encrypt     [in] Whether to encrypt buffer content.
+ * @param
+ *      cid         [in] CID of uploaded content.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 int hive_ipfs_put_file_from_buffer(HiveConnect *connect, const void *from, size_t length, bool encrypt, IPFSCid *cid);
 
+/**
+ * \~English
+ * Get the length of a file in IPFS.
+ *
+ * @param
+ *      connect    [in] A connect instance.
+ * @param
+ *      cid        [in] CID of the file.
+ *
+ * @return
+ *      If no error occurs, return the length of the file. Otherwise, return -1, and a
+ *      specific error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 ssize_t hive_ipfs_get_file_length(HiveConnect *connect, const IPFSCid *cid);
 
+/**
+ * \~English
+ * Download a file in IPFS to buffer.
+ *
+ * @param
+ *      connect    [in] A connect instance.
+ * @param
+ *      cid        [in] CID of the file.
+ * @param
+ *      decrypt    [in] Whether to decrypt file content.
+ * @param
+ *      to         [in] A pointer to buffer.
+ * @param
+ *      buflen     [in] Length of the buffer.
+ *
+ * @return
+ *      If no error occurs, return the length of the file. Otherwise, return -1,
+ *      and a specific error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 ssize_t hive_ipfs_get_file_to_buffer(HiveConnect *connect, const IPFSCid *cid,  bool decrypt, void *to, size_t bulen);
 
+/**
+ * \~English
+ * Download a file in IPFS.
+ *
+ * @param
+ *      connect    [in] A connect instance.
+ * @param
+ *      cid        [in] CID of the file.
+ * @param
+ *      decrypt    [in] Whether to decrypt file content.
+ * @param
+ *      to         [in] Destination file path.
+ *
+ * @return
+ *      If no error occurs, return the length of the file. Otherwise, return -1,
+ *      and a specific error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 ssize_t hive_ipfs_get_file(HiveConnect *connect, const IPFSCid *cid, bool decrypt, const char *to);
 
+/**
+ * \~English
+ * Append value to the specified key.
+ *
+ * @param
+ *      connect    [in] A connect instance.
+ * @param
+ *      key        [in] Key.
+ * @param
+ *      value      [in] Value.
+ * @param
+ *      length     [in] Value length.
+ * @param
+ *      encrypt    [in] Whether to encrypt value.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 int hive_put_value(HiveConnect *connect, const char *key, const void *value, size_t length, bool encrypt);
 
+/**
+ * \~English
+ * Overwrite value of the specified key with specified value.
+ *
+ * @param
+ *      connect    [in] A connect instance.
+ * @param
+ *      key        [in] Key.
+ * @param
+ *      value      [in] Value.
+ * @param
+ *      length     [in] Value length.
+ * @param
+ *      encrypt    [in] Whether to encrypt value.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 int hive_set_value(HiveConnect *connect, const char *key, const void *value, size_t length, bool encrypt);
 
+/**
+ * \~English
+ * An application-defined function that iterate the each value of a specific key.
+ *
+ * @param
+ *      key         [in] Key.
+ * @param
+ *      value       [in] Value.
+ * @param
+ *      length      [in] Value length.
+ * @param
+ *      context     [in] The application-defined context data.
+ *
+ * @return
+ *      Return true to continue iteration, false to abort from iteration
+ *      immediately.
+ */
 typedef bool HiveKeyValuesIterateCallback(const char *key, const void *value, size_t length, void *context);
 
+/**
+ * \~English
+ * Get all values of a key.
+ *
+ * @param
+ *      connect    [in] A connect instance.
+ * @param
+ *      key        [in] Key.
+ * @param
+ *      decrypt    [in] Whether to decrypt value.
+ * @param
+ *      callback   [in] An application-defined function that iterate the each value.
+ * @param
+ *      context    [in] The application-defined context data.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 int hive_get_values(HiveConnect *connect, const char *key, bool decrypt, HiveKeyValuesIterateCallback *callback, void *context);
 
+/**
+ * \~English
+ * Delete key:value(s) pair.
+ *
+ * @param
+ *      connect    [in] A connect instance.
+ * @param
+ *      key        [in] The key to be deleted.
+ *
+ * @return
+ *      If no error occurs, return 0. Otherwise, return -1, and a specific
+ *      error code can be retrieved by calling hive_get_error().
+ */
 HIVE_API
 int hive_delete_key(HiveConnect *connect, const char *key);
 

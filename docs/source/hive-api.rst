@@ -4,65 +4,35 @@ Elastos Hive core APIs
 Constants
 ---------
 
-HIVE_MAX_USER_ID_LEN
-####################
-
-.. doxygendefine:: HIVE_MAX_USER_ID_LEN
-   :project: HiveAPI
-
-HIVE_MAX_USER_NAME_LEN
-######################
-
-.. doxygendefine:: HIVE_MAX_USER_NAME_LEN
-   :project: HiveAPI
-
-HIVE_MAX_PHONE_LEN
+HIVE_MAX_VALUE_LEN
 ##################
 
-.. doxygendefine:: HIVE_MAX_PHONE_LEN
+.. doxygendefine:: HIVE_MAX_VALUE_LEN
    :project: HiveAPI
 
-HIVE_MAX_EMAIL_LEN
+HIVE_MAX_FILE_SIZE
 ##################
 
-.. doxygendefine:: HIVE_MAX_EMAIL_LEN
+.. doxygendefine:: HIVE_MAX_FILE_SIZE
    :project: HiveAPI
 
-HIVE_MAX_REGION_LEN
-###################
-
-.. doxygendefine:: HIVE_MAX_REGION_LEN
-   :project: HiveAPI
-
-HIVE_MAX_DRIVE_ID_LEN
+HIVE_MAX_IPFS_CID_LEN
 #####################
 
-.. doxygendefine:: HIVE_MAX_DRIVE_ID_LEN
-   :project: HiveAPI
-
-HIVE_MAX_FILE_ID_LEN
-####################
-
-.. doxygendefine:: HIVE_MAX_FILE_ID_LEN
-   :project: HiveAPI
-
-HIVE_MAX_FILE_TYPE_LEN
-######################
-
-.. doxygendefine:: HIVE_MAX_FILE_TYPE_LEN
+.. doxygendefine:: HIVE_MAX_IPFS_CID_LEN
    :project: HiveAPI
 
 Data types
 ----------
 
 HiveLogLevel
-###########
+############
 
 .. doxygenenum:: HiveLogLevel
    :project: HiveAPI
 
 HiveBackendType
-#############
+###############
 
 .. doxygenenum:: HiveBackendType
    :project: HiveAPI
@@ -74,45 +44,10 @@ HiveOptions
    :project: HiveAPI
    :members:
 
-OneDriveConnectOptions
-###############
+HiveConnectOptions
+##################
 
-.. doxygenstruct:: OneDriveConnectOptions
-   :project: HiveAPI
-   :members:
-
-HiveRpcNode
-###########
-
-.. doxygenstruct:: HiveRpcNode
-   :project: HiveAPI
-   :members:
-
-IPFSConnectOptions
-###########
-
-.. doxygenstruct:: IPFSConnectOptions
-   :project: HiveAPI
-   :members:
-
-HiveClientInfo
-##############
-
-.. doxygenstruct:: HiveClientInfo
-   :project: HiveAPI
-   :members:
-
-HiveDriveInfo
-#############
-
-.. doxygenstruct:: HiveDriveInfo
-   :project: HiveAPI
-   :members:
-
-HiveFileInfo
-############
-
-.. doxygenstruct:: HiveFileInfo
+.. doxygenstruct:: HiveConnectOptions
    :project: HiveAPI
    :members:
 
@@ -122,10 +57,24 @@ HiveRequestAuthenticationCallback
 .. doxygentypedef:: HiveRequestAuthenticationCallback
    :project: HiveAPI
 
-KeyValue
+OneDriveConnectOptions
+######################
+
+.. doxygenstruct:: OneDriveConnectOptions
+   :project: HiveAPI
+   :members:
+
+IPFSNode
 ########
 
-.. doxygenstruct:: KeyValue
+.. doxygenstruct:: IPFSNode
+   :project: HiveAPI
+   :members:
+
+IPFSConnectOptions
+##################
+
+.. doxygenstruct:: IPFSConnectOptions
    :project: HiveAPI
    :members:
 
@@ -135,10 +84,17 @@ HiveFilesIterateCallback
 .. doxygentypedef:: HiveFilesIterateCallback
    :project: HiveAPI
 
-Whence
-######
+IPFSCid
+#######
 
-.. doxygenenum:: Whence
+.. doxygenstruct:: IPFSCid
+   :project: HiveAPI
+   :members:
+
+HiveKeyValuesIterateCallback
+############################
+
+.. doxygentypedef:: HiveKeyValuesIterateCallback
    :project: HiveAPI
 
 Functions
@@ -159,131 +115,128 @@ hive_cient_close
 .. doxygenfunction:: hive_client_close
    :project: HiveAPI
 
-hive_client_login
-~~~~~~~~~~~~~~~~~
+Connect instance functions
+##########################
 
-.. doxygenfunction:: hive_client_login
-   :project: HiveAPI
-
-hive_client_logout
-~~~~~~~~~~~~~~~~~~
-
-.. doxygenfunction:: hive_client_logout
-   :project: HiveAPI
-
-hive_client_get_info
-~~~~~~~~~~~~~~~~~~~~
-
-.. doxygenfunction:: hive_client_get_info
-   :project: HiveAPI
-
-Drive instance functions
-########################
-
-hive_drive_open
-~~~~~~~~~~~~~~~
-
-.. doxygenfunction:: hive_drive_open
-   :project: HiveAPI
-
-hive_drive_close
-~~~~~~~~~~~~~~~~
-
-.. doxygenfunction:: hive_drive_close
-   :project: HiveAPI
-
-hive_drive_get_info
+hive_client_connect
 ~~~~~~~~~~~~~~~~~~~
 
-.. doxygenfunction:: hive_drive_get_info
+.. doxygenfunction:: hive_client_connect
    :project: HiveAPI
 
-hive_drive_list_files
-~~~~~~~~~~~~~~~~~~~~~
-
-.. doxygenfunction:: hive_drive_list_files
-   :project: HiveAPI
-
-hive_drive_mkdir
-~~~~~~~~~~~~~~~~
-
-.. doxygenfunction:: hive_drive_mkdir
-   :project: HiveAPI
-
-hive_drive_move_file
-~~~~~~~~~~~~~~~~~~~~
-
-.. doxygenfunction:: hive_drive_move_file
-   :project: HiveAPI
-
-hive_drive_copy_file
-~~~~~~~~~~~~~~~~~~~~
-
-.. doxygenfunction:: hive_drive_copy_file
-   :project: HiveAPI
-
-hive_drive_delete_file
+hive_client_disconnect
 ~~~~~~~~~~~~~~~~~~~~~~
 
-.. doxygenfunction:: hive_drive_delete_file
+.. doxygenfunction:: hive_client_disconnect
    :project: HiveAPI
 
-hive_drive_file_stat
+hive_set_encrypt_key
 ~~~~~~~~~~~~~~~~~~~~
 
-.. doxygenfunction:: hive_drive_file_stat
+.. doxygenfunction:: hive_set_encrypt_key
    :project: HiveAPI
 
-File instance functions
-#######################
+hive_put_file
+~~~~~~~~~~~~~
 
-hive_file_open
-~~~~~~~~~~~~~~
-
-.. doxygenfunction:: hive_file_open
+.. doxygenfunction:: hive_put_file
    :project: HiveAPI
 
-hive_file_close
-~~~~~~~~~~~~~~~
+hive_put_file_from_buffer
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. doxygenfunction:: hive_file_close
+.. doxygenfunction:: hive_put_file_from_buffer
    :project: HiveAPI
 
-hive_file_seek
-~~~~~~~~~~~~~~
+hive_get_file_length
+~~~~~~~~~~~~~~~~~~~~
 
-.. doxygenfunction:: hive_file_seek
+.. doxygenfunction:: hive_get_file_length
    :project: HiveAPI
 
-hive_file_read
-~~~~~~~~~~~~~~
+hive_get_file_to_buffer
+~~~~~~~~~~~~~~~~~~~~~~~
 
-.. doxygenfunction:: hive_file_read
+.. doxygenfunction:: hive_get_file_to_buffer
    :project: HiveAPI
 
-hive_file_write
-~~~~~~~~~~~~~~~
+hive_get_file
+~~~~~~~~~~~~~
 
-.. doxygenfunction:: hive_file_write
+.. doxygenfunction:: hive_get_file
    :project: HiveAPI
 
-hive_file_commit
+hive_delete_file
 ~~~~~~~~~~~~~~~~
 
-.. doxygenfunction:: hive_file_commit
+.. doxygenfunction:: hive_delete_file
    :project: HiveAPI
 
-hive_file_discard
-~~~~~~~~~~~~~~~~~
+hive_list_files
+~~~~~~~~~~~~~~~
 
-.. doxygenfunction:: hive_file_discard
+.. doxygenfunction:: hive_list_files
+   :project: HiveAPI
+
+hive_ipfs_put_file
+~~~~~~~~~~~~~~~~~~
+
+.. doxygenfunction:: hive_ipfs_put_file
+   :project: HiveAPI
+
+hive_ipfs_put_file_from_buffer
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. doxygenfunction:: hive_ipfs_put_file_from_buffer
+   :project: HiveAPI
+
+hive_ipfs_get_file_length
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. doxygenfunction:: hive_ipfs_get_file_length
+   :project: HiveAPI
+
+hive_ipfs_get_file_to_buffer
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. doxygenfunction:: hive_ipfs_get_file_to_buffer
+   :project: HiveAPI
+
+hive_ipfs_get_file
+~~~~~~~~~~~~~~~~~~
+
+.. doxygenfunction:: hive_ipfs_get_file
+   :project: HiveAPI
+
+hive_put_value
+~~~~~~~~~~~~~~
+
+.. doxygenfunction:: hive_put_value
+   :project: HiveAPI
+
+hive_set_value
+~~~~~~~~~~~~~~
+
+.. doxygenfunction:: hive_set_value
+   :project: HiveAPI
+
+hive_get_values
+~~~~~~~~~~~~~~~
+
+.. doxygenfunction:: hive_get_values
+   :project: HiveAPI
+
+hive_delete_key
+~~~~~~~~~~~~~~~
+
+.. doxygenfunction:: hive_delete_key
    :project: HiveAPI
 
 Utility functions
 #################
 
 hive_log_init
-~~~~~~~~~~~~
+~~~~~~~~~~~~~
 
 .. doxygenfunction:: hive_log_init
    :project: HiveAPI
