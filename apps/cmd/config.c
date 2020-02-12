@@ -89,7 +89,7 @@ static void qualified_path(const char *path, const char *ref, char *qualified)
 
 static void rpc_node_destructor(void *obj)
 {
-    HiveRpcNode *node = (HiveRpcNode *)obj;
+    IPFSNode *node = (IPFSNode *)obj;
 
     if (!node)
         return;
@@ -170,7 +170,7 @@ cmd_cfg_t *load_config(const char *config_file)
     }
 
     config->ipfs_rpc_nodes_sz = entries;
-    config->ipfs_rpc_nodes = (HiveRpcNode **)calloc(1, entries * sizeof(HiveRpcNode *));
+    config->ipfs_rpc_nodes = (IPFSNode **)calloc(1, entries * sizeof(IPFSNode *));
     if (!config->ipfs_rpc_nodes) {
         fprintf(stderr, "Out of memory.\n");
         config_destroy(&cfg);
@@ -179,9 +179,9 @@ cmd_cfg_t *load_config(const char *config_file)
     }
 
     for (i = 0; i < entries; i++) {
-        HiveRpcNode *node;
+        IPFSNode *node;
 
-        node = rc_zalloc(sizeof(HiveRpcNode), rpc_node_destructor);
+        node = rc_zalloc(sizeof(IPFSNode), rpc_node_destructor);
         if (!node) {
             fprintf(stderr, "Out of memory.\n");
             config_destroy(&cfg);

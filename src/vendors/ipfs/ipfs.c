@@ -354,7 +354,7 @@ HiveConnect *ipfs_client_connect(HiveClient *client, const HiveConnectOptions *o
 
     token_options->rpc_nodes_count = options->rpc_node_count;
     for (i = 0; i < options->rpc_node_count; ++i) {
-        HiveRpcNode *node = &options->rpcNodes[i];
+        IPFSNode *node = &options->rpcNodes[i];
         rpc_node_t *node_options = &token_options->rpc_nodes[i];
         size_t ipv4_len;
         size_t ipv6_len;

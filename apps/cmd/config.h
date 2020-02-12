@@ -34,7 +34,7 @@ typedef struct {
     char *data_location;
 
     int ipfs_rpc_nodes_sz;
-    HiveRpcNode **ipfs_rpc_nodes;
+    IPFSNode **ipfs_rpc_nodes;
 } cmd_cfg_t;
 
 cmd_cfg_t *load_config(const char *config_file);

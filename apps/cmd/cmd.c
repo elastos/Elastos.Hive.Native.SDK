@@ -241,14 +241,14 @@ static void client_connect(ctx_t *ctx, int argc, char **argv)
         cmd_cfg_t *cfg = ctx->cfg;
         int i;
 
-        HiveRpcNode *nodes = calloc(1, sizeof(HiveRpcNode) * cfg->ipfs_rpc_nodes_sz);
+        IPFSNode *nodes = calloc(1, sizeof(IPFSNode) * cfg->ipfs_rpc_nodes_sz);
         if (!nodes) {
             console("create HiveConnect instance failure.\n");
             return;
         }
 
         for (i = 0; i < cfg->ipfs_rpc_nodes_sz; ++i) {
-            HiveRpcNode *node = nodes + i;
+            IPFSNode *node = nodes + i;
 
             node->ipv4 = cfg->ipfs_rpc_nodes[i]->ipv4;
             node->ipv6 = cfg->ipfs_rpc_nodes[i]->ipv6;
