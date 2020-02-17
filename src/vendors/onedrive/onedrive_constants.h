@@ -29,8 +29,8 @@
 
 #define MY_DRIVE    "https://graph.microsoft.com/v1.0/me/drive"
 #define APP_ROOT    MY_DRIVE"/special/approot"
-#define FILES_DIR   "/files"
-#define KEYS_DIR    "/keys"
+#define FILES_DIR   "/Files"
+#define KEYS_DIR    "/KeyValues"
 
 #define METHOD_AUTHORIZE "authorize"
 #define METHOD_TOKEN     "token"
