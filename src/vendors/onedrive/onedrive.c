@@ -148,8 +148,78 @@ static int expire_token(HiveConnect *base)
     return 0;
 }
 
-static int __upload_empty_file(OneDriveConnect *connect, http_client_t *httpc,
-                               const char *file_path)
+static char *__build_create_folder_request_body(const char *fname)
+{
+    cJSON *body;
+    char *body_str;
+
+    body = cJSON_CreateObject();
+    if (!body)
+        return NULL;
+
+    if (!cJSON_AddStringToObject(body, "name", fname) ||
+        !cJSON_AddObjectToObject(body, "folder")) {
+        cJSON_Delete(body);
+        return NULL;
+    }
+
+    body_str = cJSON_PrintUnformatted(body);
+    cJSON_Delete(body);
+
+    return body_str;
+}
+
+static int __create_folder(OneDriveConnect *connect, http_client_t *httpc,
+                           const char *path)
+{
+    char url[MAX_URL_LEN] = {0};
+    char path_tmp[PATH_MAX];
+    char path_buf[PATH_MAX];
+    long resp_code = 0;
+    char *body;
+    char *dir;
+    int rc;
+
+    strcpy(path_buf, path);
+    strcpy(path_tmp, path);
+    dir = dirname(path_tmp);
+    if (!strcmp(dir, "/"))
+        sprintf(url, "%s/children", APP_ROOT);
+    else
+        sprintf(url, "%s:%s:/children", APP_ROOT, dir);
+
+    body = __build_create_folder_request_body(basename(path_buf));
+    if (!body)
+        return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
+
+    http_client_set_url(httpc, url);
+    http_client_set_method(httpc, HTTP_METHOD_POST);
+    http_client_set_header(httpc, "Content-Type", "application/json");
+    http_client_set_header(httpc, "Authorization", get_bearer_token(connect->token));
+    http_client_set_request_body_instant(httpc, body, strlen(body));
+
+    rc = http_client_request(httpc);
+    free(body);
+    if (rc)
+        return HIVE_CURL_ERROR(rc);
+
+    rc = http_client_get_response_code(httpc, &resp_code);
+    if (rc)
+        return HIVE_CURL_ERROR(rc);
+
+    if (resp_code == HttpStatus_Unauthorized) {
+        oauth_token_set_expired(connect->token);
+        return HIVE_GENERAL_ERROR(HIVEERR_TRY_AGAIN);
+    }
+
+    if (resp_code != HttpStatus_Created && resp_code != HttpStatus_OK)
+        return HIVE_HTTP_STATUS_ERROR(resp_code);
+
+    return 0;
+}
+
+static int __upload_file(OneDriveConnect *connect, http_client_t *httpc,
+                         const char *file_path, const void *from, size_t length)
 {
     char url[MAX_URL_LEN] = {0};
     long resp_code = 0;
@@ -160,7 +230,7 @@ static int __upload_empty_file(OneDriveConnect *connect, http_client_t *httpc,
     http_client_set_url(httpc, url);
     http_client_set_method(httpc, HTTP_METHOD_PUT);
     http_client_set_header(httpc, "Authorization", get_bearer_token(connect->token));
-    http_client_set_request_body_instant(httpc, NULL, 0);
+    http_client_set_request_body_instant(httpc, length ? from : NULL, length);
 
     rc = http_client_request(httpc);
     if (rc)
@@ -281,7 +351,9 @@ static int __put_file_from_buffer(OneDriveConnect *connect,
                                   const char *path)
 {
     char url[MAX_URL_LEN] = {0};
+    char path_tmp[PATH_MAX];
     http_client_t *httpc;
+    char *dir;
     int rc;
 
     rc = oauth_token_check_expire(connect->token);
@@ -292,11 +364,22 @@ static int __put_file_from_buffer(OneDriveConnect *connect,
     if (!httpc)
         return HIVE_GENERAL_ERROR(HIVEERR_OUT_OF_MEMORY);
 
-    if (!length) {
-        rc = __upload_empty_file(connect, httpc, path);
+    if (length <= 4 * 1024 * 1024) {
+        rc = __upload_file(connect, httpc, path, from, length);
         http_client_close(httpc);
         return rc;
     }
+
+    strcpy(path_tmp, path);
+    dir = dirname(path_tmp);
+
+    rc = __create_folder(connect, httpc, dir);
+    if (rc < 0) {
+        http_client_close(httpc);
+        return rc;
+    }
+
+    http_client_reset(httpc);
 
     rc = __create_upload_session(connect, httpc, path, url, sizeof(url));
     if (rc < 0) {
